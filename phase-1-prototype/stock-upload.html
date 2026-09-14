@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Upload — Greenfield Mart POS</title>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-role="admin">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="logo-mark">GM</div>
+      <div><div class="brand-name">Greenfield Mart</div><div class="brand-tag">Phase 1 &middot; Core Billing</div></div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="sidebar__section-label">Billing</div>
+      <a class="nav-link" href="pos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.4a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+        Billing
+      </a>
+      <a class="nav-link" href="hold-bills.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        Hold &amp; Recall
+      </a>
+      <a class="nav-link" href="returns.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Returns
+      </a>
+      <div class="sidebar__section-label">Inventory</div>
+      <a class="nav-link" href="items-stock.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l2-4h14l2 4M9 12h6"/></svg>
+        Items &amp; Stock
+      </a>
+      <a class="nav-link active" href="stock-upload.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        Stock Upload
+      </a>
+      <div class="sidebar__section-label">Insights</div>
+      <a class="nav-link" href="reports.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Reports
+      </a>
+      <div class="sidebar__section-label">Administration</div>
+      <a class="nav-link" href="discounts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 8-9 9-8-8V3a1 1 0 011-1h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        Discounts
+      </a>
+      <a class="nav-link" href="tax-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Tax Configuration
+      </a>
+      <a class="nav-link" href="users.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M16 14c2.8.3 5 2.6 5 6"/></svg>
+        Users &amp; Roles
+      </a>
+      <a class="nav-link" href="store-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.6 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+        Store Settings
+      </a>
+    </nav>
+    <div class="sidebar__footer">v2.0 &middot; Phase 1 prototype</div>
+  </aside>
+
+  <header class="topbar">
+    <div class="row">
+      <div class="role-switch">
+        <button data-role="cashier">Cashier</button>
+        <button data-role="admin" class="active">Admin</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="icon-btn" title="Lock screen" onclick="document.getElementById('lockOverlay').classList.add('open')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">AM</div>
+        <div>
+          <div class="text-sm user-chip-name" style="font-weight:600;line-height:1.2">Arjun M.</div>
+          <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">Admin &middot; Store Manager</div>
+        </div>
+      </div>
+      <a class="icon-btn" href="login.html" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">FR-P1-STK-001, 006</span>
+        <h1>Bulk Item &amp; Stock Upload</h1>
+        <p>Upload a CSV/Excel file to initialize or refresh stock. Nothing is committed until you review the preview below.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:var(--space-5)">
+      <div class="row-between wrap" style="gap:var(--space-4)">
+        <div class="row" style="gap:var(--space-4)">
+          <div style="width:52px;height:52px;border-radius:var(--radius-md);background:var(--primary-subtle);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--primary)"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+          </div>
+          <div>
+            <h3>Upload a CSV/Excel file</h3>
+            <p class="text-sm text-muted">Columns: sku, barcode, name, category, cost_price, selling_price, tax_rate, opening_qty</p>
+          </div>
+        </div>
+        <div class="row wrap" style="gap:var(--space-2)">
+          <a class="btn btn-secondary" href="assets/data/items.sample.csv" download>Download Template</a>
+          <button class="btn btn-secondary" onclick="loadSampleFile()">Load Sample File</button>
+          <label class="btn btn-primary" style="cursor:pointer">
+            Choose File
+            <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+          </label>
+        </div>
+      </div>
+      <p class="text-xs text-subtle" id="fileNameLabel" style="margin-top:var(--space-3)"></p>
+    </div>
+
+    <div class="card card-flush" id="previewSection" style="display:none">
+      <div class="card-header">
+        <h3>Preview Before Commit</h3>
+        <div class="row" style="gap:var(--space-2)">
+          <span class="badge badge-info"><span id="countNew">0</span> new</span>
+          <span class="badge badge-warning"><span id="countUpdate">0</span> qty update</span>
+          <span class="badge badge-danger"><span id="countError">0</span> errors</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th class="num">Price</th><th class="num">Qty</th><th>Result</th></tr></thead>
+          <tbody id="previewTbody"></tbody>
+        </table>
+      </div>
+      <div class="card-body row-between" style="border-top:1px solid var(--border)">
+        <p class="text-sm text-muted">Rows marked <strong>Error</strong> will be skipped automatically.</p>
+        <button class="btn btn-success btn-lg" id="commitBtn" onclick="commitUpload()">Commit Upload</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="lock-overlay" id="lockOverlay">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  <h2>Screen Locked</h2>
+  <p class="text-sm" style="color:var(--slate-400)">Idle timeout reached. Re-enter your PIN to continue.</p>
+  <input class="input input-lg" id="lockPinInput" type="password" maxlength="6" placeholder="••••" style="max-width:220px;text-align:center;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);color:#fff">
+  <button class="btn btn-primary btn-lg" onclick="unlockScreen()">Unlock</button>
+</div>
+
+<div class="toast-stack"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/upload.js"></script>
+</body>
+</html>

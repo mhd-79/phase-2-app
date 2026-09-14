@@ -1,0 +1,22 @@
+# Node & Angular
+node_modules/
+dist/
+.angular/
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Environment & IDE
+.env
+.idea/
+.vscode/
+
+# System
+Thumbs.db
+.DS_Store

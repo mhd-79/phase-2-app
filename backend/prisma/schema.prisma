@@ -1,0 +1,168 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+model User {
+  id           String     @id @default(uuid())
+  username     String     @unique
+  pin_hash     String
+  role         String     // "admin" | "cashier"
+  full_name    String
+  sub_text     String
+  is_active    Boolean    @default(true)
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
+  sales        Sale[]
+  returns      SaleReturn[]
+  held_bills   HeldBill[]
+  audit_logs   AuditLog[]
+}
+
+model Category {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  created_at DateTime @default(now())
+}
+
+model Item {
+  sku            String   @id
+  barcode        String
+  name           String
+  category_name  String
+  price          Float
+  wholesale_price Float?
+  cost_price     Float    @default(0.0)
+  tax_rate       Float
+  stock          Float
+  min_stock      Float    @default(10.0)
+  pricing_method String   @default("qty") // "qty" | "weight"
+  unit           String   @default("pcs") // "pcs" | "kg"
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+}
+
+model Discount {
+  id           String    @id @default(uuid())
+  name         String
+  type         String    // "percent" | "flat"
+  value        Float
+  applies_to   String    // "all" | "selected"
+  product_skus String    @default("[]") // JSON string of SKUs
+  start_date   String?
+  end_date     String?
+  status       String    @default("active") // "active" | "inactive"
+  created_at   DateTime  @default(now())
+}
+
+model Sale {
+  id                    String       @id @default(uuid())
+  invoice_no            String       @unique
+  created_by_username   String
+  created_by            User         @relation(fields: [created_by_username], references: [username])
+  time                  DateTime     @default(now())
+  pricing_mode          String       @default("exclusive") // "exclusive" | "inclusive"
+  subtotal_original     Float
+  auto_discount_total   Float
+  manual_discount_total Float
+  discount_total        Float
+  taxable_total         Float
+  gst_total             Float
+  grand_total           Float
+  status                String       @default("COMPLETED") // "COMPLETED" | "RETURNED" | "PARTIALLY_RETURNED"
+  created_at            DateTime     @default(now())
+  items                 SaleItem[]
+  tenders               SaleTender[]
+  returns               SaleReturn[]
+}
+
+model SaleItem {
+  id               String   @id @default(uuid())
+  sale_id          String
+  sale             Sale     @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+  sku              String
+  name             String
+  price            Float
+  tax_rate         Float
+  qty              Float
+  unit             String
+  pricing_method   String
+  original_amount  Float
+  discount_amount  Float
+  discount_name    String?
+  taxable_amount   Float
+  gst_amount       Float
+  final_amount     Float
+}
+
+model SaleTender {
+  id      String @id @default(uuid())
+  sale_id String
+  sale    Sale   @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+  mode    String // "Cash" | "Card" | "UPI"
+  amount  Float
+}
+
+model SaleReturn {
+  id                  String       @id @default(uuid())
+  return_no           String       @unique
+  invoice_no          String
+  sale_id             String
+  sale                Sale         @relation(fields: [sale_id], references: [id])
+  created_by_username String
+  created_by          User         @relation(fields: [created_by_username], references: [username])
+  time                DateTime     @default(now())
+  total_refund        Float
+  reason              String?
+  items               ReturnItem[]
+  created_at          DateTime     @default(now())
+}
+
+model ReturnItem {
+  id            String     @id @default(uuid())
+  return_id     String
+  return_record SaleReturn @relation(fields: [return_id], references: [id], onDelete: Cascade)
+  sku           String
+  qty           Float
+  refund_amount Float
+}
+
+model HeldBill {
+  id                  String   @id @default(uuid())
+  held_id             String   @unique
+  created_by_username String
+  created_by          User     @relation(fields: [created_by_username], references: [username])
+  time                DateTime @default(now())
+  lines_json          String
+  discount_json       String
+  item_count          Float
+  total               Float
+  created_at          DateTime @default(now())
+}
+
+model StoreSettings {
+  id                   String   @id @default("store_main")
+  store_name           String   @default("Greenfield Mart")
+  address              String   @default("12, MG Road, Bengaluru")
+  phone                String   @default("+91 98765 43210")
+  gstin                String   @default("29ABCDE1234F1Z5")
+  pricing_mode         String   @default("exclusive")
+  idle_timeout_seconds Int      @default(45)
+  updated_at           DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  username     String
+  user         User     @relation(fields: [username], references: [username])
+  action       String
+  details_json String?
+  timestamp    DateTime @default(now())
+}
