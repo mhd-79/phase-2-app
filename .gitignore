@@ -13,7 +13,6 @@ env/
 *.egg-info/
 
 # Environment & IDE
-.env
 .idea/
 .vscode/
 
