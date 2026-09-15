@@ -24,6 +24,8 @@ class UserSchema(BaseModel):
     sub_text: str = Field(..., description="Counter / role subtitle")
     auto_lock_minutes: int = Field(15, description="Auto-lock idle timeout in minutes")
     is_active: bool = Field(True, description="Account active status")
+    weekly_shifts: Optional[List['ShiftDayConfig']] = Field(None, description="Configured weekly shift schedule")
+    working_schedule: Optional[str] = Field(None, description="Formatted working schedule text")
 
 class UserCreate(BaseModel):
     username: str = Field(..., description="Unique username", example="sana.r")
@@ -32,6 +34,7 @@ class UserCreate(BaseModel):
     full_name: str = Field(..., description="Full name", example="Sana R.")
     sub_text: str = Field(..., description="Sub-text description", example="Cashier · Counter 3")
     auto_lock_minutes: int = Field(2, description="Auto-lock timeout in minutes", example=2)
+    shifts: Optional[List['ShiftDayConfig']] = Field(None, description="Weekly shift schedule")
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, description="Updated full name")
@@ -40,6 +43,7 @@ class UserUpdate(BaseModel):
     sub_text: Optional[str] = Field(None, description="Updated counter / role subtitle")
     auto_lock_minutes: Optional[int] = Field(None, description="Updated auto-lock timeout in minutes")
     is_active: Optional[bool] = Field(None, description="Updated active status")
+    shifts: Optional[List['ShiftDayConfig']] = Field(None, description="Updated weekly shift schedules")
 
 class PinVerifyRequest(BaseModel):
     pin: str = Field(..., description="Admin authorization PIN", example="9999")
