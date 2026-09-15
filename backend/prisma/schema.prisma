@@ -1,6 +1,6 @@
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -10,19 +10,22 @@ generator client {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  username     String     @unique
-  pin_hash     String
-  role         String     // "admin" | "cashier"
-  full_name    String
-  sub_text     String
-  is_active    Boolean    @default(true)
-  created_at   DateTime   @default(now())
-  updated_at   DateTime   @updatedAt
-  sales        Sale[]
-  returns      SaleReturn[]
-  held_bills   HeldBill[]
-  audit_logs   AuditLog[]
+  id                String       @id @default(uuid())
+  username          String       @unique
+  pin_hash          String
+  role              String       // "admin" | "cashier"
+  full_name         String
+  sub_text          String
+  auto_lock_minutes Int          @default(15)
+  is_active         Boolean      @default(true)
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  sales             Sale[]
+  returns           SaleReturn[]
+  held_bills        HeldBill[]
+  audit_logs        AuditLog[]
+  shift_schedules   UserShiftSchedule[]
+  leave_records     UserLeave[]
 }
 
 model Category {
@@ -166,3 +169,41 @@ model AuditLog {
   details_json String?
   timestamp    DateTime @default(now())
 }
+
+model CashCounter {
+  id            String   @id @default(uuid())
+  counter_name  String   @unique
+  opening_float Float    @default(2000.0)
+  counted_cash  Float?
+  notes         String?
+  is_active     Boolean  @default(true)
+  updated_at    DateTime @updatedAt
+}
+
+model UserShiftSchedule {
+  id          String   @id @default(uuid())
+  username    String
+  user        User     @relation(fields: [username], references: [username], onDelete: Cascade)
+  day_of_week String
+  is_working  Boolean  @default(true)
+  start_time  String   @default("09:00 AM")
+  end_time    String   @default("05:00 PM")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@unique([username, day_of_week])
+}
+
+model UserLeave {
+  id         String   @id @default(uuid())
+  username   String
+  user       User     @relation(fields: [username], references: [username], onDelete: Cascade)
+  leave_date String
+  reason     String
+  created_by String
+  created_at DateTime @default(now())
+
+  @@unique([username, leave_date])
+}
+
+

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List
 import json
 from app.schemas import DiscountSchema, DiscountCreate
@@ -7,7 +7,12 @@ from app.database import db
 
 router = APIRouter(prefix="/discounts", tags=["Discounts"])
 
-@router.get("", response_model=List[DiscountSchema])
+@router.get(
+    "",
+    response_model=List[DiscountSchema],
+    summary="List Active & Inactive Discount Rules",
+    description="Retrieves all configured promotional discount rules (flat or percentage), target product SKUs, and validity dates."
+)
 async def get_discounts():
     discounts = await db.discount.find_many()
     result = []
@@ -30,7 +35,13 @@ async def get_discounts():
         ))
     return result
 
-@router.post("", response_model=DiscountSchema)
+@router.post(
+    "",
+    response_model=DiscountSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Promotional Discount Rule",
+    description="Admin-only endpoint to create a new discount rule (flat amount or percentage rate) applying to all products or selected SKUs."
+)
 async def create_discount(req: DiscountCreate, user = Depends(require_admin)):
     d = await db.discount.create(data={
         "name": req.name,
@@ -48,7 +59,12 @@ async def create_discount(req: DiscountCreate, user = Depends(require_admin)):
         start_date=d.start_date, end_date=d.end_date, status=d.status
     )
 
-@router.put("/{discount_id}", response_model=DiscountSchema)
+@router.put(
+    "/{discount_id}",
+    response_model=DiscountSchema,
+    summary="Update Discount Rule",
+    description="Admin-only endpoint to update an existing discount rule configuration, percentage/flat value, status, or date range."
+)
 async def update_discount(discount_id: str, req: DiscountCreate, user = Depends(require_admin)):
     existing = await db.discount.find_unique(where={"id": discount_id})
     if not existing:
@@ -72,7 +88,11 @@ async def update_discount(discount_id: str, req: DiscountCreate, user = Depends(
         start_date=d.start_date, end_date=d.end_date, status=d.status
     )
 
-@router.delete("/{discount_id}")
+@router.delete(
+    "/{discount_id}",
+    summary="Delete Discount Rule",
+    description="Admin-only endpoint to permanently remove a promotional discount rule."
+)
 async def delete_discount(discount_id: str, user = Depends(require_admin)):
     existing = await db.discount.find_unique(where={"id": discount_id})
     if existing:

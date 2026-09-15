@@ -6,7 +6,12 @@ from app.database import db
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 
-@router.get("/store", response_model=StoreSettingsSchema)
+@router.get(
+    "/store",
+    response_model=StoreSettingsSchema,
+    summary="Get Store Profile Settings",
+    description="Retrieves store configuration including store name, address, contact phone, GSTIN number, pricing mode (exclusive/inclusive), and default idle timeout."
+)
 async def get_store_settings():
     store = await db.storesettings.find_unique(where={"id": "store_main"})
     if not store:
@@ -20,7 +25,12 @@ async def get_store_settings():
         idle_timeout_seconds=store.idle_timeout_seconds
     )
 
-@router.put("/store", response_model=StoreSettingsSchema)
+@router.put(
+    "/store",
+    response_model=StoreSettingsSchema,
+    summary="Update Store Profile Settings",
+    description="Admin-only endpoint to update store details, GSTIN, default tax pricing mode, and idle timeout."
+)
 async def update_store_settings(req: StoreSettingsUpdate, user = Depends(require_admin)):
     data = req.dict(exclude_unset=True)
     store = await db.storesettings.upsert(
@@ -36,7 +46,11 @@ async def update_store_settings(req: StoreSettingsUpdate, user = Depends(require
         idle_timeout_seconds=store.idle_timeout_seconds
     )
 
-@router.post("/backup")
+@router.post(
+    "/backup",
+    summary="Trigger Store Data Backup",
+    description="Admin-only endpoint to generate a manual local/cloud database backup snapshot of catalog items, transactions, users, and store configurations."
+)
 async def trigger_backup(user = Depends(require_admin)):
     items = await db.item.find_many()
     sales = await db.sale.find_many(include={"items": True, "tenders": True})

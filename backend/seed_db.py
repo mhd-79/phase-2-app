@@ -2,14 +2,17 @@ import asyncio
 import json
 from copy import deepcopy
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+load_dotenv()
+
 from app.database import db, connect_db, disconnect_db
 from app.security import get_pin_hash
 
 DEMO_USERS = [
-    {"username": "owner.arjun", "pin": "9999", "role": "admin", "full_name": "Arjun M.", "sub_text": "Admin · Store Manager", "is_active": True},
-    {"username": "priya.k", "pin": "1234", "role": "cashier", "full_name": "Priya K.", "sub_text": "Cashier · Counter 1", "is_active": True},
-    {"username": "ravi.s", "pin": "2345", "role": "cashier", "full_name": "Ravi S.", "sub_text": "Cashier · Counter 2", "is_active": True},
-    {"username": "meena.t", "pin": "3456", "role": "cashier", "full_name": "Meena T.", "sub_text": "Relief Cashier", "is_active": False}
+    {"username": "owner.arjun", "pin": "9999", "role": "admin", "full_name": "Arjun M.", "sub_text": "Admin · Store Manager", "auto_lock_minutes": 15, "is_active": True},
+    {"username": "priya.k", "pin": "1234", "role": "cashier", "full_name": "Priya K.", "sub_text": "Cashier · Counter 1", "auto_lock_minutes": 2, "is_active": True},
+    {"username": "ravi.s", "pin": "2345", "role": "cashier", "full_name": "Ravi S.", "sub_text": "Cashier · Counter 2", "auto_lock_minutes": 2, "is_active": True},
+    {"username": "meena.t", "pin": "3456", "role": "cashier", "full_name": "Meena T.", "sub_text": "Relief Cashier", "auto_lock_minutes": 2, "is_active": False}
 ]
 
 DEMO_CATEGORIES = [
@@ -205,12 +208,17 @@ DEMO_RETURNS = [
     }
 ]
 
+DEMO_COUNTERS = [
+    {"counter_name": "Counter 1 - Main Express", "opening_float": 2000.0, "notes": "Main checkout counter"},
+    {"counter_name": "Counter 2 - General", "opening_float": 1500.0, "notes": "Secondary counter"}
+]
+
 DEMO_AUDIT_LOGS = [
     {"username": "priya.k", "action": "Bill created", "details_json": json.dumps({"reference": "INV-FY26-01031"})},
     {"username": "priya.k", "action": "Bill completed", "details_json": json.dumps({"reference": "INV-FY26-01031"})},
     {"username": "owner.arjun", "action": "Discount approved (15%)", "details_json": json.dumps({"reference": "INV-FY26-00988"})},
     {"username": "owner.arjun", "action": "Return processed", "details_json": json.dumps({"reference": "INV-FY26-00988"})},
-    {"username": "ravi.s", "action": "Bill parked (hold)", "details_json": json.dumps({"reference": "HOLD-3341"})},
+    {"username": "ravi.s", "action": "Bill held", "details_json": json.dumps({"reference": "HOLD-3341"})},
     {"username": "ravi.s", "action": "Bill recalled & completed", "details_json": json.dumps({"reference": "INV-FY26-01032"})},
     {"username": "priya.k", "action": "Bill cancelled", "details_json": json.dumps({"reference": "INV-FY26-00962"})},
     {"username": "ravi.s", "action": "Return processed", "details_json": json.dumps({"reference": "INV-FY26-00910"})}
@@ -230,9 +238,14 @@ async def seed_all_sample_data(disconnect_at_end: bool = False):
                 "role": u["role"],
                 "full_name": u["full_name"],
                 "sub_text": u["sub_text"],
+                "auto_lock_minutes": u.get("auto_lock_minutes", 15),
                 "is_active": u["is_active"]
             })
             print(f"Created User: {u['username']}")
+        else:
+            await db.user.update(where={"username": u["username"]}, data={
+                "auto_lock_minutes": u.get("auto_lock_minutes", 15)
+            })
 
     # 2. Store Settings
     store = await db.storesettings.find_unique(where={"id": "store_main"})
@@ -301,14 +314,19 @@ async def seed_all_sample_data(disconnect_at_end: bool = False):
                 created_ret = await db.salereturn.create(data=return_record)
                 for r_item in items:
                     await db.returnitem.create(data={"return_id": created_ret.id, **r_item})
-                print(f"Created Return: {created_ret.return_no}")
-
     # 9. Audit Logs
     existing_logs_count = await db.auditlog.count()
     if existing_logs_count == 0:
         for log in DEMO_AUDIT_LOGS:
             await db.auditlog.create(data=log)
         print("Created Audit Logs")
+
+    # 10. Cash Counters
+    for cc in DEMO_COUNTERS:
+        existing_counter = await db.cashcounter.find_unique(where={"counter_name": cc["counter_name"]})
+        if not existing_counter:
+            await db.cashcounter.create(data=cc)
+            print(f"Created Cash Counter: {cc['counter_name']}")
 
     # Validate the complete fixture against the relationships used by the API.
     expected_skus = {item["sku"] for item in DEMO_CATALOG + DEMO_UPLOAD_ITEMS}

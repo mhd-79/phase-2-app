@@ -42,3 +42,29 @@ def test_manual_flat_discount():
     assert totals["discount_total"] == 20.0
     assert totals["taxable_total"] == 180.0
     assert totals["grand_total"] == 180.0
+
+def test_held_bill_schema_compatibility():
+    from app.schemas import HeldBillCreate
+    # Test camelCase itemCount
+    req1 = HeldBillCreate(
+        lines=[{"sku": "BEV-001", "qty": 2}],
+        itemCount=2.0,
+        total=90.0
+    )
+    assert req1.computed_item_count == 2.0
+
+    # Test snake_case item_count
+    req2 = HeldBillCreate(
+        lines=[{"sku": "BEV-001", "qty": 3}],
+        item_count=3.0,
+        total=135.0
+    )
+    assert req2.computed_item_count == 3.0
+
+    # Test fallback to lines length
+    req3 = HeldBillCreate(
+        lines=[{"sku": "BEV-001", "qty": 1}, {"sku": "BEV-002", "qty": 1}],
+        total=155.0
+    )
+    assert req3.computed_item_count == 2.0
+
