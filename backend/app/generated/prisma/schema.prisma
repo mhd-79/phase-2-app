@@ -1,0 +1,220 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+  output               = "../app/generated/prisma"
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  username           String              @unique
+  pin_hash           String
+  role               String // "admin" | "cashier"
+  full_name          String
+  sub_text           String
+  auto_lock_minutes  Int                 @default(15)
+  is_active          Boolean             @default(true)
+  created_at         DateTime            @default(now())
+  updated_at         DateTime            @updatedAt
+  sales              Sale[]
+  returns            SaleReturn[]
+  held_bills         HeldBill[]
+  audit_logs         AuditLog[]
+  shift_schedules    UserShiftSchedule[]
+  leave_records      UserLeave[]
+  pin_reset_requests PinResetRequest[]
+}
+
+model Category {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  created_at DateTime @default(now())
+}
+
+model Item {
+  sku             String   @id
+  barcode         String
+  name            String
+  category_name   String
+  price           Float
+  wholesale_price Float?
+  cost_price      Float    @default(0.0)
+  tax_rate        Float
+  stock           Float
+  min_stock       Float    @default(10.0)
+  pricing_method  String   @default("qty") // "qty" | "weight"
+  unit            String   @default("pcs") // "pcs" | "kg"
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+}
+
+model Discount {
+  id           String   @id @default(uuid())
+  name         String
+  type         String // "percent" | "flat"
+  value        Float
+  applies_to   String // "all" | "selected"
+  product_skus String   @default("[]") // JSON string of SKUs
+  start_date   String?
+  end_date     String?
+  status       String   @default("active") // "active" | "inactive"
+  created_at   DateTime @default(now())
+}
+
+model Sale {
+  id                    String       @id @default(uuid())
+  invoice_no            String       @unique
+  created_by_username   String
+  created_by            User         @relation(fields: [created_by_username], references: [username])
+  time                  DateTime     @default(now())
+  pricing_mode          String       @default("exclusive") // "exclusive" | "inclusive"
+  subtotal_original     Float
+  auto_discount_total   Float
+  manual_discount_total Float
+  discount_total        Float
+  taxable_total         Float
+  gst_total             Float
+  grand_total           Float
+  status                String       @default("COMPLETED") // "COMPLETED" | "RETURNED" | "PARTIALLY_RETURNED"
+  created_at            DateTime     @default(now())
+  items                 SaleItem[]
+  tenders               SaleTender[]
+  returns               SaleReturn[]
+}
+
+model SaleItem {
+  id              String  @id @default(uuid())
+  sale_id         String
+  sale            Sale    @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+  sku             String
+  name            String
+  price           Float
+  tax_rate        Float
+  qty             Float
+  unit            String
+  pricing_method  String
+  original_amount Float
+  discount_amount Float
+  discount_name   String?
+  taxable_amount  Float
+  gst_amount      Float
+  final_amount    Float
+}
+
+model SaleTender {
+  id      String @id @default(uuid())
+  sale_id String
+  sale    Sale   @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+  mode    String // "Cash" | "Card" | "UPI"
+  amount  Float
+}
+
+model SaleReturn {
+  id                  String       @id @default(uuid())
+  return_no           String       @unique
+  invoice_no          String
+  sale_id             String
+  sale                Sale         @relation(fields: [sale_id], references: [id])
+  created_by_username String
+  created_by          User         @relation(fields: [created_by_username], references: [username])
+  time                DateTime     @default(now())
+  total_refund        Float
+  reason              String?
+  items               ReturnItem[]
+  created_at          DateTime     @default(now())
+}
+
+model ReturnItem {
+  id            String     @id @default(uuid())
+  return_id     String
+  return_record SaleReturn @relation(fields: [return_id], references: [id], onDelete: Cascade)
+  sku           String
+  qty           Float
+  refund_amount Float
+}
+
+model HeldBill {
+  id                  String   @id @default(uuid())
+  held_id             String   @unique
+  created_by_username String
+  created_by          User     @relation(fields: [created_by_username], references: [username])
+  time                DateTime @default(now())
+  lines_json          String
+  discount_json       String
+  item_count          Float
+  total               Float
+  created_at          DateTime @default(now())
+}
+
+model StoreSettings {
+  id                   String   @id @default("store_main")
+  store_name           String   @default("Greenfield Mart")
+  address              String   @default("12, MG Road, Bengaluru")
+  phone                String   @default("+91 98765 43210")
+  gstin                String   @default("29ABCDE1234F1Z5")
+  pricing_mode         String   @default("exclusive")
+  idle_timeout_seconds Int      @default(45)
+  updated_at           DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  username     String
+  user         User     @relation(fields: [username], references: [username])
+  action       String
+  details_json String?
+  timestamp    DateTime @default(now())
+}
+
+model CashCounter {
+  id            String   @id @default(uuid())
+  counter_name  String   @unique
+  opening_float Float    @default(2000.0)
+  counted_cash  Float?
+  notes         String?
+  is_active     Boolean  @default(true)
+  updated_at    DateTime @updatedAt
+}
+
+model UserShiftSchedule {
+  id          String   @id @default(uuid())
+  username    String
+  user        User     @relation(fields: [username], references: [username], onDelete: Cascade)
+  day_of_week String
+  is_working  Boolean  @default(true)
+  start_time  String   @default("09:00 AM")
+  end_time    String   @default("05:00 PM")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@unique([username, day_of_week])
+}
+
+model UserLeave {
+  id         String   @id @default(uuid())
+  username   String
+  user       User     @relation(fields: [username], references: [username], onDelete: Cascade)
+  leave_date String
+  reason     String
+  created_by String
+  created_at DateTime @default(now())
+
+  @@unique([username, leave_date])
+}
+
+model PinResetRequest {
+  id           String    @id @default(uuid())
+  username     String
+  user         User      @relation(fields: [username], references: [username], onDelete: Cascade)
+  status       String    @default("PENDING") // "PENDING" | "RESOLVED" | "REJECTED"
+  reason       String?
+  requested_at DateTime  @default(now())
+  resolved_at  DateTime?
+  resolved_by  String?
+}
