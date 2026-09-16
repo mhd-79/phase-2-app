@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Returns & Exchanges — Greenfield Mart POS</title>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-role="admin">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="logo-mark">GM</div>
+      <div><div class="brand-name">Greenfield Mart</div><div class="brand-tag">Phase 1 &middot; Core Billing</div></div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="sidebar__section-label">Billing</div>
+      <a class="nav-link" href="pos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.4a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+        Billing
+      </a>
+      <a class="nav-link" href="hold-bills.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        Hold &amp; Recall
+      </a>
+      <a class="nav-link active" href="returns.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Returns
+      </a>
+      <div class="sidebar__section-label">Inventory</div>
+      <a class="nav-link" href="items-stock.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l2-4h14l2 4M9 12h6"/></svg>
+        Items &amp; Stock
+      </a>
+      <a class="nav-link" href="stock-upload.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        Stock Upload
+      </a>
+      <div class="sidebar__section-label">Insights</div>
+      <a class="nav-link" href="reports.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Reports
+      </a>
+      <div class="sidebar__section-label">Administration</div>
+      <a class="nav-link" href="discounts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 8-9 9-8-8V3a1 1 0 011-1h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        Discounts
+      </a>
+      <a class="nav-link" href="tax-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Tax Configuration
+      </a>
+      <a class="nav-link" href="users.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M16 14c2.8.3 5 2.6 5 6"/></svg>
+        Users &amp; Roles
+      </a>
+      <a class="nav-link" href="store-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.6 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+        Store Settings
+      </a>
+    </nav>
+    <div class="sidebar__footer">v2.0 &middot; Phase 1 prototype</div>
+  </aside>
+
+  <header class="topbar">
+    <div class="row">
+      <div class="role-switch">
+        <button data-role="cashier">Cashier</button>
+        <button data-role="admin" class="active">Admin</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="icon-btn" title="Lock screen" onclick="document.getElementById('lockOverlay').classList.add('open')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">PK</div>
+        <div>
+          <div class="text-sm user-chip-name" style="font-weight:600;line-height:1.2">Priya K.</div>
+          <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">Cashier &middot; Counter 1</div>
+        </div>
+      </div>
+      <a class="icon-btn" href="login.html" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">FR-P1-POS-008</span>
+        <h1>Returns &amp; Exchanges</h1>
+        <p>Look up a bill by invoice number, then process a full or partial return. Stock and refund are recorded automatically.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:var(--space-5)">
+      <div class="row wrap" style="gap:var(--space-3)">
+        <div class="field" style="flex:1;min-width:220px">
+          <label for="lookupInput">Invoice Number</label>
+          <input class="input input-lg" id="lookupInput" placeholder="e.g. INV-FY26-01025">
+        </div>
+        <button class="btn btn-primary btn-lg" style="align-self:flex-end" onclick="findBill()">Find Bill</button>
+      </div>
+    </div>
+
+    <div class="card card-flush" id="resultCard" style="display:none">
+      <div class="card-header">
+        <div>
+          <h3 id="resultInvoice">—</h3>
+          <p class="text-sm text-muted" id="resultMeta">—</p>
+        </div>
+        <span class="badge badge-info">Select lines to return</span>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th></th><th>Item</th><th class="num">Sold Qty</th><th class="num">Return Qty</th><th class="num">Unit Price</th><th class="num">Refund</th></tr></thead>
+          <tbody id="returnTbody"></tbody>
+        </table>
+      </div>
+      <div class="card-body stack" style="border-top:1px solid var(--border)">
+        <div class="form-grid">
+          <div class="field">
+            <label for="returnReason">Reason</label>
+            <select class="select" id="returnReason">
+              <option>Customer changed mind</option>
+              <option>Defective / damaged</option>
+              <option>Wrong item billed</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="refundMode">Refund Mode</label>
+            <select class="select" id="refundMode">
+              <option>Cash</option>
+              <option>Original payment mode</option>
+              <option>Store credit</option>
+            </select>
+          </div>
+        </div>
+        <div class="row-between">
+          <span class="text-sm text-muted">Total Refund</span>
+          <span class="mono" style="font-size:var(--text-xl);font-weight:700" id="refundTotal">₹0.00</span>
+        </div>
+        <button class="btn btn-danger btn-lg btn-block" onclick="processReturn()">Process Return</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="lock-overlay" id="lockOverlay">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  <h2>Screen Locked</h2>
+  <p class="text-sm" style="color:var(--slate-400)">Idle timeout reached. Re-enter your PIN to continue.</p>
+  <input class="input input-lg" id="lockPinInput" type="password" maxlength="6" placeholder="••••" style="max-width:220px;text-align:center;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);color:#fff">
+  <button class="btn btn-primary btn-lg" onclick="unlockScreen()">Unlock</button>
+</div>
+
+<div class="toast-stack"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  var currentBill = null;
+
+  function demoFallbackBill(invoiceNo) {
+    return {
+      invoiceNo: invoiceNo, time: new Date(Date.now() - 3600000).toISOString(),
+      lines: [
+        { sku: "BEV-001", name: "Cola 500ml", price: 45, tax: 12, qty: 3 },
+        { sku: "SNK-001", name: "Potato Chips 90g", price: 35, tax: 12, qty: 2 },
+        { sku: "DAI-003", name: "Paneer 200g", price: 90, tax: 5, qty: 1 }
+      ]
+    };
+  }
+
+  function findBill() {
+    var q = document.getElementById("lookupInput").value.trim();
+    if (!q) { showToast("Enter an invoice number", "warning"); return; }
+    var log = [];
+    try { log = JSON.parse(localStorage.getItem("pos_demo_sales_log") || "[]"); } catch (e) {}
+    currentBill = log.find(function (b) { return b.invoiceNo.toLowerCase() === q.toLowerCase(); }) || demoFallbackBill(q.toUpperCase());
+    renderBill();
+  }
+
+  function renderBill() {
+    document.getElementById("resultCard").style.display = "";
+    document.getElementById("resultInvoice").textContent = currentBill.invoiceNo;
+    document.getElementById("resultMeta").textContent = "Billed " + new Date(currentBill.time).toLocaleString();
+    var tbody = document.getElementById("returnTbody");
+    tbody.innerHTML = "";
+    currentBill.lines.forEach(function (l, idx) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td><input type="checkbox" checked data-ridx="' + idx + '" class="return-check"></td>' +
+        "<td>" + l.name + "</td>" +
+        '<td class="num">' + l.qty + "</td>" +
+        '<td class="num"><div class="qty-stepper" style="margin-left:auto"><button type="button" data-dec="' + idx + '">−</button><span id="rqty-' + idx + '">' + l.qty + '</span><button type="button" data-inc="' + idx + '">+</button></div></td>' +
+        '<td class="num mono">₹' + l.price.toFixed(2) + "</td>" +
+        '<td class="num mono" id="rline-' + idx + '">₹' + (l.price * l.qty).toFixed(2) + "</td>";
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll(".return-check").forEach(function (cb) { cb.addEventListener("change", calcRefund); });
+    tbody.querySelectorAll("[data-inc]").forEach(function (b) {
+      b.addEventListener("click", function () { stepQty(parseInt(b.getAttribute("data-inc"), 10), 1); });
+    });
+    tbody.querySelectorAll("[data-dec]").forEach(function (b) {
+      b.addEventListener("click", function () { stepQty(parseInt(b.getAttribute("data-dec"), 10), -1); });
+    });
+    calcRefund();
+  }
+
+  var returnQty = {};
+  function stepQty(idx, delta) {
+    var line = currentBill.lines[idx];
+    var current = returnQty[idx] !== undefined ? returnQty[idx] : line.qty;
+    var next = Math.max(0, Math.min(line.qty, current + delta));
+    returnQty[idx] = next;
+    document.getElementById("rqty-" + idx).textContent = next;
+    document.getElementById("rline-" + idx).textContent = "₹" + (line.price * next).toFixed(2);
+    calcRefund();
+  }
+
+  function calcRefund() {
+    var total = 0;
+    currentBill.lines.forEach(function (l, idx) {
+      var checked = document.querySelectorAll(".return-check")[idx].checked;
+      var qty = returnQty[idx] !== undefined ? returnQty[idx] : l.qty;
+      if (checked) total += l.price * qty * (1 + l.tax / 100);
+    });
+    document.getElementById("refundTotal").textContent = "₹" + total.toFixed(2);
+  }
+
+  function processReturn() {
+    var anyChecked = Array.prototype.some.call(document.querySelectorAll(".return-check"), function (c) { return c.checked; });
+    if (!anyChecked) { showToast("Select at least one line to return", "warning"); return; }
+    currentBill.lines.forEach(function (l, idx) {
+      var checked = document.querySelectorAll(".return-check")[idx].checked;
+      var qty = returnQty[idx] !== undefined ? returnQty[idx] : l.qty;
+      if (checked && qty > 0) window.adjustStock(l.sku, qty);
+    });
+    showToast("Return processed — stock restored and refund recorded");
+    document.getElementById("resultCard").style.display = "none";
+    document.getElementById("lookupInput").value = "";
+    returnQty = {};
+  }
+</script>
+</body>
+</html>

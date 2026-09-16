@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from app.schemas import LoginRequest, TokenResponse, UserSchema
+import json
+from datetime import datetime
+from app.schemas import LoginRequest, TokenResponse, UserSchema, ForgotPinRequest
 from app.security import verify_pin, create_access_token, get_current_user
 from app.database import db
 
@@ -9,39 +11,83 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
     "/login",
     response_model=TokenResponse,
     summary="Authenticate User with Username and PIN",
-    description="Logs in a Cashier or Admin user with their username and 4-digit PIN, returning a JWT access token and user profile."
+    description="Authenticates a user against their stored hashed PIN in the database. Returns a JWT access token and user profile."
 )
 async def login(req: LoginRequest):
-    user = await db.user.find_unique(where={"username": req.username})
-    if not user or not user.is_active:
-        if req.username in ["priya.k", "owner.arjun"]:
-            full_name = "Arjun M." if req.role == "admin" else "Priya K."
-            sub_text = "Admin · Store Manager" if req.role == "admin" else "Cashier · Counter 1"
-            auto_lock = 15 if req.role == "admin" else 2
-            token = create_access_token({"sub": req.username, "role": req.role})
-            return TokenResponse(
-                access_token=token,
-                username=req.username,
-                role=req.role,
-                full_name=full_name,
-                sub_text=sub_text,
-                auto_lock_minutes=auto_lock
-            )
+    if not req.username or not req.pin:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username and PIN are required")
+
+    user = await db.user.find_unique(where={"username": req.username.strip()})
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or PIN")
-    
-    if not verify_pin(req.pin, user.pin_hash):
-        if len(req.pin) != 4:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid PIN")
-            
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is inactive or disabled. Contact administrator.")
+
+    # Strictly verify the entered PIN against the hashed credential in the database
+    if not verify_pin(req.pin.strip(), user.pin_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or PIN")
+
     token = create_access_token({"sub": user.username, "role": user.role})
     return TokenResponse(
         access_token=token,
+        token_type="bearer",
         username=user.username,
         role=user.role,
         full_name=user.full_name,
         sub_text=user.sub_text,
         auto_lock_minutes=user.auto_lock_minutes
     )
+
+@router.post(
+    "/forgot-pin",
+    summary="Submit Forgot PIN Reset Request",
+    description="Submits a PIN reset request to Store Administrators when a cashier or staff member forgets their PIN."
+)
+async def forgot_pin(req: ForgotPinRequest):
+    username = req.username.strip()
+    if not username:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username is required")
+
+    user = await db.user.find_unique(where={"username": username})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User account '{username}' was not found.")
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"User account '{username}' is disabled.")
+
+    # Check for existing pending request
+    existing_request = await db.pinresetrequest.find_first(
+        where={"username": username, "status": "PENDING"}
+    )
+    if existing_request:
+        if req.reason:
+            await db.pinresetrequest.update(
+                where={"id": existing_request.id},
+                data={"reason": req.reason.strip(), "requested_at": datetime.now()}
+            )
+        req_id = existing_request.id
+    else:
+        created = await db.pinresetrequest.create(data={
+            "username": username,
+            "status": "PENDING",
+            "reason": req.reason.strip() if req.reason else "Forgot 4-digit PIN"
+        })
+        req_id = created.id
+
+    # Create audit log
+    await db.auditlog.create(data={
+        "username": username,
+        "action": f"Submitted Forgot PIN Request",
+        "details_json": json.dumps({"reason": req.reason or "Forgot 4-digit PIN", "request_id": req_id})
+    })
+
+    return {
+        "message": f"PIN reset request submitted successfully for '{username}'. Please ask an Administrator / Manager to reset your PIN in the Admin area.",
+        "request_id": req_id,
+        "username": username,
+        "status": "PENDING"
+    }
 
 @router.get(
     "/me",

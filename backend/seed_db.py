@@ -244,6 +244,7 @@ async def seed_all_sample_data(disconnect_at_end: bool = False):
             print(f"Created User: {u['username']}")
         else:
             await db.user.update(where={"username": u["username"]}, data={
+                "pin_hash": get_pin_hash(u["pin"]),
                 "auto_lock_minutes": u.get("auto_lock_minutes", 15)
             })
 

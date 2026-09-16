@@ -37,7 +37,7 @@ export class AuthService {
     }
     if (savedRole && savedName) {
       const parts = savedName.trim().split(" ");
-      const initials = parts.map(p => p[0]).join("").toUpperCase();
+      const initials = parts.map((p: string) => p[0]).join("").toUpperCase();
       const profile: UserProfile = {
         id: `usr-${savedRole}`,
         username: savedRole === "admin" ? "owner.arjun" : "priya.k",

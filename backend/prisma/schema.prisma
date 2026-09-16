@@ -26,6 +26,7 @@ model User {
   audit_logs        AuditLog[]
   shift_schedules   UserShiftSchedule[]
   leave_records     UserLeave[]
+  pin_reset_requests PinResetRequest[]
 }
 
 model Category {
@@ -206,4 +207,13 @@ model UserLeave {
   @@unique([username, leave_date])
 }
 
-
+model PinResetRequest {
+  id           String    @id @default(uuid())
+  username     String
+  user         User      @relation(fields: [username], references: [username], onDelete: Cascade)
+  status       String    @default("PENDING") // "PENDING" | "RESOLVED" | "REJECTED"
+  reason       String?
+  requested_at DateTime  @default(now())
+  resolved_at  DateTime?
+  resolved_by  String?
+}

@@ -31,10 +31,6 @@ jobs:
           cd backend
           python -m pytest
 
-      - name: Build Docker Container Image
-        run: |
-          docker build -t greenfield-pos-backend:latest ./backend
-
   build-deploy-frontend:
     runs-on: ubuntu-latest
     steps:

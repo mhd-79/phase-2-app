@@ -187,6 +187,40 @@ import { AuthService } from '../../core/services/auth.service';
         <!-- ================= TAB 2: USER ACCOUNTS & ROLES (DEFAULT) ================= -->
         <div *ngIf="activeTab === 'accounts'">
           
+          <!-- PENDING PIN RESET REQUESTS BANNER -->
+          <div *ngIf="pendingPinRequests.length > 0" class="card" style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; margin-bottom:24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:18px;">🔔</span>
+                <strong style="color:#92400e; font-size:15px;">Pending PIN Reset Requests ({{ pendingPinRequests.length }})</strong>
+              </div>
+              <span class="badge badge-warning" style="font-size:11px;">Requires Admin Action</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div *ngFor="let req of pendingPinRequests" style="background:#ffffff; border:1px solid #fef3c7; border-radius:8px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="font-weight:700; color:var(--text); font-size:14px;">
+                    {{ req.full_name || req.username }} <span class="mono text-muted text-xs">({{ req.username }})</span>
+                    <span class="badge" [style.background]="req.role === 'admin' ? '#ede9fe' : '#f1f5f9'" [style.color]="req.role === 'admin' ? '#4338ca' : '#475569'" style="margin-left:8px; font-size:10px;">
+                      {{ req.role | titlecase }}
+                    </span>
+                  </div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                    <strong>Note:</strong> {{ req.reason || 'Forgot PIN' }} &middot; Requested: {{ req.requested_at | date:'short' }}
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button type="button" class="btn btn-primary btn-sm" style="font-size:12px; padding:4px 14px;" (click)="openResetPinModal(req)">
+                    🔑 Reset PIN
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" style="font-size:12px; color:var(--danger-700);" (click)="rejectPinRequest(req.id)">
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- ACCESS DESCRIPTION CARDS (2-COLUMN GRID) -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;">
             <!-- Admin Card -->
@@ -274,7 +308,10 @@ import { AuthService } from '../../core/services/auth.service';
 
                     <!-- Actions -->
                     <td style="padding:14px 18px; text-align:right;">
-                      <div style="display:inline-flex; align-items:center; gap:16px;">
+                      <div style="display:inline-flex; align-items:center; gap:12px;">
+                        <button type="button" class="btn-ghost" style="border:none; background:transparent; font-size:13px; font-weight:600; color:var(--primary); cursor:pointer; padding:0;" (click)="openResetPinModal(u)">
+                          Reset PIN
+                        </button>
                         <button type="button" class="btn-ghost" style="border:none; background:transparent; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; padding:0;" (click)="openEditModal(u)">
                           Edit
                         </button>
@@ -670,11 +707,44 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
       </div>
     </div>
+
+    <!-- ================= SECURE RESET PIN MODAL ================= -->
+    <div class="modal-overlay" [class.open]="showResetPinModal" (click)="closeResetPinModal()" style="z-index:1150;">
+      <div class="modal" style="max-width:440px;" (click)="$event.stopPropagation()">
+        <div class="modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0; font-size:1.15rem; font-weight:700;">🔑 Secure PIN Reset</h3>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeResetPinModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:14px;">
+          <div style="font-size:13px; color:var(--text-muted);">
+            Reset credentials for <strong>{{ resetPinUser?.full_name || resetPinUser?.username }}</strong> (<span class="mono">{{ resetPinUser?.username }}</span>).
+          </div>
+          <div class="field">
+            <label class="form-label" style="font-weight:600; font-size:13px; margin-bottom:4px;">Enter New 4-Digit PIN <span style="color:var(--danger-700)">*</span></label>
+            <input class="input mono" type="password" maxlength="4" [(ngModel)]="newPinInput" placeholder="••••" style="font-size:18px; letter-spacing:4px; text-align:center;">
+            <span class="hint" style="font-size:12px; color:var(--text-muted); margin-top:4px; display:block;">
+              The new PIN will be hashed and updated in PostgreSQL. The user can immediately log in with this PIN.
+            </span>
+          </div>
+          <div *ngIf="resetPinError" style="color:var(--danger-700); background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:8px 12px; font-size:13px; font-weight:600;">
+            {{ resetPinError }}
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px;">
+          <button type="button" class="btn btn-secondary" (click)="closeResetPinModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" [disabled]="submittingResetPin" (click)="submitResetPin()">
+            {{ submittingResetPin ? 'Updating...' : 'Confirm Reset PIN' }}
+          </button>
+        </div>
+      </div>
+    </div>
   `
 })
 export class UsersComponent implements OnInit {
   users: any[] = [];
   auditLogs: any[] = [];
+  pinResetRequests: any[] = [];
+  pendingPinRequests: any[] = [];
 
   activeTab: 'accounts' | 'performance' | 'logs' = 'accounts';
 
@@ -703,6 +773,13 @@ export class UsersComponent implements OnInit {
     shifts: []
   };
 
+  // Reset PIN Modal
+  showResetPinModal: boolean = false;
+  resetPinUser: any = null;
+  newPinInput: string = '';
+  resetPinError: string = '';
+  submittingResetPin: boolean = false;
+
   // User Details & Performance Modal
   showDetailModal: boolean = false;
   selectedUser: any = null;
@@ -724,6 +801,7 @@ export class UsersComponent implements OnInit {
   ngOnInit() {
     this.loadUsers();
     this.loadAuditLogs();
+    this.loadPinResetRequests();
   }
 
   getAuthHeaders(): Record<string, string> {
@@ -766,7 +844,7 @@ export class UsersComponent implements OnInit {
   getInitials(name: string): string {
     if (!name) return 'U';
     const parts = name.trim().split(' ');
-    return parts.map(p => p[0]).join('').toUpperCase().substring(0, 2);
+    return parts.map((p: string) => p[0]).join('').toUpperCase().substring(0, 2);
   }
 
   formatShiftsToScheduleString(shifts: any[]): string {
@@ -1180,11 +1258,13 @@ export class UsersComponent implements OnInit {
           alert('User account and Working Schedule updated successfully!');
           this.closeModal();
           this.loadUsers();
+          this.loadAuditLogs();
         },
         error: (err) => {
           alert('User updated: ' + (err.error?.detail || 'Saved'));
           this.closeModal();
           this.loadUsers();
+          this.loadAuditLogs();
         }
       });
     } else {
@@ -1193,11 +1273,90 @@ export class UsersComponent implements OnInit {
           alert('User account created successfully with configured schedule!');
           this.closeModal();
           this.loadUsers();
+          this.loadAuditLogs();
         },
         error: (err) => {
           alert('User creation error: ' + (err.error?.detail || 'Failed'));
         }
       });
     }
+  }
+
+  // --- PIN Reset Request & Admin Reset Flow ---
+  loadPinResetRequests() {
+    this.http.get<any[]>('http://localhost:8000/api/v1/users/pin-reset-requests', { headers: this.getAuthHeaders() }).subscribe({
+      next: (data) => {
+        this.pinResetRequests = data || [];
+        this.pendingPinRequests = (data || []).filter(r => r.status === 'PENDING');
+      },
+      error: () => {
+        this.pinResetRequests = [];
+        this.pendingPinRequests = [];
+      }
+    });
+  }
+
+  openResetPinModal(userOrReq: any) {
+    this.resetPinUser = userOrReq;
+    this.newPinInput = '';
+    this.resetPinError = '';
+    this.showResetPinModal = true;
+  }
+
+  closeResetPinModal() {
+    this.showResetPinModal = false;
+    this.resetPinUser = null;
+    this.newPinInput = '';
+    this.resetPinError = '';
+  }
+
+  submitResetPin() {
+    const pin = (this.newPinInput || '').trim();
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      this.resetPinError = 'Please enter a valid 4-digit numeric PIN (e.g. 1234).';
+      return;
+    }
+
+    const username = this.resetPinUser?.username;
+    if (!username) {
+      this.resetPinError = 'Invalid user selected.';
+      return;
+    }
+
+    this.submittingResetPin = true;
+    this.resetPinError = '';
+
+    const payload = { new_pin: pin };
+
+    this.http.post<any>(`http://localhost:8000/api/v1/users/${encodeURIComponent(username)}/reset-pin`, payload, { headers: this.getAuthHeaders() }).subscribe({
+      next: (res) => {
+        this.submittingResetPin = false;
+        alert(res.message || `PIN for '${username}' has been successfully reset!`);
+        this.closeResetPinModal();
+        this.loadUsers();
+        this.loadPinResetRequests();
+        this.loadAuditLogs();
+      },
+      error: (err) => {
+        this.submittingResetPin = false;
+        this.resetPinError = err.error?.detail || 'Failed to reset PIN.';
+      }
+    });
+  }
+
+  rejectPinRequest(requestId: string) {
+    if (!confirm('Are you sure you want to dismiss / reject this PIN reset request?')) {
+      return;
+    }
+
+    this.http.post<any>(`http://localhost:8000/api/v1/users/pin-reset-requests/${encodeURIComponent(requestId)}/reject`, {}, { headers: this.getAuthHeaders() }).subscribe({
+      next: () => {
+        this.loadPinResetRequests();
+        this.loadAuditLogs();
+      },
+      error: (err) => {
+        alert(err.error?.detail || 'Failed to reject request.');
+      }
+    });
   }
 }

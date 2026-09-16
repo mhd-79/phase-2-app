@@ -37,7 +37,7 @@ import { AuthService } from '../../core/services/auth.service';
 
           <div class="field">
             <label for="usernameInput">Username</label>
-            <input class="input" id="usernameInput" [(ngModel)]="username" placeholder="e.g. priya.k">
+            <input class="input" id="usernameInput" [(ngModel)]="username" placeholder="e.g. priya.k" (ngModelChange)="errorMessage = ''">
           </div>
 
           <div style="margin-top:var(--space-4)">
@@ -64,12 +64,63 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
           </div>
 
-          <div *ngIf="errorMessage" class="error-msg" style="color:var(--danger-700); font-size:13px; margin-top:12px; font-weight:600;">
+          <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+            <button type="button" class="btn-link" style="background:none; border:none; color:var(--primary); font-size:13px; font-weight:600; cursor:pointer; padding:0;" (click)="openForgotModal()">
+              Forgot PIN/Password?
+            </button>
+          </div>
+
+          <div *ngIf="errorMessage" class="error-msg" style="color:var(--danger-700); background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:8px 12px; font-size:13px; margin-top:12px; font-weight:600;">
             {{ errorMessage }}
           </div>
 
-          <button type="button" class="btn btn-primary btn-lg btn-block" style="margin-top:var(--space-6)" (click)="attemptLogin()">Sign In</button>
+          <div *ngIf="infoMessage" class="info-msg" style="color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:8px 12px; font-size:13px; margin-top:12px; font-weight:600;">
+            {{ infoMessage }}
+          </div>
+
+          <button type="button" class="btn btn-primary btn-lg btn-block" style="margin-top:var(--space-5)" [disabled]="isSubmitting" (click)="attemptLogin()">
+            {{ isSubmitting ? 'Signing in...' : 'Sign In' }}
+          </button>
           <p class="demo-note">Demo Admin: owner.arjun (PIN 9999) &middot; Cashier: priya.k (PIN 1234)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORGOT PIN MODAL -->
+    <div class="modal-overlay" *ngIf="showForgotModal" (click)="closeForgotModal()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="margin:0; font-size:1.25rem; font-weight:700;">Forgot PIN / Password?</h3>
+          <button type="button" class="btn-close" (click)="closeForgotModal()" style="border:none; background:none; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+          Submit a PIN reset request to Store Administrators. Once requested, your Store Manager can securely reset your PIN in the Admin panel.
+        </p>
+
+        <div class="field" style="margin-bottom:12px;">
+          <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">Username</label>
+          <input class="input" [(ngModel)]="forgotUsername" placeholder="e.g. priya.k" style="width:100%;">
+        </div>
+
+        <div class="field" style="margin-bottom:16px;">
+          <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">Reason / Contact Note (Optional)</label>
+          <input class="input" [(ngModel)]="forgotReason" placeholder="e.g. Forgot my Counter 1 PIN" style="width:100%;">
+        </div>
+
+        <div *ngIf="forgotError" style="color:var(--danger-700); background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:8px 12px; font-size:13px; margin-bottom:14px; font-weight:600;">
+          {{ forgotError }}
+        </div>
+
+        <div *ngIf="forgotSuccess" style="color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:10px 14px; font-size:13px; margin-bottom:14px; font-weight:600; line-height:1.4;">
+          {{ forgotSuccess }}
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-secondary" (click)="closeForgotModal()">Close</button>
+          <button type="button" class="btn btn-primary" [disabled]="submittingForgot" (click)="submitForgotPin()">
+            {{ submittingForgot ? 'Submitting...' : 'Submit Request' }}
+          </button>
         </div>
       </div>
     </div>
@@ -95,6 +146,9 @@ import { AuthService } from '../../core/services/auth.service';
     .keypad button { min-height: 52px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface-alt); font-size: var(--text-lg); font-weight: 600; cursor: pointer; }
     .keypad button:active { background: var(--slate-100); }
     .demo-note { font-size: var(--text-xs); color: var(--text-subtle); text-align: center; margin-top: var(--space-5); }
+    
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 16px; }
+    .modal-card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); width: 100%; max-width: 440px; padding: 24px; border: 1px solid var(--border); }
   `]
 })
 export class LoginComponent {
@@ -102,6 +156,16 @@ export class LoginComponent {
   username: string = 'priya.k';
   pin: string = '';
   errorMessage: string = '';
+  infoMessage: string = '';
+  isSubmitting: boolean = false;
+
+  // Forgot PIN Modal state
+  showForgotModal: boolean = false;
+  forgotUsername: string = '';
+  forgotReason: string = '';
+  forgotError: string = '';
+  forgotSuccess: string = '';
+  submittingForgot: boolean = false;
 
   constructor(private http: HttpClient, private router: Router, private auth: AuthService) {}
 
@@ -109,61 +173,124 @@ export class LoginComponent {
     this.selectedRole = role;
     this.username = role === 'admin' ? 'owner.arjun' : 'priya.k';
     this.errorMessage = '';
+    this.infoMessage = '';
+    this.pin = '';
   }
 
   pressPin(val: string) {
-    if (val === 'clear') { this.pin = ''; }
-    else if (val === 'back') { this.pin = this.pin.slice(0, -1); }
-    else if (this.pin.length < 4) {
+    if (val === 'clear') {
+      this.pin = '';
+      this.errorMessage = '';
+    } else if (val === 'back') {
+      this.pin = this.pin.slice(0, -1);
+      this.errorMessage = '';
+    } else if (this.pin.length < 4) {
       this.pin += val;
-      if (this.pin.length === 4) { this.attemptLogin(); }
+      this.errorMessage = '';
+      if (this.pin.length === 4) {
+        this.attemptLogin();
+      }
     }
   }
 
   attemptLogin() {
-    if (!this.username.trim()) {
-      this.username = this.selectedRole === 'admin' ? 'owner.arjun' : 'priya.k';
-    }
-    if (!this.pin || this.pin.length < 4) {
-      this.pin = this.selectedRole === 'admin' ? '9999' : '1234';
+    const trimmedUser = (this.username || '').trim();
+    if (!trimmedUser) {
+      this.errorMessage = 'Please enter your username.';
+      return;
     }
 
-    const payload = { username: this.username.trim(), pin: this.pin };
-    const role = this.selectedRole as 'admin' | 'cashier';
-    const targetRoute = role === 'admin' ? '/reports' : '/pos';
+    if (!this.pin || this.pin.length !== 4) {
+      this.errorMessage = 'Please enter your complete 4-digit PIN.';
+      return;
+    }
 
-    const handleSuccess = (userRole: 'admin' | 'cashier', fullName: string, username: string, token?: string) => {
-      const parts = fullName.trim().split(" ");
-      const initials = parts.map(p => p[0]).join("").toUpperCase();
-      this.auth.setCurrentUser({
-        id: `usr-${userRole}`,
-        username: username,
-        fullName: fullName,
-        role: userRole,
-        subText: userRole === 'admin' ? 'Admin · Store Manager' : 'Cashier · Counter 1',
-        initials: initials || (userRole === 'admin' ? 'AM' : 'PK'),
-        isActive: true,
-        pin: this.pin,
-        autoLockMinutes: userRole === 'admin' ? 15 : 2
-      });
-      if (token) {
-        localStorage.setItem('pos_token', token);
-      } else {
-        localStorage.setItem('pos_token', 'demo-token');
-      }
-      this.router.navigate([userRole === 'admin' ? '/reports' : '/pos']);
+    this.isSubmitting = true;
+    this.errorMessage = '';
+    this.infoMessage = '';
+
+    const payload = {
+      username: trimmedUser,
+      pin: this.pin,
+      role: this.selectedRole
     };
 
     this.http.post<any>('http://localhost:8000/api/v1/auth/login', payload).subscribe({
       next: (res) => {
-        const uRole = (res.role || res.user?.role || role) as 'admin' | 'cashier';
-        const uName = res.full_name || res.user?.full_name || (uRole === 'admin' ? 'Arjun M.' : 'Priya K.');
-        const token = res.access_token || res.token;
-        handleSuccess(uRole, uName, this.username, token);
+        this.isSubmitting = false;
+        const uRole = res.role as 'admin' | 'cashier';
+        const fullName = res.full_name || trimmedUser;
+        const parts = fullName.trim().split(' ');
+        const initials = parts.map((p: string) => p[0]).join('').toUpperCase();
+
+        this.auth.setCurrentUser({
+          id: `usr-${uRole}`,
+          username: res.username,
+          fullName: fullName,
+          role: uRole,
+          subText: res.sub_text || (uRole === 'admin' ? 'Admin · Store Manager' : 'Cashier · Counter 1'),
+          initials: initials || (uRole === 'admin' ? 'AM' : 'PK'),
+          isActive: true,
+          pin: '',
+          autoLockMinutes: res.auto_lock_minutes || (uRole === 'admin' ? 15 : 2)
+        });
+
+        if (res.access_token) {
+          localStorage.setItem('pos_token', res.access_token);
+        }
+
+        this.router.navigate([uRole === 'admin' ? '/reports' : '/pos']);
       },
-      error: () => {
-        const uName = role === 'admin' ? 'Arjun M.' : 'Priya K.';
-        handleSuccess(role, uName, this.username, 'demo-token');
+      error: (err) => {
+        this.isSubmitting = false;
+        this.pin = '';
+        this.errorMessage = err.error?.detail || 'Invalid username or PIN. Please try again.';
+      }
+    });
+  }
+
+  openForgotModal() {
+    this.forgotUsername = (this.username || '').trim() || 'priya.k';
+    this.forgotReason = '';
+    this.forgotError = '';
+    this.forgotSuccess = '';
+    this.showForgotModal = true;
+  }
+
+  closeForgotModal() {
+    this.showForgotModal = false;
+    this.forgotError = '';
+    this.forgotSuccess = '';
+  }
+
+  submitForgotPin() {
+    const u = (this.forgotUsername || '').trim();
+    if (!u) {
+      this.forgotError = 'Please enter a username.';
+      return;
+    }
+
+    this.submittingForgot = true;
+    this.forgotError = '';
+    this.forgotSuccess = '';
+
+    const payload = {
+      username: u,
+      reason: this.forgotReason.trim() || 'Forgot 4-digit PIN'
+    };
+
+    this.http.post<any>('http://localhost:8000/api/v1/auth/forgot-pin', payload).subscribe({
+      next: (res) => {
+        this.submittingForgot = false;
+        this.forgotSuccess = res.message || `PIN reset request for '${u}' was sent to Admin.`;
+        this.infoMessage = `PIN reset request for '${u}' is pending Admin review.`;
+        setTimeout(() => {
+          this.closeForgotModal();
+        }, 2200);
+      },
+      error: (err) => {
+        this.submittingForgot = false;
+        this.forgotError = err.error?.detail || 'Failed to submit PIN reset request.';
       }
     });
   }

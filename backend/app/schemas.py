@@ -48,6 +48,25 @@ class UserUpdate(BaseModel):
 class PinVerifyRequest(BaseModel):
     pin: str = Field(..., description="Admin authorization PIN", example="9999")
 
+class ForgotPinRequest(BaseModel):
+    username: str = Field(..., description="Username requesting PIN reset", example="priya.k")
+    reason: Optional[str] = Field(None, description="Optional note or contact info from user", example="Forgot my 4-digit PIN")
+
+class PinResetRequestSchema(BaseModel):
+    id: str = Field(..., description="Reset request UUID")
+    username: str = Field(..., description="Username requesting reset")
+    full_name: Optional[str] = Field(None, description="User full name")
+    role: Optional[str] = Field(None, description="User role")
+    sub_text: Optional[str] = Field(None, description="User counter or department")
+    status: str = Field(..., description="Request status: PENDING, RESOLVED, REJECTED")
+    reason: Optional[str] = Field(None, description="User reason or note")
+    requested_at: str = Field(..., description="ISO timestamp of request")
+    resolved_at: Optional[str] = Field(None, description="ISO timestamp of resolution")
+    resolved_by: Optional[str] = Field(None, description="Admin username who resolved the request")
+
+class AdminResetPinRequest(BaseModel):
+    new_pin: str = Field(..., min_length=4, max_length=4, description="New 4-digit numeric PIN", example="5678")
+
 # --- User Shift & Leave ---
 class ShiftDayConfig(BaseModel):
     day_of_week: str = Field(..., description="Day name (e.g. Monday, Tuesday)", example="Monday")

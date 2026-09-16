@@ -5,7 +5,8 @@ import json
 from app.schemas import (
     UserSchema, UserCreate, UserUpdate,
     ShiftDayConfig, ShiftScheduleUpdateRequest,
-    UserLeaveRequest, UserDetailMetricsResponse
+    UserLeaveRequest, UserDetailMetricsResponse,
+    PinResetRequestSchema, AdminResetPinRequest
 )
 from app.security import get_pin_hash, require_admin
 from app.database import db
@@ -631,4 +632,105 @@ async def get_audit_logs(user = Depends(require_admin)):
             "timestamp": l.timestamp.isoformat()
         } for l in logs
     ]
+
+@router.get(
+    "/pin-reset-requests",
+    response_model=List[PinResetRequestSchema],
+    summary="List PIN Reset Requests",
+    description="Admin-only endpoint to view pending and recently resolved PIN reset requests submitted from the login screen."
+)
+async def get_pin_reset_requests(user = Depends(require_admin)):
+    requests = await db.pinresetrequest.find_many(
+        include={"user": True},
+        order={"requested_at": "desc"}
+    )
+    result = []
+    for r in requests:
+        u = r.user
+        result.append(PinResetRequestSchema(
+            id=r.id,
+            username=r.username,
+            full_name=u.full_name if u else None,
+            role=u.role if u else None,
+            sub_text=u.sub_text if u else None,
+            status=r.status,
+            reason=r.reason,
+            requested_at=r.requested_at.isoformat() if r.requested_at else datetime.now().isoformat(),
+            resolved_at=r.resolved_at.isoformat() if r.resolved_at else None,
+            resolved_by=r.resolved_by
+        ))
+    return result
+
+@router.post(
+    "/{username}/reset-pin",
+    summary="Admin Secure PIN Reset",
+    description="Admin-only endpoint to securely reset a user's 4-digit PIN in the database, resolving pending reset requests and logging an audit trail."
+)
+async def reset_user_pin(username: str, req: AdminResetPinRequest, user = Depends(require_admin)):
+    if len(req.new_pin) != 4 or not req.new_pin.isdigit():
+        raise HTTPException(status_code=400, detail="New PIN must be exactly 4 numeric digits")
+
+    u = await db.user.find_unique(where={"username": username})
+    if not u:
+        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
+
+    new_hash = get_pin_hash(req.new_pin)
+    await db.user.update(
+        where={"username": username},
+        data={"pin_hash": new_hash}
+    )
+
+    # Mark all pending requests for this user as RESOLVED
+    pending_reqs = await db.pinresetrequest.find_many(
+        where={"username": username, "status": "PENDING"}
+    )
+    for pr in pending_reqs:
+        await db.pinresetrequest.update(
+            where={"id": pr.id},
+            data={
+                "status": "RESOLVED",
+                "resolved_at": datetime.now(),
+                "resolved_by": user.username
+            }
+        )
+
+    # Log audit entry
+    await db.auditlog.create(data={
+        "username": user.username,
+        "action": f"Admin Reset Security PIN for user: {username}",
+        "details_json": json.dumps({"target_user": username, "reset_by": user.username, "resolved_requests_count": len(pending_reqs)})
+    })
+
+    return {
+        "message": f"PIN for user '{username}' ({u.full_name}) was successfully reset.",
+        "username": username,
+        "resolved_requests": len(pending_reqs)
+    }
+
+@router.post(
+    "/pin-reset-requests/{request_id}/reject",
+    summary="Reject PIN Reset Request",
+    description="Admin-only endpoint to dismiss / reject a pending PIN reset request."
+)
+async def reject_pin_reset_request(request_id: str, user = Depends(require_admin)):
+    req = await db.pinresetrequest.find_unique(where={"id": request_id})
+    if not req:
+        raise HTTPException(status_code=404, detail="PIN reset request not found")
+
+    await db.pinresetrequest.update(
+        where={"id": request_id},
+        data={
+            "status": "REJECTED",
+            "resolved_at": datetime.now(),
+            "resolved_by": user.username
+        }
+    )
+
+    await db.auditlog.create(data={
+        "username": user.username,
+        "action": f"Rejected PIN Reset Request for user: {req.username}",
+        "details_json": json.dumps({"request_id": request_id, "target_user": req.username, "rejected_by": user.username})
+    })
+
+    return {"message": "PIN reset request rejected successfully", "request_id": request_id}
 

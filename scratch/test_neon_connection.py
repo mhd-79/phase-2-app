@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.abspath("backend"))
 load_dotenv("backend/.env")
 
 from app.database import db, connect_db, disconnect_db
+from app.security import verify_pin
 
 async def verify():
     print("Connecting to Neon PostgreSQL...")
