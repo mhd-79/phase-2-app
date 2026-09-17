@@ -1,3 +1,4 @@
+import app.config # Ensures DATABASE_URL is set in os.environ
 try:
     from app.generated.prisma import Prisma
 except ImportError:

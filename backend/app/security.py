@@ -15,19 +15,26 @@ security_bearer = HTTPBearer(auto_error=False)
 def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
     if not hashed_pin:
         return False
+    # Direct plain text check
+    if str(plain_pin).strip() == str(hashed_pin).strip():
+        return True
     if hashed_pin.startswith("$pbkdf2"):
-        return pwd_context.verify(plain_pin, hashed_pin)
+        try:
+            return pwd_context.verify(plain_pin, hashed_pin)
+        except Exception:
+            return False
     elif hashed_pin.startswith("$2"):
         try:
             return pwd_context.verify(plain_pin, hashed_pin)
         except Exception:
             return False
-    # Fallback comparison for plain or sha256 PINs
-    sha = hashlib.sha256(plain_pin.encode("utf-8")).hexdigest()
-    return plain_pin == hashed_pin or sha == hashed_pin
+    # Fallback comparison for sha256 PINs
+    sha = hashlib.sha256(str(plain_pin).strip().encode("utf-8")).hexdigest()
+    return sha == hashed_pin.strip()
 
 def get_pin_hash(pin: str) -> str:
-    return pwd_context.hash(pin)
+    # Stored directly as plain text
+    return str(pin).strip()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()

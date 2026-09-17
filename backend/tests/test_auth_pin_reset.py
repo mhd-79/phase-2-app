@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from starlette.testclient import TestClient
 from app.main import app
 
@@ -66,9 +67,11 @@ def test_user_crud_and_deactivation_lifecycle(client):
     admin_token = admin_login.json()["access_token"]
     headers = {"Authorization": f"Bearer {admin_token}", "X-User-Role": "admin", "X-Username": "owner.arjun"}
 
+    username = f"test.cashier_{int(datetime.now().timestamp())}"
+
     # 1. Create a new cashier user
     create_res = client.post("/api/v1/users", json={
-        "username": "test.cashier",
+        "username": username,
         "pin": "5566",
         "role": "cashier",
         "full_name": "Test Cashier",
@@ -77,17 +80,17 @@ def test_user_crud_and_deactivation_lifecycle(client):
     }, headers=headers)
     assert create_res.status_code == 201
     created_data = create_res.json()
-    assert created_data["username"] == "test.cashier"
+    assert created_data["username"] == username
     assert created_data["role"] == "cashier"
     assert created_data["is_active"] is True
 
     # 2. Login with the new cashier credentials
-    login_res = client.post("/api/v1/auth/login", json={"username": "test.cashier", "pin": "5566", "role": "cashier"})
+    login_res = client.post("/api/v1/auth/login", json={"username": username, "pin": "5566", "role": "cashier"})
     assert login_res.status_code == 200
     assert login_res.json()["full_name"] == "Test Cashier"
 
     # 3. Update user details & PIN
-    update_res = client.put("/api/v1/users/test.cashier", json={
+    update_res = client.put(f"/api/v1/users/{username}", json={
         "full_name": "Test Cashier Senior",
         "pin": "7788"
     }, headers=headers)
@@ -95,27 +98,27 @@ def test_user_crud_and_deactivation_lifecycle(client):
     assert update_res.json()["full_name"] == "Test Cashier Senior"
 
     # Old PIN fails
-    assert client.post("/api/v1/auth/login", json={"username": "test.cashier", "pin": "5566"}).status_code == 401
+    assert client.post("/api/v1/auth/login", json={"username": username, "pin": "5566"}).status_code == 401
     # New PIN succeeds
-    assert client.post("/api/v1/auth/login", json={"username": "test.cashier", "pin": "7788"}).status_code == 200
+    assert client.post("/api/v1/auth/login", json={"username": username, "pin": "7788"}).status_code == 200
 
     # 4. Deactivate user
-    deactivate_res = client.put("/api/v1/users/test.cashier", json={"is_active": False}, headers=headers)
+    deactivate_res = client.put(f"/api/v1/users/{username}", json={"is_active": False}, headers=headers)
     assert deactivate_res.status_code == 200
     assert deactivate_res.json()["is_active"] is False
 
     # Login must now be rejected for deactivated account
-    inactive_login = client.post("/api/v1/auth/login", json={"username": "test.cashier", "pin": "7788"})
+    inactive_login = client.post("/api/v1/auth/login", json={"username": username, "pin": "7788"})
     assert inactive_login.status_code == 401
     assert "inactive or disabled" in inactive_login.json().get("detail", "")
 
     # 5. Reactivate user
-    reactivate_res = client.put("/api/v1/users/test.cashier", json={"is_active": True}, headers=headers)
+    reactivate_res = client.put(f"/api/v1/users/{username}", json={"is_active": True}, headers=headers)
     assert reactivate_res.status_code == 200
     assert reactivate_res.json()["is_active"] is True
 
     # Login succeeds again
-    assert client.post("/api/v1/auth/login", json={"username": "test.cashier", "pin": "7788"}).status_code == 200
+    assert client.post("/api/v1/auth/login", json={"username": username, "pin": "7788"}).status_code == 200
 
 def test_database_backed_admin_discount_approval(client):
     # Valid admin PIN 9999 succeeds
