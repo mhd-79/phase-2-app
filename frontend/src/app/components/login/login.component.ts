@@ -245,7 +245,7 @@ export class LoginComponent {
       error: (err) => {
         this.isSubmitting = false;
         this.pin = '';
-        this.errorMessage = err.error?.detail || 'Invalid username or PIN. Please try again.';
+        this.errorMessage = err.error?.detail || (err.status === 500 ? 'Server / Database error (HTTP 500). Please check backend status.' : 'Invalid username or PIN. Please try again.');
       }
     });
   }

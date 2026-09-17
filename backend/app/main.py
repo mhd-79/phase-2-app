@@ -1,5 +1,6 @@
 import json
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
@@ -74,8 +75,18 @@ async def db_session_middleware(request, call_next):
         try:
             await connect_db()
         except Exception as e:
-            print(f"DB auto-connect notice: {e}")
+            print(f"DB auto-connect notice: {e}", flush=True)
     return await call_next(request)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    trace = traceback.format_exc()
+    print(f"UNHANDLED ERROR: {request.method} {request.url}\n{trace}", flush=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {str(exc)}", "type": type(exc).__name__, "traceback": trace}
+    )
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(catalog.router, prefix=settings.API_V1_STR)
