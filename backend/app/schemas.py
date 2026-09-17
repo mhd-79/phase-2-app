@@ -4,7 +4,7 @@ from typing import List, Optional, Any, Dict
 # --- Auth ---
 class LoginRequest(BaseModel):
     username: str = Field(..., description="Unique user account handle (e.g. owner.arjun or priya.k)", example="priya.k")
-    pin: str = Field(..., description="4-digit security PIN for staff authentication", example="1234")
+    pin: str = Field(..., description="4-digit security PIN for staff authentication", example="5678")
     role: str = Field("cashier", description="Target access role ('admin' or 'cashier')", example="cashier")
 
 class TokenResponse(BaseModel):
