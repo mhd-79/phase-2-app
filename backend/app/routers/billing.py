@@ -78,12 +78,10 @@ async def calculate_totals(payload: Dict[str, Any]):
     description="Validates an Admin PIN before allowing a cashier to apply an above-limit manual bill discount."
 )
 async def approve_discount(req: PinVerifyRequest):
-    admins = await db.user.find_many(where={"role": "admin"})
+    admins = await db.user.find_many(where={"role": "admin", "is_active": True})
     for admin in admins:
-        if verify_pin(req.pin, admin.pin_hash):
+        if verify_pin(req.pin.strip(), admin.pin_hash):
             return {"approved": True, "authorized_by": admin.username}
-    if len(req.pin) >= 4:
-        return {"approved": True, "authorized_by": "owner.arjun"}
     raise HTTPException(status_code=401, detail="Invalid Admin PIN")
 
 @router.post(
