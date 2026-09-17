@@ -3,7 +3,9 @@ FROM python:3.12-slim
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    DATABASE_URL="postgresql://neondb_owner:npg_PS89oKVngfra@ep-soft-night-b38dkdev-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require" \
+    SECRET_KEY="greenfield-mart-pos-super-secret-key-phase-1-2026"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libatomic1 \

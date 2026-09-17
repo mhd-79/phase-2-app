@@ -1,4 +1,6 @@
+import os
 import app.config # Ensures DATABASE_URL is set in os.environ
+
 try:
     from app.generated.prisma import Prisma
 except ImportError:
@@ -7,9 +9,23 @@ except ImportError:
 db = Prisma()
 
 async def connect_db():
-    if not db.is_connected():
-        await db.connect()
+    try:
+        if not db.is_connected():
+            await db.connect()
+    except Exception as e:
+        print(f"Prisma connection notice: {e}")
+        try:
+            if db.is_connected():
+                await db.disconnect()
+        except:
+            pass
+        if not db.is_connected():
+            await db.connect()
 
 async def disconnect_db():
-    if db.is_connected():
-        await db.disconnect()
+    try:
+        if db.is_connected():
+            await db.disconnect()
+    except Exception:
+        pass
+

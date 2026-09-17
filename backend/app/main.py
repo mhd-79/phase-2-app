@@ -68,6 +68,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def db_session_middleware(request, call_next):
+    if not db.is_connected():
+        try:
+            await connect_db()
+        except Exception as e:
+            print(f"DB auto-connect notice: {e}")
+    return await call_next(request)
+
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(catalog.router, prefix=settings.API_V1_STR)
 app.include_router(billing.router, prefix=settings.API_V1_STR)
@@ -82,5 +91,18 @@ async def root():
         "status": "online",
         "app": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "docs": "/docs"
+        "docs": "/docs",
+        "db_connected": db.is_connected()
     }
+
+@app.get(f"{settings.API_V1_STR}/health", summary="DB Health Check")
+async def health_check():
+    await connect_db()
+    users_count = await db.user.count()
+    return {
+        "status": "healthy",
+        "database": "Neon PostgreSQL",
+        "db_connected": db.is_connected(),
+        "users_count": users_count
+    }
+
