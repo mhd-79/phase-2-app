@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-reports',
@@ -416,7 +417,7 @@ export class ReportsComponent implements OnInit {
   }
 
   loadCategories() {
-    this.http.get<string[]>('http://localhost:8000/api/v1/catalog/categories').subscribe({
+    this.http.get<string[]>(`${environment.apiUrl}/catalog/categories`).subscribe({
       next: (cats) => { this.categories = cats; },
       error: () => {}
     });
@@ -474,7 +475,7 @@ export class ReportsComponent implements OnInit {
 
   loadZReportAndTransactions() {
     const periodParam = this.activeDateFilter === 'week' ? 'this_week' : (this.activeDateFilter === 'month' ? 'this_month' : this.activeDateFilter);
-    const urlSummary = `http://localhost:8000/api/v1/reports/z-report?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}`;
+    const urlSummary = `${environment.apiUrl}/reports/z-report?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}`;
     
     this.http.get<any>(urlSummary).subscribe({
       next: (summary) => {
@@ -483,7 +484,7 @@ export class ReportsComponent implements OnInit {
       error: () => {}
     });
 
-    const urlTx = `http://localhost:8000/api/v1/reports/completed-transactions?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}`;
+    const urlTx = `${environment.apiUrl}/reports/completed-transactions?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}`;
     this.http.get<any[]>(urlTx).subscribe({
       next: (data) => {
         this.transactions = data;
@@ -498,7 +499,7 @@ export class ReportsComponent implements OnInit {
 
   loadItemSales() {
     const periodParam = this.activeDateFilter === 'week' ? 'this_week' : (this.activeDateFilter === 'month' ? 'this_month' : this.activeDateFilter);
-    let url = `http://localhost:8000/api/v1/reports/item-sales?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}`;
+    let url = `${environment.apiUrl}/reports/item-sales?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}`;
     
     if (this.selectedCategory && this.selectedCategory !== 'All') {
       url += `&category=${encodeURIComponent(this.selectedCategory)}`;
@@ -535,7 +536,7 @@ export class ReportsComponent implements OnInit {
   }
 
   loadCashCounters() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/reports/cash-counters').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/reports/cash-counters`).subscribe({
       next: (data) => {
         this.counters = data;
       },
@@ -555,7 +556,7 @@ export class ReportsComponent implements OnInit {
       return;
     }
 
-    this.http.post<any>('http://localhost:8000/api/v1/reports/cash-counters', this.newCounterForm).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/reports/cash-counters`, this.newCounterForm).subscribe({
       next: (res) => {
         alert(`Counter "${res.counter_name}" created successfully!`);
         this.showAddCounter = false;
@@ -580,7 +581,7 @@ export class ReportsComponent implements OnInit {
       return;
     }
 
-    const url = `http://localhost:8000/api/v1/reports/cash-counters/${this.editingCounter.id}`;
+    const url = `${environment.apiUrl}/reports/cash-counters/${this.editingCounter.id}`;
     this.http.put<any>(url, { opening_float: this.editFloatValue }).subscribe({
       next: (res) => {
         alert(`Opening float for ${res.counter_name} updated to ₹${res.opening_float.toFixed(2)}`);
@@ -595,7 +596,7 @@ export class ReportsComponent implements OnInit {
 
   loadAIInsights() {
     const periodParam = this.activeDateFilter === 'week' ? 'this_week' : (this.activeDateFilter === 'month' ? 'this_month' : this.activeDateFilter);
-    const url = `http://localhost:8000/api/v1/reports/ai-insights?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}&sort_by=${this.aiSortBy}`;
+    const url = `${environment.apiUrl}/reports/ai-insights?period=${periodParam}&start_date=${this.startDate}&end_date=${this.endDate}&sort_by=${this.aiSortBy}`;
 
     this.http.get<any>(url).subscribe({
       next: (data) => {

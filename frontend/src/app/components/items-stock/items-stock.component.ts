@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-items-stock',
@@ -224,7 +225,7 @@ export class ItemsStockComponent implements OnInit {
   }
 
   loadCategories() {
-    this.http.get<string[]>('http://localhost:8000/api/v1/catalog/categories').subscribe({
+    this.http.get<string[]>(`${environment.apiUrl}/catalog/categories`).subscribe({
       next: (cats) => {
         this.categories = cats;
       }
@@ -232,7 +233,7 @@ export class ItemsStockComponent implements OnInit {
   }
 
   loadCatalog() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/catalog/items').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/catalog/items`).subscribe({
       next: (data) => {
         this.items = data;
         this.filterItems();
@@ -272,7 +273,7 @@ export class ItemsStockComponent implements OnInit {
     const headers: Record<string, string> = { 'X-User-Role': role };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    this.http.post<any>('http://localhost:8000/api/v1/catalog/categories', { name: cleanName }, { headers }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/catalog/categories`, { name: cleanName }, { headers }).subscribe({
       next: () => {
         alert('Category "' + cleanName + '" created and saved permanently in database!');
         if (!this.categories.includes(cleanName)) {
@@ -338,7 +339,7 @@ export class ItemsStockComponent implements OnInit {
     const headers: Record<string, string> = { 'X-User-Role': role };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    this.http.post<any>('http://localhost:8000/api/v1/catalog/items', payload, { headers }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/catalog/items`, payload, { headers }).subscribe({
       next: () => {
         alert('Item "' + payload.name + '" created successfully!');
         this.showAddItem = false;

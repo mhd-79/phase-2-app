@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogService } from '../../core/services/catalog.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-discounts',
@@ -224,7 +225,7 @@ export class DiscountsComponent implements OnInit {
   }
 
   loadDiscounts() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/discounts').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/discounts`).subscribe({
       next: (data) => {
         this.rules = data || [];
       },
@@ -236,7 +237,7 @@ export class DiscountsComponent implements OnInit {
 
   loadCatalog() {
     this.catalogItems = this.catalogService.items();
-    this.http.get<any[]>('http://localhost:8000/api/v1/items').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/catalog/items`).subscribe({
       next: (items) => {
         if (items && items.length > 0) {
           this.catalogItems = items;
@@ -361,7 +362,7 @@ export class DiscountsComponent implements OnInit {
     };
 
     if (this.editingDiscountId) {
-      this.http.put<any>(`http://localhost:8000/api/v1/discounts/${encodeURIComponent(this.editingDiscountId)}`, payload, { headers }).subscribe({
+      this.http.put<any>(`${environment.apiUrl}/discounts/${encodeURIComponent(this.editingDiscountId)}`, payload, { headers }).subscribe({
         next: (res) => {
           this.saving = false;
           this.closeModal();
@@ -374,7 +375,7 @@ export class DiscountsComponent implements OnInit {
         }
       });
     } else {
-      this.http.post<any>('http://localhost:8000/api/v1/discounts', payload, { headers }).subscribe({
+      this.http.post<any>(`${environment.apiUrl}/discounts`, payload, { headers }).subscribe({
         next: (res) => {
           this.saving = false;
           this.closeModal();

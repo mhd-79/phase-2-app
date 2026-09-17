@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-users',
@@ -815,7 +816,7 @@ export class UsersComponent implements OnInit {
   }
 
   loadUsers() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/users', { headers: this.getAuthHeaders() }).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/users`, { headers: this.getAuthHeaders() }).subscribe({
       next: (data) => {
         this.users = data;
       },
@@ -831,7 +832,7 @@ export class UsersComponent implements OnInit {
   }
 
   loadAuditLogs() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/users/audit-logs', { headers: this.getAuthHeaders() }).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/users/audit-logs`, { headers: this.getAuthHeaders() }).subscribe({
       next: (data) => {
         this.auditLogs = data;
       },
@@ -965,7 +966,7 @@ export class UsersComponent implements OnInit {
       is_active: newStatus
     };
 
-    this.http.put(`http://localhost:8000/api/v1/users/${encodeURIComponent(u.username)}`, payload, { headers: this.getAuthHeaders() }).subscribe({
+    this.http.put(`${environment.apiUrl}/users/${encodeURIComponent(u.username)}`, payload, { headers: this.getAuthHeaders() }).subscribe({
       next: () => {
         u.is_active = newStatus;
         alert(`User account "${u.username}" is now ${newStatus ? 'Active' : 'Disabled'}.`);
@@ -985,7 +986,7 @@ export class UsersComponent implements OnInit {
   }
 
   loadUserDetails(username: string) {
-    this.http.get<any>(`http://localhost:8000/api/v1/users/${encodeURIComponent(username)}/details`, { headers: this.getAuthHeaders() }).subscribe({
+    this.http.get<any>(`${environment.apiUrl}/users/${encodeURIComponent(username)}/details`, { headers: this.getAuthHeaders() }).subscribe({
       next: (data) => {
         this.userDetails = data;
         this.editingShifts = (data.weekly_shifts || []).map((s: any) => ({ ...s }));
@@ -1056,7 +1057,7 @@ export class UsersComponent implements OnInit {
     if (!this.userDetails?.username) return;
     this.savingShifts = true;
 
-    this.http.put(`http://localhost:8000/api/v1/users/${encodeURIComponent(this.userDetails.username)}/shifts`, { shifts: this.editingShifts }, { headers: this.getAuthHeaders() }).subscribe({
+    this.http.put(`${environment.apiUrl}/users/${encodeURIComponent(this.userDetails.username)}/shifts`, { shifts: this.editingShifts }, { headers: this.getAuthHeaders() }).subscribe({
       next: (res: any) => {
         this.savingShifts = false;
         this.showShiftConfig = false;
@@ -1090,7 +1091,7 @@ export class UsersComponent implements OnInit {
     this.submittingLeave = true;
     const username = this.userDetails?.username;
 
-    this.http.post(`http://localhost:8000/api/v1/users/${encodeURIComponent(username)}/leave`, { reason: this.leaveReasonInput.trim() }, { headers: this.getAuthHeaders() }).subscribe({
+    this.http.post(`${environment.apiUrl}/users/${encodeURIComponent(username)}/leave`, { reason: this.leaveReasonInput.trim() }, { headers: this.getAuthHeaders() }).subscribe({
       next: () => {
         this.submittingLeave = false;
         this.closeLeavePromptModal();
@@ -1108,7 +1109,7 @@ export class UsersComponent implements OnInit {
     if (!confirm('Are you sure you want to cancel / remove the leave mark for today?')) return;
     const username = this.userDetails?.username;
 
-    this.http.delete(`http://localhost:8000/api/v1/users/${encodeURIComponent(username)}/leave`, { headers: this.getAuthHeaders() }).subscribe({
+    this.http.delete(`${environment.apiUrl}/users/${encodeURIComponent(username)}/leave`, { headers: this.getAuthHeaders() }).subscribe({
       next: () => {
         this.loadUserDetails(username);
         alert('Leave status removed successfully.');
@@ -1253,7 +1254,7 @@ export class UsersComponent implements OnInit {
     }
 
     if (this.editingUser) {
-      this.http.put('http://localhost:8000/api/v1/users/' + encodeURIComponent(this.formData.username), this.formData, { headers: this.getAuthHeaders() }).subscribe({
+      this.http.put(`${environment.apiUrl}/users/` + encodeURIComponent(this.formData.username), this.formData, { headers: this.getAuthHeaders() }).subscribe({
         next: (updatedUser: any) => {
           alert('User account and Working Schedule updated successfully!');
           this.closeModal();
@@ -1268,7 +1269,7 @@ export class UsersComponent implements OnInit {
         }
       });
     } else {
-      this.http.post('http://localhost:8000/api/v1/users', this.formData, { headers: this.getAuthHeaders() }).subscribe({
+      this.http.post(`${environment.apiUrl}/users`, this.formData, { headers: this.getAuthHeaders() }).subscribe({
         next: () => {
           alert('User account created successfully with configured schedule!');
           this.closeModal();
@@ -1284,7 +1285,7 @@ export class UsersComponent implements OnInit {
 
   // --- PIN Reset Request & Admin Reset Flow ---
   loadPinResetRequests() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/users/pin-reset-requests', { headers: this.getAuthHeaders() }).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/users/pin-reset-requests`, { headers: this.getAuthHeaders() }).subscribe({
       next: (data) => {
         this.pinResetRequests = data || [];
         this.pendingPinRequests = (data || []).filter(r => r.status === 'PENDING');
@@ -1328,7 +1329,7 @@ export class UsersComponent implements OnInit {
 
     const payload = { new_pin: pin };
 
-    this.http.post<any>(`http://localhost:8000/api/v1/users/${encodeURIComponent(username)}/reset-pin`, payload, { headers: this.getAuthHeaders() }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/users/${encodeURIComponent(username)}/reset-pin`, payload, { headers: this.getAuthHeaders() }).subscribe({
       next: (res) => {
         this.submittingResetPin = false;
         alert(res.message || `PIN for '${username}' has been successfully reset!`);
@@ -1349,7 +1350,7 @@ export class UsersComponent implements OnInit {
       return;
     }
 
-    this.http.post<any>(`http://localhost:8000/api/v1/users/pin-reset-requests/${encodeURIComponent(requestId)}/reject`, {}, { headers: this.getAuthHeaders() }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/users/pin-reset-requests/${encodeURIComponent(requestId)}/reject`, {}, { headers: this.getAuthHeaders() }).subscribe({
       next: () => {
         this.loadPinResetRequests();
         this.loadAuditLogs();

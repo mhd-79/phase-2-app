@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-returns',
@@ -167,7 +168,7 @@ export class ReturnsComponent implements OnInit {
       return;
     }
 
-    this.http.get<any>('http://localhost:8000/api/v1/billing/sales/' + encodeURIComponent(query)).subscribe({
+    this.http.get<any>(`${environment.apiUrl}/billing/sales/` + encodeURIComponent(query)).subscribe({
       next: (data) => {
         if (data.lines) {
           data.lines = data.lines.map((l: any) => ({ ...l, returnQty: l.qty }));
@@ -176,7 +177,7 @@ export class ReturnsComponent implements OnInit {
       },
       error: () => {
         // Try searching invoices list
-        this.http.get<any[]>('http://localhost:8000/api/v1/billing/invoices/search?q=' + encodeURIComponent(query)).subscribe({
+        this.http.get<any[]>(`${environment.apiUrl}/billing/invoices/search?q=` + encodeURIComponent(query)).subscribe({
           next: (list) => {
             if (list.length === 1) {
               this.selectInvoice(list[0]);
@@ -195,7 +196,7 @@ export class ReturnsComponent implements OnInit {
   }
 
   selectInvoice(inv: any) {
-    this.http.get<any>('http://localhost:8000/api/v1/billing/sales/' + encodeURIComponent(inv.invoice_no)).subscribe({
+    this.http.get<any>(`${environment.apiUrl}/billing/sales/` + encodeURIComponent(inv.invoice_no)).subscribe({
       next: (data) => {
         if (data.lines) {
           data.lines = data.lines.map((l: any) => ({ ...l, returnQty: l.qty }));
@@ -229,7 +230,7 @@ export class ReturnsComponent implements OnInit {
     if (user?.role) headers['X-User-Role'] = user.role;
     if (user?.username) headers['X-Username'] = user.username;
 
-    this.http.post<any>('http://localhost:8000/api/v1/billing/returns', returnPayload, { headers }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/billing/returns`, returnPayload, { headers }).subscribe({
       next: (res) => {
         alert(res.message || ('Return processed successfully! Refund issued for ' + item.name));
         this.searchInvoice();

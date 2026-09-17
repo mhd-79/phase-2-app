@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface CartItem {
   sku: string;
@@ -553,7 +554,7 @@ export class PosComponent implements OnInit {
       } catch (e) {}
     }
 
-    this.http.get<any>('http://localhost:8000/api/v1/settings/store').subscribe({
+    this.http.get<any>(`${environment.apiUrl}/settings/store`).subscribe({
       next: (res) => {
         if (res?.pricing_mode) {
           this.pricingMode = res.pricing_mode === 'inclusive' ? 'inclusive' : 'exclusive';
@@ -564,7 +565,7 @@ export class PosComponent implements OnInit {
   }
 
   loadCategories() {
-    this.http.get<string[]>('http://localhost:8000/api/v1/catalog/categories').subscribe({
+    this.http.get<string[]>(`${environment.apiUrl}/catalog/categories`).subscribe({
       next: (cats) => {
         if (cats && cats.length > 0) {
           this.categories = Array.from(new Set([...this.categories, ...cats]));
@@ -574,7 +575,7 @@ export class PosComponent implements OnInit {
   }
 
   loadCatalog() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/catalog/items').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/catalog/items`).subscribe({
       next: (data) => {
         this.catalogItems = data;
         const itemCats = (data || []).map((i: any) => i.category_name).filter((c: any) => !!c);
@@ -885,7 +886,7 @@ export class PosComponent implements OnInit {
     const token = localStorage.getItem('pos_token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-    this.http.post<any>('http://localhost:8000/api/v1/billing/held-bills', payload, { headers }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/billing/held-bills`, payload, { headers }).subscribe({
       next: () => {
         alert('Bill placed on hold successfully!');
         this.cart = [];
@@ -914,7 +915,7 @@ export class PosComponent implements OnInit {
   }
 
   openRecallModal() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/billing/held-bills').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/billing/held-bills`).subscribe({
       next: (list) => {
         this.heldBillsList = list || [];
         this.showRecallModal = true;
@@ -941,14 +942,14 @@ export class PosComponent implements OnInit {
       }
       const billId = h.id || h.held_id;
       if (billId) {
-        this.http.delete(`http://localhost:8000/api/v1/billing/held-bills/${billId}`).subscribe({ next: () => {} });
+        this.http.delete(`${environment.apiUrl}/billing/held-bills/${billId}`).subscribe({ next: () => {} });
       }
       this.showRecallModal = false;
     }
   }
 
   discardHeldBill(id: string) {
-    this.http.delete(`http://localhost:8000/api/v1/billing/held-bills/${id}`).subscribe({
+    this.http.delete(`${environment.apiUrl}/billing/held-bills/${id}`).subscribe({
       next: () => {
         this.heldBillsList = this.heldBillsList.filter(b => b.id !== id && b.held_id !== id);
       }
@@ -956,7 +957,7 @@ export class PosComponent implements OnInit {
   }
 
   recallBillDirect(heldId: string) {
-    this.http.get<any[]>('http://localhost:8000/api/v1/billing/held-bills').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/billing/held-bills`).subscribe({
       next: (list) => {
         const matching = (list || []).find(h => h.id === heldId || h.held_id === heldId);
         if (matching && matching.lines) {
@@ -966,7 +967,7 @@ export class PosComponent implements OnInit {
           } else {
             this.appliedDiscount = null;
           }
-          this.http.delete(`http://localhost:8000/api/v1/billing/held-bills/${heldId}`).subscribe({ next: () => {} });
+          this.http.delete(`${environment.apiUrl}/billing/held-bills/${heldId}`).subscribe({ next: () => {} });
         }
       }
     });
@@ -1008,7 +1009,7 @@ export class PosComponent implements OnInit {
       return;
     }
 
-    this.http.post<any>('http://localhost:8000/api/v1/billing/approve-discount', { pin: this.adminPinInput }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/billing/approve-discount`, { pin: this.adminPinInput }).subscribe({
       next: (res) => {
         if (res.approved) {
           this.showApprovalModal = false;
@@ -1146,7 +1147,7 @@ export class PosComponent implements OnInit {
     if (user?.role) headers['X-User-Role'] = user.role;
     if (user?.username) headers['X-Username'] = user.username;
 
-    this.http.post<any>('http://localhost:8000/api/v1/billing/sales', salePayload, { headers }).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/billing/sales`, salePayload, { headers }).subscribe({
       next: (res) => {
         this.completedSaleData = res;
         this.showPaymentModal = false;

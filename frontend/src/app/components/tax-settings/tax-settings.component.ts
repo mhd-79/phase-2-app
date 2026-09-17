@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-tax-settings',
@@ -66,7 +67,7 @@ export class TaxSettingsComponent implements OnInit {
   constructor(public auth: AuthService, private http: HttpClient) {}
 
   ngOnInit() {
-    this.http.get<any>('http://localhost:8000/api/v1/settings/store').subscribe({
+    this.http.get<any>(`${environment.apiUrl}/settings/store`).subscribe({
       next: (res) => {
         if (res?.pricing_mode) {
           this.pricingMode = res.pricing_mode;
@@ -90,7 +91,7 @@ export class TaxSettingsComponent implements OnInit {
     if (user?.role) headers['X-User-Role'] = user.role;
     if (user?.username) headers['X-Username'] = user.username;
 
-    this.http.put<any>('http://localhost:8000/api/v1/settings/store', { pricing_mode: this.pricingMode }, { headers }).subscribe({
+    this.http.put<any>(`${environment.apiUrl}/settings/store`, { pricing_mode: this.pricingMode }, { headers }).subscribe({
       next: (res) => {
         this.pricingMode = res.pricing_mode;
         localStorage.setItem('pos_tax_settings', JSON.stringify({ pricingMode: this.pricingMode }));

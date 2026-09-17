@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-stock-upload',
@@ -127,7 +128,7 @@ export class StockUploadComponent implements OnInit {
   ngOnInit() {}
 
   downloadSample() {
-    window.open('http://localhost:8000/api/v1/catalog/upload/sample', '_blank');
+    window.open(`${environment.apiUrl}/catalog/upload/sample`, '_blank');
   }
 
   loadSampleFile() {
@@ -154,7 +155,7 @@ export class StockUploadComponent implements OnInit {
       const formData = new FormData();
       formData.append('file', file);
 
-      this.http.post<any>('http://localhost:8000/api/v1/catalog/upload/preview', formData).subscribe({
+      this.http.post<any>(`${environment.apiUrl}/catalog/upload/preview`, formData).subscribe({
         next: (res) => {
           this.previewSummary = res;
           this.previewRows = res.rows || [];
@@ -169,7 +170,7 @@ export class StockUploadComponent implements OnInit {
   commitUpload() {
     if (this.previewRows.length === 0) return;
 
-    this.http.post<any>('http://localhost:8000/api/v1/catalog/upload/commit', this.previewRows).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/catalog/upload/commit`, this.previewRows).subscribe({
       next: (res) => {
         alert(res.message || 'Stock upload committed successfully!');
         this.previewRows = [];

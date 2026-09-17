@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-hold-bills',
@@ -102,7 +103,7 @@ export class HoldBillsComponent implements OnInit {
   }
 
   loadHeldBills() {
-    this.http.get<any[]>('http://localhost:8000/api/v1/billing/held-bills').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/billing/held-bills`).subscribe({
       next: (data) => {
         this.heldBills = data;
       },
@@ -123,7 +124,7 @@ export class HoldBillsComponent implements OnInit {
 
   discardBill(heldId: string) {
     if (!confirm('Discard this held bill?')) return;
-    this.http.delete<any>(`http://localhost:8000/api/v1/billing/held-bills/${heldId}`).subscribe({
+    this.http.delete<any>(`${environment.apiUrl}/billing/held-bills/${heldId}`).subscribe({
       next: () => {
         this.loadHeldBills();
       },

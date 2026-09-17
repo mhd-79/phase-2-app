@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-store-settings',
@@ -82,7 +83,7 @@ export class StoreSettingsComponent implements OnInit {
   constructor(public auth: AuthService, private http: HttpClient) {}
 
   ngOnInit() {
-    this.http.get<any>('http://localhost:8000/api/v1/settings/store').subscribe({
+    this.http.get<any>(`${environment.apiUrl}/settings/store`).subscribe({
       next: (res) => {
         if (res) {
           this.storeName = res.store_name || this.storeName;
@@ -111,7 +112,7 @@ export class StoreSettingsComponent implements OnInit {
       pricing_mode: this.pricingMode
     };
 
-    this.http.put<any>('http://localhost:8000/api/v1/settings/store', payload, { headers }).subscribe({
+    this.http.put<any>(`${environment.apiUrl}/settings/store`, payload, { headers }).subscribe({
       next: () => {
         alert('Store settings saved successfully!');
       },

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -215,7 +216,7 @@ export class LoginComponent {
       role: this.selectedRole
     };
 
-    this.http.post<any>('http://localhost:8000/api/v1/auth/login', payload).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/auth/login`, payload).subscribe({
       next: (res) => {
         this.isSubmitting = false;
         const uRole = res.role as 'admin' | 'cashier';
@@ -279,7 +280,7 @@ export class LoginComponent {
       reason: this.forgotReason.trim() || 'Forgot 4-digit PIN'
     };
 
-    this.http.post<any>('http://localhost:8000/api/v1/auth/forgot-pin', payload).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/auth/forgot-pin`, payload).subscribe({
       next: (res) => {
         this.submittingForgot = false;
         this.forgotSuccess = res.message || `PIN reset request for '${u}' was sent to Admin.`;
