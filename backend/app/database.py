@@ -8,19 +8,26 @@ except ImportError:
 
 db = Prisma()
 
+import asyncio
+
+_db_lock = asyncio.Lock()
+
 async def connect_db():
-    try:
+    if db.is_connected():
+        return
+    async with _db_lock:
         if not db.is_connected():
-            await db.connect()
-    except Exception as e:
-        print(f"Prisma connection notice: {e}")
-        try:
-            if db.is_connected():
-                await db.disconnect()
-        except:
-            pass
-        if not db.is_connected():
-            await db.connect()
+            try:
+                await db.connect()
+            except Exception as e:
+                print(f"Prisma connection notice: {e}", flush=True)
+                try:
+                    if db.is_connected():
+                        await db.disconnect()
+                except:
+                    pass
+                if not db.is_connected():
+                    await db.connect()
 
 async def disconnect_db():
     try:
