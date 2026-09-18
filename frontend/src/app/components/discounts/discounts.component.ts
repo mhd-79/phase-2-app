@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogService } from '../../core/services/catalog.service';
@@ -16,7 +16,7 @@ import { environment } from '../../../environments/environment';
       <aside class="sidebar">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
-          <div><div class="brand-name" style="font-weight:700">Greenfield Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
@@ -39,6 +39,19 @@ import { environment } from '../../../environments/environment';
             <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
+
+        <div class="sidebar__footer" style="margin-top:auto; padding:16px 8px 8px; border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
+            <div style="overflow:hidden;">
+              <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
+            <span>🚪</span> Sign Out
+          </button>
+        </div>
       </aside>
 
       <main class="main">
@@ -216,6 +229,7 @@ export class DiscountsComponent implements OnInit {
   constructor(
     public auth: AuthService,
     private http: HttpClient,
+    private router: Router,
     private catalogService: CatalogService
   ) {}
 
@@ -272,21 +286,21 @@ export class DiscountsComponent implements OnInit {
     this.showModal = true;
   }
 
-  openEditModal(r: any) {
+  openEditModal(rule: any) {
     if (!this.auth.isAdmin()) {
       alert('Only Admin can edit discounts.');
       return;
     }
 
-    this.editingDiscountId = r.id;
-    this.formName = r.name || '';
-    this.formType = (r.type === 'flat' ? 'flat' : 'percent');
-    this.formValue = r.value !== undefined ? r.value : null;
-    this.formAppliesTo = (r.applies_to === 'selected' ? 'selected' : 'all');
-    this.formSelectedSkus = Array.isArray(r.product_skus) ? [...r.product_skus] : [];
-    this.formStartDate = r.start_date || '';
-    this.formEndDate = r.end_date || '';
-    this.formIsActive = (r.status === 'active');
+    this.editingDiscountId = rule.id;
+    this.formName = rule.name || '';
+    this.formType = (rule.type === 'flat' ? 'flat' : 'percent');
+    this.formValue = rule.value !== undefined ? rule.value : null;
+    this.formAppliesTo = (rule.applies_to === 'selected' ? 'selected' : 'all');
+    this.formSelectedSkus = Array.isArray(rule.product_skus) ? [...rule.product_skus] : [];
+    this.formStartDate = rule.start_date || '';
+    this.formEndDate = rule.end_date || '';
+    this.formIsActive = (rule.status === 'active');
     this.saving = false;
 
     this.showModal = true;
@@ -295,6 +309,7 @@ export class DiscountsComponent implements OnInit {
   closeModal() {
     this.showModal = false;
     this.editingDiscountId = null;
+    this.saving = false;
   }
 
   onBackdropClick(event: MouseEvent) {
@@ -314,9 +329,15 @@ export class DiscountsComponent implements OnInit {
     }
   }
 
+  toggleSkuSelection(sku: string) {
+    this.toggleSku(sku);
+  }
+
   saveDiscount() {
+    if (this.saving) return;
+
     if (!this.formName || !this.formName.trim()) {
-      alert('Please enter a discount name.');
+      alert('Please provide a discount campaign name.');
       return;
     }
 
@@ -345,7 +366,10 @@ export class DiscountsComponent implements OnInit {
 
     const token = localStorage.getItem('pos_token');
     const user = this.auth.currentUser();
-    const headers: Record<string, string> = {};
+    const discTxId = 'disc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const headers: Record<string, string> = {
+      'Idempotency-Key': discTxId
+    };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (user?.role) headers['X-User-Role'] = user.role;
     if (user?.username) headers['X-Username'] = user.username;
@@ -389,5 +413,9 @@ export class DiscountsComponent implements OnInit {
       });
     }
   }
-}
 
+  signOut() {
+    this.auth.signOut();
+    this.router.navigate(['/login']);
+  }
+}

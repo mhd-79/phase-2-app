@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
@@ -15,7 +15,7 @@ import { environment } from '../../../environments/environment';
       <aside class="sidebar">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
-          <div><div class="brand-name" style="font-weight:700">Greenfield Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
@@ -38,6 +38,19 @@ import { environment } from '../../../environments/environment';
             <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
+
+        <div class="sidebar__footer" style="margin-top:auto; padding:16px 8px 8px; border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
+            <div style="overflow:hidden;">
+              <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
+            <span>🚪</span> Sign Out
+          </button>
+        </div>
       </aside>
 
       <main class="main">
@@ -47,7 +60,9 @@ import { environment } from '../../../environments/environment';
             <h1>Tax &amp; GST Configuration</h1>
             <p class="text-muted">Configure default tax mode (Tax Exclusive / Tax Inclusive) and GST slab rates.</p>
           </div>
-          <button class="btn btn-primary" (click)="saveTaxSettings()">Save Tax Settings</button>
+          <button class="btn btn-primary" [disabled]="isSavingTax" (click)="saveTaxSettings()">
+            {{ isSavingTax ? 'Saving...' : 'Save Tax Settings' }}
+          </button>
         </div>
 
         <div class="card" style="max-width:640px;">
@@ -63,8 +78,18 @@ import { environment } from '../../../environments/environment';
 })
 export class TaxSettingsComponent implements OnInit {
   pricingMode: string = 'exclusive';
+  isSavingTax: boolean = false;
 
-  constructor(public auth: AuthService, private http: HttpClient) {}
+  constructor(
+    public auth: AuthService,
+    private http: HttpClient,
+    private router: Router
+  ) {}
+
+  signOut() {
+    this.auth.signOut();
+    this.router.navigate(['/login']);
+  }
 
   ngOnInit() {
     this.http.get<any>(`${environment.apiUrl}/settings/store`).subscribe({
@@ -84,6 +109,9 @@ export class TaxSettingsComponent implements OnInit {
   }
 
   saveTaxSettings() {
+    if (this.isSavingTax) return;
+    this.isSavingTax = true;
+
     const token = localStorage.getItem('pos_token');
     const user = this.auth.currentUser();
     const headers: Record<string, string> = {};
@@ -93,11 +121,13 @@ export class TaxSettingsComponent implements OnInit {
 
     this.http.put<any>(`${environment.apiUrl}/settings/store`, { pricing_mode: this.pricingMode }, { headers }).subscribe({
       next: (res) => {
+        this.isSavingTax = false;
         this.pricingMode = res.pricing_mode;
         localStorage.setItem('pos_tax_settings', JSON.stringify({ pricingMode: this.pricingMode }));
         alert('Tax configuration saved successfully!');
       },
       error: () => {
+        this.isSavingTax = false;
         localStorage.setItem('pos_tax_settings', JSON.stringify({ pricingMode: this.pricingMode }));
         alert('Tax configuration saved!');
       }

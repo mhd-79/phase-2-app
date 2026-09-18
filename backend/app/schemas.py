@@ -4,8 +4,8 @@ from typing import List, Optional, Any, Dict
 # --- Auth ---
 class LoginRequest(BaseModel):
     username: str = Field(..., description="Unique user account handle (e.g. owner.arjun or priya.k)", example="priya.k")
-    pin: str = Field(..., description="4-digit security PIN for staff authentication", example="5678")
-    role: str = Field("cashier", description="Target access role ('admin' or 'cashier')", example="cashier")
+    pin: str = Field(..., description="4-digit security PIN for staff authentication", example="1234")
+    role: Optional[str] = Field("cashier", description="Target access role ('admin' or 'cashier')", example="cashier")
 
 class TokenResponse(BaseModel):
     access_token: str = Field(..., description="JWT Bearer access token")
@@ -236,11 +236,13 @@ class SaleCreate(BaseModel):
     pricing_mode: str = Field("exclusive", description="Tax computation mode ('exclusive' or 'inclusive')", example="exclusive")
     manual_discount: Optional[ManualDiscountInput] = Field(None, description="Bill-level manual discount")
     tenders: List[TenderInput] = Field(..., description="Payment tender breakup list")
+    idempotency_key: Optional[str] = Field(None, description="Optional client transaction idempotency key to prevent duplicate checkouts")
 
 class SaleReturnCreate(BaseModel):
     invoice_no: str = Field(..., description="Target invoice number to return", example="INV-FY26-01025")
     reason: Optional[str] = Field("Customer return", description="Return reason code or text", example="Defective packaging")
     items: List[Dict[str, Any]] = Field(..., description="Returned items list with SKUs and return quantities", example=[{"sku": "BEV-001", "qty": 1.0}])
+    idempotency_key: Optional[str] = Field(None, description="Optional client idempotency key to prevent duplicate refunds")
 
 class HeldBillCreate(BaseModel):
     id: Optional[str] = Field(None, description="Held bill reference ID", example="HOLD-3341")
@@ -249,6 +251,7 @@ class HeldBillCreate(BaseModel):
     item_count: Optional[float] = Field(None, description="Total line items count", example=3.0)
     itemCount: Optional[float] = Field(None, description="CamelCase alias for item_count", example=3.0)
     total: float = Field(..., description="Held total amount", example=140.0)
+    idempotency_key: Optional[str] = Field(None, description="Optional idempotency key to prevent duplicate holds")
 
     @property
     def computed_item_count(self) -> float:

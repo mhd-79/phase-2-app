@@ -1,5 +1,5 @@
 import re
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Header
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
@@ -7,6 +7,7 @@ from app.schemas import SaleCreate, SaleReturnCreate, HeldBillCreate, PinVerifyR
 from app.security import get_current_user, verify_pin
 from app.pricing_engine import compute_cart_totals, render_receipt_html
 from app.database import db
+from app.idempotency import idempotency_manager, generate_fingerprint
 
 router = APIRouter(prefix="/billing", tags=["Billing & POS"])
 
@@ -90,112 +91,127 @@ async def approve_discount(req: PinVerifyRequest):
     summary="Complete Checkout Sale Transaction",
     description="Processes sale checkout, verifies item stock, generates sequential invoice number (INV-FY26-XXXXX), records sale items and payment tenders, automatically deducts inventory stock, and generates thermal receipt HTML."
 )
-async def create_sale(req: SaleCreate, user = Depends(get_current_user)):
-    discounts_db = await db.discount.find_many(where={"status": "active"})
-    active_discounts = [d.dict() for d in discounts_db]
-    
-    pricing_mode = req.pricing_mode
-    if not pricing_mode:
+async def create_sale(
+    req: SaleCreate,
+    idempotency_key_header: Optional[str] = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key_header: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+    user = Depends(get_current_user)
+):
+    idem_key = req.idempotency_key or idempotency_key_header or x_idempotency_key_header
+    if not idem_key:
+        idem_key = generate_fingerprint("sale", user.username, req)
+    else:
+        idem_key = f"sale:{idem_key}"
+
+    async def do_create_sale():
+        discounts_db = await db.discount.find_many(where={"status": "active"})
+        active_discounts = [d.dict() for d in discounts_db]
+        
+        pricing_mode = req.pricing_mode
+        if not pricing_mode:
+            store = await db.storesettings.find_unique(where={"id": "store_main"})
+            pricing_mode = store.pricing_mode if store else "exclusive"
+
+        cart_dicts = [l.dict() for l in req.lines]
+        manual_disc = req.manual_discount.dict() if req.manual_discount else {"type": "percent", "value": 0.0}
+        totals = compute_cart_totals(cart_dicts, pricing_mode, manual_disc, active_discounts)
+        
+        for line in req.lines:
+            item = await db.item.find_unique(where={"sku": line.sku})
+            if item and item.stock < line.qty:
+                raise HTTPException(status_code=400, detail=f"Insufficient stock for {line.name} (Available: {item.stock})")
+                
+        invoice_no = await generate_next_invoice_no()
+        
+        sale = await db.sale.create(data={
+            "invoice_no": invoice_no,
+            "created_by_username": user.username,
+            "pricing_mode": pricing_mode,
+            "subtotal_original": totals["subtotal_original"],
+            "auto_discount_total": totals["auto_discount_total"],
+            "manual_discount_total": totals["manual_discount_total"],
+            "discount_total": totals["discount_total"],
+            "taxable_total": totals["taxable_total"],
+            "gst_total": totals["gst_total"],
+            "grand_total": totals["grand_total"],
+            "status": "COMPLETED"
+        })
+        
+        saved_items = []
+        for l in totals["lines"]:
+            item_rec = await db.saleitem.create(data={
+                "sale_id": sale.id,
+                "sku": l["sku"],
+                "name": l["name"],
+                "price": l["price"],
+                "tax_rate": l["tax"],
+                "qty": l["qty"],
+                "unit": l["unit"],
+                "pricing_method": l["pricing_method"],
+                "original_amount": l["original_amount"],
+                "discount_amount": l["discount_amount"],
+                "discount_name": l["discount_name"],
+                "taxable_amount": l["taxable_amount"],
+                "gst_amount": l["gst_amount"],
+                "final_amount": l["final_amount"]
+            })
+            saved_items.append(item_rec.dict())
+            
+            db_item = await db.item.find_unique(where={"sku": l["sku"]})
+            if db_item:
+                precision = 3 if l["unit"] == "kg" else 2
+                new_stock = max(0.0, round(db_item.stock - l["qty"], precision))
+                await db.item.update(where={"sku": l["sku"]}, data={"stock": new_stock})
+                
+        saved_tenders = []
+        for t in req.tenders:
+            t_rec = await db.saletender.create(data={
+                "sale_id": sale.id,
+                "mode": t.mode,
+                "amount": t.amount
+            })
+            saved_tenders.append({"mode": t_rec.mode, "amount": t_rec.amount})
+            
+        try:
+            await db.auditlog.create(data={
+                "username": user.username,
+                "action": "Bill completed",
+                "details_json": json.dumps({"reference": invoice_no, "grand_total": sale.grand_total})
+            })
+        except Exception as e:
+            print(f"Audit log notice: {e}")
+
+        sale_record = {
+            "id": sale.id,
+            "invoice_no": invoice_no,
+            "time": sale.time.isoformat(),
+            "cashier_username": user.username,
+            "cashier_name": user.full_name,
+            "pricing_mode": sale.pricing_mode,
+            "lines": saved_items,
+            "tenders": saved_tenders,
+            "subtotal_original": sale.subtotal_original,
+            "auto_discount_total": sale.auto_discount_total,
+            "manual_discount_total": sale.manual_discount_total,
+            "discount_total": sale.discount_total,
+            "taxable_total": sale.taxable_total,
+            "gst_total": sale.gst_total,
+            "grand_total": sale.grand_total,
+            "status": sale.status
+        }
+        
         store = await db.storesettings.find_unique(where={"id": "store_main"})
-        pricing_mode = store.pricing_mode if store else "exclusive"
+        store_dict = {
+            "store_name": store.store_name if store else "Okuto Mart",
+            "address": store.address if store else "12, MG Road, Bengaluru",
+            "gstin": store.gstin if store else "29ABCDE1234F1Z5"
+        }
+        receipt_html = render_receipt_html(sale_record, store_dict)
+        sale_record["receipt_html"] = receipt_html
+        return sale_record
 
-    cart_dicts = [l.dict() for l in req.lines]
-    manual_disc = req.manual_discount.dict() if req.manual_discount else {"type": "percent", "value": 0.0}
-    totals = compute_cart_totals(cart_dicts, pricing_mode, manual_disc, active_discounts)
-    
-    for line in req.lines:
-        item = await db.item.find_unique(where={"sku": line.sku})
-        if item and item.stock < line.qty:
-            raise HTTPException(status_code=400, detail=f"Insufficient stock for {line.name} (Available: {item.stock})")
-            
-    invoice_no = await generate_next_invoice_no()
-    
-    sale = await db.sale.create(data={
-        "invoice_no": invoice_no,
-        "created_by_username": user.username,
-        "pricing_mode": pricing_mode,
-        "subtotal_original": totals["subtotal_original"],
-        "auto_discount_total": totals["auto_discount_total"],
-        "manual_discount_total": totals["manual_discount_total"],
-        "discount_total": totals["discount_total"],
-        "taxable_total": totals["taxable_total"],
-        "gst_total": totals["gst_total"],
-        "grand_total": totals["grand_total"],
-        "status": "COMPLETED"
-    })
-    
-    saved_items = []
-    for l in totals["lines"]:
-        item_rec = await db.saleitem.create(data={
-            "sale_id": sale.id,
-            "sku": l["sku"],
-            "name": l["name"],
-            "price": l["price"],
-            "tax_rate": l["tax"],
-            "qty": l["qty"],
-            "unit": l["unit"],
-            "pricing_method": l["pricing_method"],
-            "original_amount": l["original_amount"],
-            "discount_amount": l["discount_amount"],
-            "discount_name": l["discount_name"],
-            "taxable_amount": l["taxable_amount"],
-            "gst_amount": l["gst_amount"],
-            "final_amount": l["final_amount"]
-        })
-        saved_items.append(item_rec.dict())
-        
-        db_item = await db.item.find_unique(where={"sku": l["sku"]})
-        if db_item:
-            precision = 3 if l["unit"] == "kg" else 2
-            new_stock = max(0.0, round(db_item.stock - l["qty"], precision))
-            await db.item.update(where={"sku": l["sku"]}, data={"stock": new_stock})
-            
-    saved_tenders = []
-    for t in req.tenders:
-        t_rec = await db.saletender.create(data={
-            "sale_id": sale.id,
-            "mode": t.mode,
-            "amount": t.amount
-        })
-        saved_tenders.append({"mode": t_rec.mode, "amount": t_rec.amount})
-        
-    try:
-        await db.auditlog.create(data={
-            "username": user.username,
-            "action": "Bill completed",
-            "details_json": json.dumps({"reference": invoice_no, "grand_total": sale.grand_total})
-        })
-    except Exception as e:
-        print(f"Audit log notice: {e}")
-
-    sale_record = {
-        "id": sale.id,
-        "invoice_no": invoice_no,
-        "time": sale.time.isoformat(),
-        "cashier_username": user.username,
-        "cashier_name": user.full_name,
-        "pricing_mode": sale.pricing_mode,
-        "lines": saved_items,
-        "tenders": saved_tenders,
-        "subtotal_original": sale.subtotal_original,
-        "auto_discount_total": sale.auto_discount_total,
-        "manual_discount_total": sale.manual_discount_total,
-        "discount_total": sale.discount_total,
-        "taxable_total": sale.taxable_total,
-        "gst_total": sale.gst_total,
-        "grand_total": sale.grand_total,
-        "status": sale.status
-    }
-    
-    store = await db.storesettings.find_unique(where={"id": "store_main"})
-    store_dict = {
-        "store_name": store.store_name if store else "Greenfield Mart",
-        "address": store.address if store else "12, MG Road, Bengaluru",
-        "gstin": store.gstin if store else "29ABCDE1234F1Z5"
-    }
-    receipt_html = render_receipt_html(sale_record, store_dict)
-    sale_record["receipt_html"] = receipt_html
-    return sale_record
+    res, _ = await idempotency_manager.execute(idem_key, do_create_sale, status_code=status.HTTP_201_CREATED)
+    return res
 
 @router.get(
     "/invoices/search",
@@ -276,7 +292,7 @@ async def get_sale_by_invoice(invoice_no: str):
     }
     store = await db.storesettings.find_unique(where={"id": "store_main"})
     store_dict = {
-        "store_name": store.store_name if store else "Greenfield Mart",
+        "store_name": store.store_name if store else "Okuto Mart",
         "address": store.address if store else "12, MG Road, Bengaluru",
         "gstin": store.gstin if store else "29ABCDE1234F1Z5"
     }
@@ -288,77 +304,120 @@ async def get_sale_by_invoice(invoice_no: str):
     summary="Process Full or Partial Return and Refund",
     description="Processes full or partial product returns against an existing invoice, restores item inventory stock in database, creates a return record (RET-FY26-XXXXX), and updates invoice status."
 )
-async def process_return(req: SaleReturnCreate, user = Depends(get_current_user)):
-    q = req.invoice_no.strip()
-    sale = await db.sale.find_unique(
-        where={"invoice_no": q},
-        include={"items": True}
-    )
-    if not sale:
-        all_sales = await db.sale.find_many(include={"items": True})
-        sale = next((s for s in all_sales if s.invoice_no.lower() == q.lower() or q.lower() in s.invoice_no.lower()), None)
-    if not sale:
-        raise HTTPException(status_code=404, detail="Invoice not found for return")
-        
-    return_no = await generate_next_return_no()
-    
-    total_refund = 0.0
-    return_items_data = []
-    
-    for r_item in req.items:
-        sku = r_item.get("sku")
-        qty = float(r_item.get("qty", 1))
-        if not sku or qty <= 0:
-            continue
-        matching_sale_item = next((i for i in sale.items if i.sku == sku), None)
-        if not matching_sale_item:
-            continue
-            
-        unit_final_price = matching_sale_item.final_amount / matching_sale_item.qty if matching_sale_item.qty > 0 else matching_sale_item.price
-        refund_amount = round(qty * unit_final_price, 2)
-        total_refund += refund_amount
-        return_items_data.append({"sku": sku, "qty": qty, "refund_amount": refund_amount})
-        
-        # Restore Stock in database
-        db_item = await db.item.find_unique(where={"sku": sku})
-        if db_item:
-            precision = 3 if matching_sale_item.unit == "kg" else 2
-            await db.item.update(where={"sku": sku}, data={"stock": round(db_item.stock + qty, precision)})
-            
-    ret_rec = await db.salereturn.create(data={
-        "return_no": return_no,
-        "invoice_no": sale.invoice_no,
-        "sale_id": sale.id,
-        "created_by_username": user.username,
-        "total_refund": total_refund,
-        "reason": req.reason or "Customer Return"
-    })
-    
-    for r_data in return_items_data:
-        await db.returnitem.create(data={
-            "return_id": ret_rec.id,
-            "sku": r_data["sku"],
-            "qty": r_data["qty"],
-            "refund_amount": r_data["refund_amount"]
-        })
-        
-    await db.sale.update(where={"id": sale.id}, data={"status": "RETURNED"})
-    
-    try:
-        await db.auditlog.create(data={
-            "username": user.username,
-            "action": "Return processed",
-            "details_json": json.dumps({"reference": sale.invoice_no, "return_no": return_no, "refund": total_refund})
-        })
-    except Exception as e:
-        print(f"Audit log notice: {e}")
+async def process_return(
+    req: SaleReturnCreate,
+    idempotency_key_header: Optional[str] = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key_header: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+    user = Depends(get_current_user)
+):
+    idem_key = req.idempotency_key or idempotency_key_header or x_idempotency_key_header
+    if not idem_key:
+        idem_key = generate_fingerprint("return", user.username, req)
+    else:
+        idem_key = f"return:{idem_key}"
 
-    return {
-        "return_no": return_no,
-        "invoice_no": sale.invoice_no,
-        "total_refund": total_refund,
-        "message": f"Return processed successfully. Stock restored for {len(return_items_data)} line item(s)."
-    }
+    async def do_process_return():
+        q = req.invoice_no.strip()
+        sale = await db.sale.find_unique(
+            where={"invoice_no": q},
+            include={"items": True}
+        )
+        if not sale:
+            all_sales = await db.sale.find_many(include={"items": True})
+            sale = next((s for s in all_sales if s.invoice_no.lower() == q.lower() or q.lower() in s.invoice_no.lower()), None)
+        if not sale:
+            raise HTTPException(status_code=404, detail="Invoice not found for return")
+            
+        # Check previous returns for this sale to prevent double-refunding and duplicate stock restoration
+        past_returns = await db.salereturn.find_many(
+            where={"sale_id": sale.id},
+            include={"items": True}
+        )
+        already_returned_qty = {}
+        for pr in past_returns:
+            for p_item in pr.items:
+                already_returned_qty[p_item.sku] = already_returned_qty.get(p_item.sku, 0.0) + p_item.qty
+
+        total_refund = 0.0
+        return_items_data = []
+        
+        for r_item in req.items:
+            sku = r_item.get("sku")
+            qty = float(r_item.get("qty", 1))
+            if not sku or qty <= 0:
+                continue
+            matching_sale_item = next((i for i in sale.items if i.sku == sku), None)
+            if not matching_sale_item:
+                continue
+            
+            previously_returned = already_returned_qty.get(sku, 0.0)
+            remaining_refundable = max(0.0, matching_sale_item.qty - previously_returned)
+            if remaining_refundable <= 0:
+                continue
+            actual_return_qty = min(qty, remaining_refundable)
+
+            unit_final_price = matching_sale_item.final_amount / matching_sale_item.qty if matching_sale_item.qty > 0 else matching_sale_item.price
+            refund_amount = round(actual_return_qty * unit_final_price, 2)
+            total_refund += refund_amount
+            return_items_data.append({
+                "sku": sku,
+                "qty": actual_return_qty,
+                "refund_amount": refund_amount,
+                "unit": matching_sale_item.unit
+            })
+
+        if not return_items_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No eligible items to return. The requested items have already been fully returned and refunded."
+            )
+            
+        return_no = await generate_next_return_no()
+        
+        # Restore Stock in database strictly once
+        for r_data in return_items_data:
+            db_item = await db.item.find_unique(where={"sku": r_data["sku"]})
+            if db_item:
+                precision = 3 if r_data["unit"] == "kg" else 2
+                await db.item.update(where={"sku": r_data["sku"]}, data={"stock": round(db_item.stock + r_data["qty"], precision)})
+
+        ret_rec = await db.salereturn.create(data={
+            "return_no": return_no,
+            "invoice_no": sale.invoice_no,
+            "sale_id": sale.id,
+            "created_by_username": user.username,
+            "total_refund": total_refund,
+            "reason": req.reason or "Customer Return"
+        })
+        
+        for r_data in return_items_data:
+            await db.returnitem.create(data={
+                "return_id": ret_rec.id,
+                "sku": r_data["sku"],
+                "qty": r_data["qty"],
+                "refund_amount": r_data["refund_amount"]
+            })
+            
+        await db.sale.update(where={"id": sale.id}, data={"status": "RETURNED"})
+        
+        try:
+            await db.auditlog.create(data={
+                "username": user.username,
+                "action": "Return processed",
+                "details_json": json.dumps({"reference": sale.invoice_no, "return_no": return_no, "refund": total_refund})
+            })
+        except Exception as e:
+            print(f"Audit log notice: {e}")
+
+        return {
+            "return_no": return_no,
+            "invoice_no": sale.invoice_no,
+            "total_refund": total_refund,
+            "message": f"Return processed successfully. Stock restored for {len(return_items_data)} line item(s)."
+        }
+
+    res, _ = await idempotency_manager.execute(idem_key, do_process_return)
+    return res
 
 # --- Hold & Recall ---
 @router.get(
@@ -390,34 +449,49 @@ async def get_held_bills():
     summary="Hold Current Bill",
     description="Holds an in-progress checkout bill to be resumed later."
 )
-async def hold_bill(req: HeldBillCreate, user = Depends(get_current_user)):
-    held_id = req.id or f"HOLD-{int(datetime.now().timestamp()*1000)}"
-    existing = await db.heldbill.find_unique(where={"held_id": held_id})
-    lines_str = json.dumps(req.lines)
-    disc_str = json.dumps(req.discount or {})
-    item_count = req.computed_item_count
-    username = user.username if user else "priya.k"
-    
-    if existing:
-        h = await db.heldbill.update(
-            where={"held_id": held_id},
-            data={
+async def hold_bill(
+    req: HeldBillCreate,
+    idempotency_key_header: Optional[str] = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key_header: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+    user = Depends(get_current_user)
+):
+    idem_key = req.idempotency_key or idempotency_key_header or x_idempotency_key_header
+    if not idem_key:
+        idem_key = generate_fingerprint("hold", user.username if user else "cashier", req)
+    else:
+        idem_key = f"hold:{idem_key}"
+
+    async def do_hold():
+        held_id = req.id or f"HOLD-{int(datetime.now().timestamp()*1000)}"
+        existing = await db.heldbill.find_unique(where={"held_id": held_id})
+        lines_str = json.dumps(req.lines)
+        disc_str = json.dumps(req.discount or {})
+        item_count = req.computed_item_count
+        username = user.username if user else "priya.k"
+        
+        if existing:
+            h = await db.heldbill.update(
+                where={"held_id": held_id},
+                data={
+                    "lines_json": lines_str,
+                    "discount_json": disc_str,
+                    "item_count": item_count,
+                    "total": req.total
+                }
+            )
+        else:
+            h = await db.heldbill.create(data={
+                "held_id": held_id,
+                "created_by_username": username,
                 "lines_json": lines_str,
                 "discount_json": disc_str,
                 "item_count": item_count,
                 "total": req.total
-            }
-        )
-    else:
-        h = await db.heldbill.create(data={
-            "held_id": held_id,
-            "created_by_username": username,
-            "lines_json": lines_str,
-            "discount_json": disc_str,
-            "item_count": item_count,
-            "total": req.total
-        })
-    return {"held_id": h.held_id, "message": "Bill held successfully"}
+            })
+        return {"held_id": h.held_id, "message": "Bill held successfully"}
+
+    res, _ = await idempotency_manager.execute(idem_key, do_hold)
+    return res
 
 @router.delete(
     "/held-bills/{held_id}",

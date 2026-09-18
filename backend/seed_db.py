@@ -90,7 +90,7 @@ DEMO_DISCOUNTS = [
 
 DEMO_STORE = {
     "id": "store_main",
-    "store_name": "Greenfield Mart",
+    "store_name": "Okuto Mart",
     "address": "12, MG Road, Bengaluru, Karnataka 560001",
     "phone": "+91 98450 12345",
     "gstin": "29ABCDE1234F1Z5",

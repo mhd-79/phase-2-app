@@ -34,7 +34,7 @@ interface TenderLine {
       <aside class="sidebar">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
-          <div><div class="brand-name" style="font-weight:700">Greenfield Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
@@ -75,12 +75,25 @@ interface TenderLine {
             </a>
           </ng-container>
         </nav>
+
+        <div class="sidebar__footer" style="margin-top:auto; padding:16px 8px 8px; border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
+            <div style="overflow:hidden;">
+              <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
+            <span>🚪</span> Sign Out
+          </button>
+        </div>
       </aside>
 
       <!-- TOPBAR -->
       <header class="topbar">
         <div class="row">
-          <span style="font-weight:700; color:var(--primary)">Greenfield Mart POS</span>
+          <span style="font-weight:700; color:var(--primary)">Okuto Mart POS</span>
         </div>
         <div class="row" style="display:flex; gap:12px; align-items:center;">
           <div class="user-chip" style="display:flex; gap:8px; align-items:center;">
@@ -130,8 +143,8 @@ interface TenderLine {
           <aside class="cart-panel">
             <!-- TOP HOLD & RECALL BUTTONS (FIGURE 1) -->
             <div style="display:flex; justify-content:flex-end; gap:8px; padding:12px 16px 4px;">
-              <button class="btn btn-secondary btn-sm" style="border-radius:8px; display:flex; align-items:center; gap:6px; font-weight:500;" [disabled]="cart.length === 0" (click)="holdBill()">
-                <span style="font-size:13px;">⏸️</span> Hold Bill
+              <button class="btn btn-secondary btn-sm" style="border-radius:8px; display:flex; align-items:center; gap:6px; font-weight:500;" [disabled]="cart.length === 0 || isHoldingBill" (click)="holdBill()">
+                <span style="font-size:13px;">⏸️</span> {{ isHoldingBill ? 'Holding...' : 'Hold Bill' }}
               </button>
               <button class="btn btn-secondary btn-sm" style="border-radius:8px; font-weight:500;" (click)="openRecallModal()">
                 Recall Bill
@@ -298,8 +311,8 @@ interface TenderLine {
 
         <div class="modal-footer" style="padding:16px 24px; display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border);">
           <button class="btn btn-secondary" (click)="closePaymentModal()">Cancel</button>
-          <button class="btn" [style.background]="remainingAmount <= 0 ? '#7cdac0' : '#cbd5e1'" [style.color]="remainingAmount <= 0 ? '#fff' : '#64748b'" style="font-weight:700; border:none; padding:10px 20px; border-radius:8px;" [disabled]="remainingAmount > 0" (click)="completeSale()">
-            Complete Sale
+          <button class="btn" [style.background]="remainingAmount <= 0 && !isCompletingSale ? '#7cdac0' : '#cbd5e1'" [style.color]="remainingAmount <= 0 && !isCompletingSale ? '#fff' : '#64748b'" style="font-weight:700; border:none; padding:10px 20px; border-radius:8px;" [disabled]="remainingAmount > 0 || isCompletingSale || cart.length === 0" (click)="completeSale()">
+            {{ isCompletingSale ? '⏳ Processing Sale...' : 'Complete Sale' }}
           </button>
         </div>
       </div>
@@ -354,7 +367,9 @@ interface TenderLine {
         </div>
         <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
           <button class="btn btn-secondary" (click)="showApprovalModal = false">Cancel</button>
-          <button class="btn btn-primary" (click)="approveDiscount()">Authorize</button>
+          <button class="btn btn-primary" [disabled]="isApprovingDiscount" (click)="approveDiscount()">
+            {{ isApprovingDiscount ? 'Authorizing...' : 'Authorize' }}
+          </button>
         </div>
       </div>
     </div>
@@ -410,7 +425,7 @@ interface TenderLine {
           <button class="btn btn-ghost btn-sm" (click)="showReceiptModal = false">✕</button>
         </div>
         <div class="modal-body" style="font-family:monospace; background:#fafafa; border:1px solid #e2e8f0; padding:16px; border-radius:8px; font-size:12px;">
-          <div style="text-align:center; font-weight:700; font-size:14px; margin-bottom:8px;">Greenfield Mart</div>
+          <div style="text-align:center; font-weight:700; font-size:14px; margin-bottom:8px;">Okuto Mart</div>
           <div style="text-align:center; margin-bottom:12px;">Invoice: {{ completedSaleData.invoice_no }} &middot; {{ completedSaleData.time | date:'short' }}</div>
           <div style="border-bottom:1px dashed #cbd5e1; margin-bottom:8px;"></div>
           <div *ngFor="let l of completedSaleData.lines" style="display:flex; justify-content:space-between; margin-bottom:4px;">
@@ -515,6 +530,12 @@ export class PosComponent implements OnInit {
   selectedTenderMode: 'Cash' | 'Card' | 'UPI' = 'Cash';
   keypadInputString: string = '0';
   tenders: TenderLine[] = [{ mode: 'Cash', amount: 0 }];
+
+  // DUPLICATE PROTECTION & IDEMPOTENCY FLAGS
+  isCompletingSale: boolean = false;
+  isHoldingBill: boolean = false;
+  isApprovingDiscount: boolean = false;
+  currentSaleTxId: string = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
 
   // RECEIPT STATE
   showReceiptModal: boolean = false;
@@ -874,13 +895,16 @@ export class PosComponent implements OnInit {
 
   // --- FIGURE 1: HOLD & RECALL METHODS ---
   holdBill() {
-    if (this.cart.length === 0) return;
+    if (this.cart.length === 0 || this.isHoldingBill) return;
+    this.isHoldingBill = true;
+
     const payload = {
       lines: this.cart,
       discount: this.appliedDiscount,
       item_count: this.totalItemsCount,
       itemCount: this.totalItemsCount,
-      total: this.grandTotal
+      total: this.grandTotal,
+      idempotency_key: 'hold_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)
     };
 
     const token = localStorage.getItem('pos_token');
@@ -888,11 +912,13 @@ export class PosComponent implements OnInit {
 
     this.http.post<any>(`${environment.apiUrl}/billing/held-bills`, payload, { headers }).subscribe({
       next: () => {
+        this.isHoldingBill = false;
         alert('Bill placed on hold successfully!');
         this.cart = [];
         this.appliedDiscount = null;
       },
       error: (err) => {
+        this.isHoldingBill = false;
         let msg = 'Failed to hold bill';
         if (err.error) {
           if (typeof err.error.detail === 'string') {
@@ -1004,13 +1030,15 @@ export class PosComponent implements OnInit {
   }
 
   approveDiscount() {
-    if (!this.adminPinInput.trim()) {
-      alert('Please enter Admin PIN');
+    if (!this.adminPinInput.trim() || this.isApprovingDiscount) {
+      if (!this.adminPinInput.trim()) alert('Please enter Admin PIN');
       return;
     }
+    this.isApprovingDiscount = true;
 
     this.http.post<any>(`${environment.apiUrl}/billing/approve-discount`, { pin: this.adminPinInput }).subscribe({
       next: (res) => {
+        this.isApprovingDiscount = false;
         if (res.approved) {
           this.showApprovalModal = false;
           this.adminPinInput = '';
@@ -1021,14 +1049,8 @@ export class PosComponent implements OnInit {
         }
       },
       error: () => {
-        if (this.adminPinInput === '9999' || this.adminPinInput.length >= 4) {
-          this.showApprovalModal = false;
-          this.adminPinInput = '';
-          const val = Number(this.discountValueInput || 0);
-          this.commitDiscount(this.discountType, val);
-        } else {
-          alert('Invalid Admin PIN entered');
-        }
+        this.isApprovingDiscount = false;
+        alert('Invalid Admin PIN entered. Only active Admin credentials can authorize this discount.');
       }
     });
   }
@@ -1123,7 +1145,8 @@ export class PosComponent implements OnInit {
   }
 
   completeSale() {
-    if (this.remainingAmount > 0) return;
+    if (this.remainingAmount > 0 || this.isCompletingSale || this.cart.length === 0) return;
+    this.isCompletingSale = true;
 
     const salePayload = {
       lines: this.cart.map(l => ({
@@ -1137,12 +1160,15 @@ export class PosComponent implements OnInit {
       })),
       pricing_mode: this.pricingMode,
       manual_discount: this.appliedDiscount ? { type: this.appliedDiscount.type, value: this.appliedDiscount.value } : { type: 'percent', value: 0 },
-      tenders: this.tenders.map(t => ({ mode: t.mode, amount: t.amount }))
+      tenders: this.tenders.map(t => ({ mode: t.mode, amount: t.amount })),
+      idempotency_key: this.currentSaleTxId
     };
 
     const token = localStorage.getItem('pos_token');
     const user = this.auth.currentUser();
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      'Idempotency-Key': this.currentSaleTxId
+    };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (user?.role) headers['X-User-Role'] = user.role;
     if (user?.username) headers['X-Username'] = user.username;
@@ -1154,8 +1180,12 @@ export class PosComponent implements OnInit {
         this.showReceiptModal = true;
         this.cart = [];
         this.appliedDiscount = null;
+        this.currentSaleTxId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        this.isCompletingSale = false;
+        this.loadCatalog(); // refresh catalog stock counts
       },
       error: (err) => {
+        this.isCompletingSale = false;
         let msg = 'Failed to complete sale transaction';
         if (err.error?.detail) {
           msg = typeof err.error.detail === 'string' ? err.error.detail : JSON.stringify(err.error.detail);
@@ -1172,7 +1202,7 @@ export class PosComponent implements OnInit {
 
     const receiptHtml = this.completedSaleData.receipt_html || `
       <div style="text-align:center;margin-bottom:12px">
-        <strong>Greenfield Mart</strong>
+        <strong>Okuto Mart</strong>
         <div style="font-size:11px;color:#666">12, MG Road, Bengaluru &middot; GSTIN 29ABCDE1234F1Z5</div>
       </div>
       <hr style="border:none;border-top:1px dashed #999;margin:8px 0">

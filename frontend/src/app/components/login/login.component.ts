@@ -29,7 +29,7 @@ import { environment } from '../../../environments/environment';
       <div class="login-panel">
         <div class="login-card">
           <h2 style="margin-bottom:var(--space-1)">Welcome back</h2>
-          <p class="text-muted text-sm" style="margin-bottom:var(--space-6)">Sign in to Greenfield Mart POS</p>
+          <p class="text-muted text-sm" style="margin-bottom:var(--space-6)">Sign in to Okuto Mart POS</p>
 
           <div class="role-tabs">
             <button type="button" [class.active]="selectedRole === 'cashier'" (click)="setRole('cashier')">Cashier</button>

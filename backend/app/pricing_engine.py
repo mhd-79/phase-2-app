@@ -175,7 +175,7 @@ def compute_cart_totals(
 def render_receipt_html(sale_record: Dict[str, Any], store_info: Optional[Dict[str, Any]] = None) -> str:
     if not store_info:
         store_info = {
-            "store_name": "Greenfield Mart",
+            "store_name": "Okuto Mart",
             "address": "12, MG Road, Bengaluru",
             "gstin": "29ABCDE1234F1Z5"
         }

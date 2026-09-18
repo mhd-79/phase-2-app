@@ -1,4 +1,4 @@
-﻿import { Component } from "@angular/core";
+import { Component } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 
@@ -36,7 +36,7 @@ import { FormsModule } from "@angular/forms";
   `
 })
 export class StoreSettingsComponent {
-  storeName = "Greenfield Mart";
+  storeName = "Okuto Mart";
   storeAddress = "Store #01 · MG Road Branch, Bangalore";
   gstin = "29AAAAA0000A1Z5";
   receiptFooter = "Thank You! Visit Again";

@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Full Swagger/OpenAPI documentation for Greenfield Mart Phase 1 Billing & POS REST API engine. Supports fast checkout, tax breakdown, stock deduction, returns, multi-counter cash drawers, custom categories, stock upload, auto-lock timeouts, and AI best-selling insights.",
+    description="Full Swagger/OpenAPI documentation for Okuto Mart Phase 1 Billing & POS REST API engine. Supports fast checkout, tax breakdown, stock deduction, returns, multi-counter cash drawers, custom categories, stock upload, auto-lock timeouts, and AI best-selling insights.",
     version=settings.VERSION,
     openapi_tags=tags_metadata,
     lifespan=lifespan

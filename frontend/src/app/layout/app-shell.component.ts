@@ -16,7 +16,7 @@ import { BillingService } from "../core/services/billing.service";
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
           <div>
-            <div class="brand-name">Greenfield Mart</div>
+            <div class="brand-name">Okuto Mart</div>
             <div class="brand-tag">Phase 1 &middot; Core Billing</div>
           </div>
         </div>

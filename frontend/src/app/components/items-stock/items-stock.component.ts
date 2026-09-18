@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
@@ -15,7 +15,7 @@ import { environment } from '../../../environments/environment';
       <aside class="sidebar">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
-          <div><div class="brand-name" style="font-weight:700">Greenfield Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
@@ -38,6 +38,19 @@ import { environment } from '../../../environments/environment';
             <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
+
+        <div class="sidebar__footer" style="margin-top:auto; padding:16px 8px 8px; border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
+            <div style="overflow:hidden;">
+              <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
+            <span>🚪</span> Sign Out
+          </button>
+        </div>
       </aside>
 
       <main class="main">
@@ -120,7 +133,9 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="modal-footer" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
           <button class="btn btn-secondary" (click)="showAddCategory = false">Cancel</button>
-          <button class="btn btn-primary" (click)="saveCategory()">Save Category</button>
+          <button class="btn btn-primary" [disabled]="isSavingCategory || !newCategoryName.trim()" (click)="saveCategory()">
+            {{ isSavingCategory ? 'Saving...' : 'Save Category' }}
+          </button>
         </div>
       </div>
     </div>
@@ -187,7 +202,9 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="modal-footer" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
           <button class="btn btn-secondary" (click)="showAddItem = false">Cancel</button>
-          <button class="btn btn-primary" (click)="saveItem()">Create Item</button>
+          <button class="btn btn-primary" [disabled]="isSavingItem" (click)="saveItem()">
+            {{ isSavingItem ? 'Saving...' : 'Create Item' }}
+          </button>
         </div>
       </div>
     </div>
@@ -201,6 +218,8 @@ export class ItemsStockComponent implements OnInit {
   searchQuery: string = '';
   showAddCategory: boolean = false;
   showAddItem: boolean = false;
+  isSavingItem: boolean = false;
+  isSavingCategory: boolean = false;
   newCategoryName: string = '';
   itemForm: any = {
     sku: '',
@@ -217,7 +236,7 @@ export class ItemsStockComponent implements OnInit {
     unit: 'pcs'
   };
 
-  constructor(public auth: AuthService, private http: HttpClient) {}
+  constructor(public auth: AuthService, private http: HttpClient, private router: Router) {}
 
   ngOnInit() {
     this.loadCategories();
@@ -266,7 +285,8 @@ export class ItemsStockComponent implements OnInit {
 
   saveCategory() {
     const cleanName = this.newCategoryName.trim();
-    if (!cleanName) return;
+    if (!cleanName || this.isSavingCategory) return;
+    this.isSavingCategory = true;
 
     const token = localStorage.getItem('pos_token');
     const role = localStorage.getItem('pos_role') || 'admin';
@@ -275,6 +295,7 @@ export class ItemsStockComponent implements OnInit {
 
     this.http.post<any>(`${environment.apiUrl}/catalog/categories`, { name: cleanName }, { headers }).subscribe({
       next: () => {
+        this.isSavingCategory = false;
         alert('Category "' + cleanName + '" created and saved permanently in database!');
         if (!this.categories.includes(cleanName)) {
           this.categories.push(cleanName);
@@ -284,6 +305,7 @@ export class ItemsStockComponent implements OnInit {
         this.showAddCategory = false;
       },
       error: (err) => {
+        this.isSavingCategory = false;
         alert('Notice: ' + (err.error?.detail || ('Category ' + cleanName + ' added!')));
         if (!this.categories.includes(cleanName)) {
           this.categories.push(cleanName);
@@ -314,10 +336,13 @@ export class ItemsStockComponent implements OnInit {
   }
 
   saveItem() {
-    if (!this.itemForm.sku.trim() || !this.itemForm.name.trim()) {
-      alert('Please fill in SKU and Item Name');
+    if (!this.itemForm.sku.trim() || !this.itemForm.name.trim() || this.isSavingItem) {
+      if (!this.itemForm.sku.trim() || !this.itemForm.name.trim()) {
+        alert('Please fill in SKU and Item Name');
+      }
       return;
     }
+    this.isSavingItem = true;
 
     const payload = {
       sku: this.itemForm.sku.trim(),
@@ -341,11 +366,13 @@ export class ItemsStockComponent implements OnInit {
 
     this.http.post<any>(`${environment.apiUrl}/catalog/items`, payload, { headers }).subscribe({
       next: () => {
+        this.isSavingItem = false;
         alert('Item "' + payload.name + '" created successfully!');
         this.showAddItem = false;
         this.loadCatalog();
       },
       error: (err) => {
+        this.isSavingItem = false;
         let msg = 'Failed to create item';
         if (err.error) {
           if (typeof err.error.detail === 'string') {
@@ -361,5 +388,10 @@ export class ItemsStockComponent implements OnInit {
         alert('Error creating item: ' + msg);
       }
     });
+  }
+
+  signOut() {
+    this.auth.signOut();
+    this.router.navigate(['/login']);
   }
 }

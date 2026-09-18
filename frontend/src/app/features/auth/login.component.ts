@@ -1,4 +1,4 @@
-﻿import { Component, inject } from "@angular/core";
+import { Component, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
@@ -13,7 +13,7 @@ import { AuthService } from "../../core/services/auth.service";
       <div class="card" style="width:100%;max-width:400px;padding:32px;box-shadow:var(--shadow-lg)">
         <div style="text-align:center;margin-bottom:24px">
           <div class="logo-mark" style="margin:0 auto 12px auto;width:48px;height:48px;font-size:20px">GM</div>
-          <h2>Greenfield Mart POS</h2>
+          <h2>Okuto Mart POS</h2>
           <p class="text-sm text-muted">Phase 1 &middot; Cashier &amp; Manager Login</p>
         </div>
 

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
@@ -15,7 +15,7 @@ import { environment } from '../../../environments/environment';
       <aside class="sidebar">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
-          <div><div class="brand-name" style="font-weight:700">Greenfield Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
@@ -38,6 +38,19 @@ import { environment } from '../../../environments/environment';
             <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
+
+        <div class="sidebar__footer" style="margin-top:auto; padding:16px 8px 8px; border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
+            <div style="overflow:hidden;">
+              <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
+            <span>🚪</span> Sign Out
+          </button>
+        </div>
       </aside>
 
       <main class="main">
@@ -353,7 +366,9 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="modal-footer" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
           <button class="btn btn-secondary" (click)="showAddCounter = false">Cancel</button>
-          <button class="btn btn-primary" (click)="createCounter()">Create Counter</button>
+          <button class="btn btn-primary" [disabled]="isCreatingCounter" (click)="createCounter()">
+            {{ isCreatingCounter ? 'Creating...' : 'Create Counter' }}
+          </button>
         </div>
       </div>
     </div>
@@ -373,7 +388,9 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="modal-footer" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
           <button class="btn btn-secondary" (click)="editingCounter = null">Cancel</button>
-          <button class="btn btn-primary" (click)="saveEditedFloat()">Update Float</button>
+          <button class="btn btn-primary" [disabled]="isUpdatingFloat" (click)="saveEditedFloat()">
+            {{ isUpdatingFloat ? 'Updating...' : 'Update Float' }}
+          </button>
         </div>
       </div>
     </div>
@@ -409,7 +426,19 @@ export class ReportsComponent implements OnInit {
   aiSortBy: string = 'most_sold';
   aiData: any = null;
 
-  constructor(public auth: AuthService, private http: HttpClient) {}
+  isCreatingCounter: boolean = false;
+  isUpdatingFloat: boolean = false;
+
+  constructor(
+    public auth: AuthService,
+    private http: HttpClient,
+    private router: Router
+  ) {}
+
+  signOut() {
+    this.auth.signOut();
+    this.router.navigate(['/login']);
+  }
 
   ngOnInit() {
     this.loadCategories();
@@ -547,6 +576,8 @@ export class ReportsComponent implements OnInit {
   }
 
   createCounter() {
+    if (this.isCreatingCounter) return;
+
     if (!this.newCounterForm.counter_name.trim()) {
       alert('Please enter a valid counter name');
       return;
@@ -556,14 +587,18 @@ export class ReportsComponent implements OnInit {
       return;
     }
 
+    this.isCreatingCounter = true;
+
     this.http.post<any>(`${environment.apiUrl}/reports/cash-counters`, this.newCounterForm).subscribe({
       next: (res) => {
+        this.isCreatingCounter = false;
         alert(`Counter "${res.counter_name}" created successfully!`);
         this.showAddCounter = false;
         this.newCounterForm = { counter_name: '', opening_float: 1000.0, notes: '' };
         this.loadCashCounters();
       },
       error: (err) => {
+        this.isCreatingCounter = false;
         alert('Error creating counter: ' + (err.error?.detail || 'Failed'));
       }
     });
@@ -575,20 +610,23 @@ export class ReportsComponent implements OnInit {
   }
 
   saveEditedFloat() {
-    if (!this.editingCounter) return;
+    if (!this.editingCounter || this.isUpdatingFloat) return;
     if (this.editFloatValue < 0) {
       alert('Opening float must be greater than or equal to 0');
       return;
     }
 
+    this.isUpdatingFloat = true;
     const url = `${environment.apiUrl}/reports/cash-counters/${this.editingCounter.id}`;
     this.http.put<any>(url, { opening_float: this.editFloatValue }).subscribe({
       next: (res) => {
+        this.isUpdatingFloat = false;
         alert(`Opening float for ${res.counter_name} updated to ₹${res.opening_float.toFixed(2)}`);
         this.editingCounter = null;
         this.loadCashCounters();
       },
       error: (err) => {
+        this.isUpdatingFloat = false;
         alert('Error updating float: ' + (err.error?.detail || 'Failed'));
       }
     });

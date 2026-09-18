@@ -1,4 +1,4 @@
-﻿import { Component, inject, OnInit, HostListener } from "@angular/core";
+import { Component, inject, OnInit, HostListener } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
@@ -206,7 +206,7 @@ import { CartItem, TenderPayment, SaleTransaction } from "../../core/models/cart
           </div>
           <div class="modal-body mono" style="font-size:12px;background:#fff;color:#000;padding:16px;border-radius:var(--radius-sm)">
             <div style="text-align:center;margin-bottom:10px">
-              <div style="font-weight:bold;font-size:16px">GREENFIELD MART</div>
+              <div style="font-weight:bold;font-size:16px">OKUTO MART</div>
               <div>Store #01 · MG Road Branch</div>
               <div>GSTIN: 29AAAAA0000A1Z5</div>
               <div>--------------------------------</div>

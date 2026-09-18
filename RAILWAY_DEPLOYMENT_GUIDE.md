@@ -1,4 +1,4 @@
-# 🚀 Greenfield Mart POS & Billing System — Complete Railway & Neon DB Production Deployment Guide
+# 🚀 Okuto Mart POS & Billing System — Complete Railway & Neon DB Production Deployment Guide
 
 A comprehensive, production-grade deployment guide for deploying the **FastAPI Backend**, **Angular 19/22 PWA Frontend**, and **Neon Serverless PostgreSQL Database** on **Railway**.
 
@@ -110,7 +110,7 @@ postgresql://<NEON_USER>:<NEON_PASSWORD>@<NEON_HOST>.neon.tech/<NEON_DB>?sslmode
 | `ALGORITHM` | `HS256` | **YES** | Token encryption algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `720` | Optional | Session expiry (12 hours) |
 | `API_V1_STR` | `/api/v1` | Optional | Router prefix |
-| `PROJECT_NAME` | `Greenfield Mart POS & Billing System` | Optional | Swagger documentation title |
+| `PROJECT_NAME` | `Okuto Mart POS & Billing System` | Optional | Swagger documentation title |
 | `AZURE_STORAGE_CONNECTION_STRING` | `""` (or Azure connection string) | Optional | Cloud backup storage |
 
 ### 4.3 Public Networking & Domain
@@ -252,7 +252,7 @@ Execute the following verification tests once both Railway services show **Activ
 
 - [ ] **5. Frontend POS Access**  
   Open `https://<frontend-domain>/` in browser.  
-  *Expected:* Greenfield Mart POS interface loads cleanly, sidebar navigates, and PIN pad functions.
+  *Expected:* Okuto Mart POS interface loads cleanly, sidebar navigates, and PIN pad functions.
 
 - [ ] **6. PWA Manifest**  
   `curl https://<frontend-domain>/manifest.webmanifest`  

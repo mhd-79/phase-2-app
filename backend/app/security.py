@@ -70,6 +70,13 @@ async def get_current_user(
     header_role = request.headers.get("x-user-role") or request.headers.get("X-User-Role")
     header_user = request.headers.get("x-username") or request.headers.get("X-Username")
 
+    if not db.is_connected():
+        try:
+            from app.database import connect_db
+            await connect_db()
+        except Exception:
+            pass
+
     if token and token != "demo-token":
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -78,7 +85,7 @@ async def get_current_user(
                 user = await db.user.find_unique(where={"username": username})
                 if user and user.is_active:
                     return user
-        except JWTError:
+        except Exception:
             pass
 
     if header_user:
