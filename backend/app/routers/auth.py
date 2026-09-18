@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 import json
 from datetime import datetime
 from app.schemas import LoginRequest, TokenResponse, UserSchema, ForgotPinRequest
-from app.security import verify_pin, create_access_token, get_current_user
+from app.security import verify_pin, get_pin_hash, create_access_token, get_current_user
 from app.database import db
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -27,6 +27,13 @@ async def login(req: LoginRequest):
     # Strictly verify the entered PIN against the hashed credential in the database
     if not verify_pin(req.pin.strip(), user.pin_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or PIN")
+
+    # If the user's PIN in DB is not yet a secure PBKDF2 hash, upgrade it immediately
+    if not user.pin_hash.startswith("$pbkdf2"):
+        await db.user.update(
+            where={"id": user.id},
+            data={"pin_hash": get_pin_hash(req.pin.strip())}
+        )
 
     token = create_access_token({"sub": user.username, "role": user.role})
     return TokenResponse(
