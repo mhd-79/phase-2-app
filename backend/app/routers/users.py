@@ -10,6 +10,7 @@ from app.schemas import (
 )
 from app.security import get_pin_hash, require_admin
 from app.database import db
+from app.idempotency import idempotency_manager, generate_fingerprint
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -168,54 +169,60 @@ async def get_users(user = Depends(require_admin)):
     description="Admin-only endpoint to create a new staff user account with assigned role (Admin or Cashier), PIN, schedule, and auto-lock duration."
 )
 async def create_user(req: UserCreate, user = Depends(require_admin)):
-    existing = await db.user.find_unique(where={"username": req.username})
-    if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    pin_hash = get_pin_hash(req.pin)
-    u = await db.user.create(data={
-        "username": req.username,
-        "pin_hash": pin_hash,
-        "role": req.role,
-        "full_name": req.full_name,
-        "sub_text": req.sub_text,
-        "auto_lock_minutes": req.auto_lock_minutes,
-        "is_active": True
-    })
-    
-    shifts_to_save = req.shifts if req.shifts else get_default_shifts_for_user(req.username, req.role)
-    saved_shifts: List[ShiftDayConfig] = []
-    for s in shifts_to_save:
-        await db.usershiftschedule.create(data={
-            "username": req.username,
-            "day_of_week": s.day_of_week,
-            "is_working": s.is_working,
-            "start_time": s.start_time,
-            "end_time": s.end_time
-        })
-        saved_shifts.append(ShiftDayConfig(
-            day_of_week=s.day_of_week,
-            is_working=s.is_working,
-            start_time=s.start_time,
-            end_time=s.end_time
-        ))
-        
-    await db.auditlog.create(data={
-        "username": user.username,
-        "action": f"Created User: {req.username}",
-        "details_json": json.dumps({"role": req.role, "full_name": req.full_name})
-    })
+    idem_key = generate_fingerprint("create_user", user.username, req)
 
-    return UserSchema(
-        id=u.id,
-        username=u.username,
-        role=u.role,
-        full_name=u.full_name,
-        sub_text=u.sub_text,
-        auto_lock_minutes=u.auto_lock_minutes,
-        is_active=u.is_active,
-        weekly_shifts=saved_shifts,
-        working_schedule=format_working_schedule(saved_shifts)
-    )
+    async def do_create():
+        existing = await db.user.find_unique(where={"username": req.username})
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        pin_hash = get_pin_hash(req.pin)
+        u = await db.user.create(data={
+            "username": req.username,
+            "pin_hash": pin_hash,
+            "role": req.role,
+            "full_name": req.full_name,
+            "sub_text": req.sub_text,
+            "auto_lock_minutes": req.auto_lock_minutes,
+            "is_active": True
+        })
+        
+        shifts_to_save = req.shifts if req.shifts else get_default_shifts_for_user(req.username, req.role)
+        saved_shifts: List[ShiftDayConfig] = []
+        for s in shifts_to_save:
+            await db.usershiftschedule.create(data={
+                "username": req.username,
+                "day_of_week": s.day_of_week,
+                "is_working": s.is_working,
+                "start_time": s.start_time,
+                "end_time": s.end_time
+            })
+            saved_shifts.append(ShiftDayConfig(
+                day_of_week=s.day_of_week,
+                is_working=s.is_working,
+                start_time=s.start_time,
+                end_time=s.end_time
+            ))
+            
+        await db.auditlog.create(data={
+            "username": user.username,
+            "action": f"Created User: {req.username}",
+            "details_json": json.dumps({"role": req.role, "full_name": req.full_name})
+        })
+
+        return UserSchema(
+            id=u.id,
+            username=u.username,
+            role=u.role,
+            full_name=u.full_name,
+            sub_text=u.sub_text,
+            auto_lock_minutes=u.auto_lock_minutes,
+            is_active=u.is_active,
+            weekly_shifts=saved_shifts,
+            working_schedule=format_working_schedule(saved_shifts)
+        )
+
+    res, _ = await idempotency_manager.execute(idem_key, do_create, status_code=status.HTTP_201_CREATED)
+    return res
 
 @router.put(
     "/{username}",
@@ -667,45 +674,51 @@ async def get_pin_reset_requests(user = Depends(require_admin)):
     description="Admin-only endpoint to securely reset a user's 4-digit PIN in the database, resolving pending reset requests and logging an audit trail."
 )
 async def reset_user_pin(username: str, req: AdminResetPinRequest, user = Depends(require_admin)):
-    if len(req.new_pin) != 4 or not req.new_pin.isdigit():
-        raise HTTPException(status_code=400, detail="New PIN must be exactly 4 numeric digits")
+    idem_key = generate_fingerprint("reset_pin", user.username, {"target": username, "pin": req.new_pin})
 
-    u = await db.user.find_unique(where={"username": username})
-    if not u:
-        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
+    async def do_reset():
+        if len(req.new_pin) != 4 or not req.new_pin.isdigit():
+            raise HTTPException(status_code=400, detail="New PIN must be exactly 4 numeric digits")
 
-    new_hash = get_pin_hash(req.new_pin)
-    await db.user.update(
-        where={"username": username},
-        data={"pin_hash": new_hash}
-    )
+        u = await db.user.find_unique(where={"username": username})
+        if not u:
+            raise HTTPException(status_code=404, detail=f"User '{username}' not found")
 
-    # Mark all pending requests for this user as RESOLVED
-    pending_reqs = await db.pinresetrequest.find_many(
-        where={"username": username, "status": "PENDING"}
-    )
-    for pr in pending_reqs:
-        await db.pinresetrequest.update(
-            where={"id": pr.id},
-            data={
-                "status": "RESOLVED",
-                "resolved_at": datetime.now(),
-                "resolved_by": user.username
-            }
+        new_hash = get_pin_hash(req.new_pin)
+        await db.user.update(
+            where={"username": username},
+            data={"pin_hash": new_hash}
         )
 
-    # Log audit entry
-    await db.auditlog.create(data={
-        "username": user.username,
-        "action": f"Admin Reset Security PIN for user: {username}",
-        "details_json": json.dumps({"target_user": username, "reset_by": user.username, "resolved_requests_count": len(pending_reqs)})
-    })
+        # Mark all pending requests for this user as RESOLVED
+        pending_reqs = await db.pinresetrequest.find_many(
+            where={"username": username, "status": "PENDING"}
+        )
+        for pr in pending_reqs:
+            await db.pinresetrequest.update(
+                where={"id": pr.id},
+                data={
+                    "status": "RESOLVED",
+                    "resolved_at": datetime.now(),
+                    "resolved_by": user.username
+                }
+            )
 
-    return {
-        "message": f"PIN for user '{username}' ({u.full_name}) was successfully reset.",
-        "username": username,
-        "resolved_requests": len(pending_reqs)
-    }
+        # Log audit entry
+        await db.auditlog.create(data={
+            "username": user.username,
+            "action": f"Admin Reset Security PIN for user: {username}",
+            "details_json": json.dumps({"target_user": username, "reset_by": user.username, "resolved_requests_count": len(pending_reqs)})
+        })
+
+        return {
+            "message": f"PIN for user '{username}' ({u.full_name}) was successfully reset.",
+            "username": username,
+            "resolved_requests": len(pending_reqs)
+        }
+
+    res, _ = await idempotency_manager.execute(idem_key, do_reset)
+    return res
 
 @router.post(
     "/pin-reset-requests/{request_id}/reject",

@@ -221,27 +221,31 @@ async def get_item_sales_report(
     summary="List Configured Cash Drawer Counters",
     description="Retrieves all configured store cash counters, opening float values, today's cash sales, expected drawer cash, counted cash, and variance."
 )
-async def get_cash_counters(user = Depends(require_admin)):
+async def get_cash_counters(user = Depends(get_current_user)):
     counters = await db.cashcounter.find_many()
     today = datetime.now().strftime("%Y-%m-%d")
     sales = await db.sale.find_many(include={"tenders": True})
     
-    cash_collected = 0.0
-    for s in sales:
-        if s.time.strftime("%Y-%m-%d") == today and s.status != "CANCELLED":
-            for t in s.tenders:
-                if t.mode == "Cash":
-                    cash_collected += t.amount
-                    
     result = []
     for c in counters:
-        expected = c.opening_float + cash_collected
+        counter_cash = 0.0
+        c_name_norm = c.counter_name.strip().lower()
+        for s in sales:
+            if s.time.strftime("%Y-%m-%d") == today and s.status != "CANCELLED":
+                s_counter = (getattr(s, "counter_name", None) or "Counter 1 - Main Express").strip().lower()
+                # Associate cash if counters match or either starts with the other
+                if s_counter == c_name_norm or c_name_norm.startswith(s_counter) or s_counter.startswith(c_name_norm):
+                    for t in s.tenders:
+                        if t.mode == "Cash":
+                            counter_cash += t.amount
+
+        expected = c.opening_float + counter_cash
         variance = (c.counted_cash - expected) if c.counted_cash is not None else 0.0
         result.append(CashCounterSchema(
             id=c.id,
             counter_name=c.counter_name,
             opening_float=c.opening_float,
-            cash_sales_today=round(cash_collected, 2),
+            cash_sales_today=round(counter_cash, 2),
             expected_cash=round(expected, 2),
             counted_cash=c.counted_cash,
             variance=round(variance, 2),

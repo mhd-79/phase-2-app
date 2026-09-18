@@ -554,6 +554,7 @@ class Sale(bases.BaseSale):
     gst_total: _float
     grand_total: _float
     status: _str
+    counter_name: Optional[_str] = None
     created_at: datetime.datetime
     items: Optional[List['models.SaleItem']] = None
     tenders: Optional[List['models.SaleTender']] = None
@@ -2634,6 +2635,14 @@ _Sale_fields: Dict['types.SaleKeys', PartialModelField] = OrderedDict(
             'name': 'status',
             'is_list': False,
             'optional': False,
+            'type': '_str',
+            'is_relational': False,
+            'documentation': None,
+        }),
+        ('counter_name', {
+            'name': 'counter_name',
+            'is_list': False,
+            'optional': True,
             'type': '_str',
             'is_relational': False,
             'documentation': None,

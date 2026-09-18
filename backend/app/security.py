@@ -13,28 +13,39 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 security_bearer = HTTPBearer(auto_error=False)
 
 def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
-    if not hashed_pin:
+    if not plain_pin or not hashed_pin:
         return False
-    # Direct plain text check
-    if str(plain_pin).strip() == str(hashed_pin).strip():
+    clean_pin = str(plain_pin).strip()
+    clean_hash = str(hashed_pin).strip()
+
+    # 1. Standard verification with PBKDF2-SHA256
+    try:
+        if pwd_context.identify(clean_hash):
+            return pwd_context.verify(clean_pin, clean_hash)
+    except Exception:
+        pass
+
+    # 2. Support bcrypt if present
+    if clean_hash.startswith("$2"):
+        try:
+            return pwd_context.verify(clean_pin, clean_hash)
+        except Exception:
+            pass
+
+    # 3. Fallback comparison for SHA-256 legacy hashes
+    sha = hashlib.sha256(clean_pin.encode("utf-8")).hexdigest()
+    if sha == clean_hash:
         return True
-    if hashed_pin.startswith("$pbkdf2"):
-        try:
-            return pwd_context.verify(plain_pin, hashed_pin)
-        except Exception:
-            return False
-    elif hashed_pin.startswith("$2"):
-        try:
-            return pwd_context.verify(plain_pin, hashed_pin)
-        except Exception:
-            return False
-    # Fallback comparison for sha256 PINs
-    sha = hashlib.sha256(str(plain_pin).strip().encode("utf-8")).hexdigest()
-    return sha == hashed_pin.strip()
+
+    # 4. Fallback comparison for legacy unhashed plain text during transition
+    if clean_pin == clean_hash:
+        return True
+
+    return False
 
 def get_pin_hash(pin: str) -> str:
-    # Stored directly as plain text
-    return str(pin).strip()
+    cleaned = str(pin).strip()
+    return pwd_context.hash(cleaned)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -59,6 +70,13 @@ async def get_current_user(
     header_role = request.headers.get("x-user-role") or request.headers.get("X-User-Role")
     header_user = request.headers.get("x-username") or request.headers.get("X-Username")
 
+    if not db.is_connected():
+        try:
+            from app.database import connect_db
+            await connect_db()
+        except Exception:
+            pass
+
     if token and token != "demo-token":
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -67,28 +85,14 @@ async def get_current_user(
                 user = await db.user.find_unique(where={"username": username})
                 if user and user.is_active:
                     return user
-        except JWTError:
+        except Exception:
             pass
 
     if header_user:
         user = await db.user.find_unique(where={"username": header_user})
         if user and user.is_active:
-            return user
-
-    if header_role == "admin":
-        admin_user = await db.user.find_first(where={"role": "admin", "is_active": True})
-        if admin_user:
-            return admin_user
-
-    # Fallback user
-    target_username = "owner.arjun" if header_role == "admin" else "priya.k"
-    default_user = await db.user.find_unique(where={"username": target_username})
-    if default_user:
-        return default_user
-        
-    any_user = await db.user.find_first(where={"is_active": True})
-    if any_user:
-        return any_user
+            if not header_role or user.role == header_role:
+                return user
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

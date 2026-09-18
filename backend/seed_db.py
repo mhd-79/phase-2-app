@@ -90,7 +90,7 @@ DEMO_DISCOUNTS = [
 
 DEMO_STORE = {
     "id": "store_main",
-    "store_name": "Greenfield Mart",
+    "store_name": "Okuto Mart",
     "address": "12, MG Road, Bengaluru, Karnataka 560001",
     "phone": "+91 98450 12345",
     "gstin": "29ABCDE1234F1Z5",
@@ -247,6 +247,16 @@ async def seed_all_sample_data(disconnect_at_end: bool = False):
                 "pin_hash": get_pin_hash(u["pin"]),
                 "auto_lock_minutes": u.get("auto_lock_minutes", 15)
             })
+
+    # Ensure all users in DB have securely hashed credentials (never stored as plain text)
+    all_users = await db.user.find_many()
+    for usr in all_users:
+        if usr.pin_hash and not usr.pin_hash.startswith("$pbkdf2") and not usr.pin_hash.startswith("$2"):
+            await db.user.update(
+                where={"id": usr.id},
+                data={"pin_hash": get_pin_hash(usr.pin_hash)}
+            )
+            print(f"Secured credentials for user: {usr.username}")
 
     # 2. Store Settings
     store = await db.storesettings.find_unique(where={"id": "store_main"})

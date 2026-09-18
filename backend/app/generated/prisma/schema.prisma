@@ -82,6 +82,7 @@ model Sale {
   gst_total             Float
   grand_total           Float
   status                String       @default("COMPLETED") // "COMPLETED" | "RETURNED" | "PARTIALLY_RETURNED"
+  counter_name          String?      @default("Counter 1 - Main Express")
   created_at            DateTime     @default(now())
   items                 SaleItem[]
   tenders               SaleTender[]
@@ -154,7 +155,7 @@ model HeldBill {
 
 model StoreSettings {
   id                   String   @id @default("store_main")
-  store_name           String   @default("Greenfield Mart")
+  store_name           String   @default("Okuto Mart")
   address              String   @default("12, MG Road, Bengaluru")
   phone                String   @default("+91 98765 43210")
   gstin                String   @default("29ABCDE1234F1Z5")

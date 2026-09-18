@@ -4,6 +4,7 @@ import json
 from app.schemas import DiscountSchema, DiscountCreate
 from app.security import require_admin
 from app.database import db
+from app.idempotency import idempotency_manager, generate_fingerprint
 
 router = APIRouter(prefix="/discounts", tags=["Discounts"])
 
@@ -43,21 +44,41 @@ async def get_discounts():
     description="Admin-only endpoint to create a new discount rule (flat amount or percentage rate) applying to all products or selected SKUs."
 )
 async def create_discount(req: DiscountCreate, user = Depends(require_admin)):
-    d = await db.discount.create(data={
-        "name": req.name,
-        "type": req.type,
-        "value": req.value,
-        "applies_to": req.applies_to,
-        "product_skus": json.dumps(req.product_skus or []),
-        "start_date": req.start_date,
-        "end_date": req.end_date,
-        "status": req.status
-    })
-    return DiscountSchema(
-        id=d.id, name=d.name, type=d.type, value=d.value,
-        applies_to=d.applies_to, product_skus=req.product_skus,
-        start_date=d.start_date, end_date=d.end_date, status=d.status
-    )
+    idem_key = generate_fingerprint("create_discount", user.username, req)
+
+    async def do_create():
+        # Check if identical active discount exists
+        existing = await db.discount.find_first(where={"name": req.name, "type": req.type, "value": req.value})
+        if existing:
+            skus = []
+            try:
+                skus = json.loads(existing.product_skus or "[]")
+            except Exception:
+                pass
+            return DiscountSchema(
+                id=existing.id, name=existing.name, type=existing.type, value=existing.value,
+                applies_to=existing.applies_to, product_skus=skus,
+                start_date=existing.start_date, end_date=existing.end_date, status=existing.status
+            )
+
+        d = await db.discount.create(data={
+            "name": req.name,
+            "type": req.type,
+            "value": req.value,
+            "applies_to": req.applies_to,
+            "product_skus": json.dumps(req.product_skus or []),
+            "start_date": req.start_date,
+            "end_date": req.end_date,
+            "status": req.status
+        })
+        return DiscountSchema(
+            id=d.id, name=d.name, type=d.type, value=d.value,
+            applies_to=d.applies_to, product_skus=req.product_skus,
+            start_date=d.start_date, end_date=d.end_date, status=d.status
+        )
+
+    res, _ = await idempotency_manager.execute(idem_key, do_create, status_code=status.HTTP_201_CREATED)
+    return res
 
 @router.put(
     "/{discount_id}",

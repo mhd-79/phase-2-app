@@ -10453,6 +10453,7 @@ class SaleOptionalCreateInput(TypedDict, total=False):
     time: datetime.datetime
     pricing_mode: _str
     status: _str
+    counter_name: Optional[_str]
     created_at: datetime.datetime
     items: 'SaleItemCreateManyNestedWithoutRelationsInput'
     tenders: 'SaleTenderCreateManyNestedWithoutRelationsInput'
@@ -10481,6 +10482,7 @@ class SaleOptionalCreateWithoutRelationsInput(TypedDict, total=False):
     time: datetime.datetime
     pricing_mode: _str
     status: _str
+    counter_name: Optional[_str]
     created_at: datetime.datetime
 
 
@@ -10547,6 +10549,7 @@ class SaleUpdateInput(TypedDict, total=False):
     gst_total: Union[AtomicFloatInput, _float]
     grand_total: Union[AtomicFloatInput, _float]
     status: _str
+    counter_name: Optional[_str]
     created_at: datetime.datetime
     items: 'SaleItemUpdateManyWithoutRelationsInput'
     tenders: 'SaleTenderUpdateManyWithoutRelationsInput'
@@ -10567,6 +10570,7 @@ class SaleUpdateManyMutationInput(TypedDict, total=False):
     gst_total: Union[AtomicFloatInput, _float]
     grand_total: Union[AtomicFloatInput, _float]
     status: _str
+    counter_name: Optional[_str]
     created_at: datetime.datetime
 
 
@@ -10706,6 +10710,14 @@ _Sale_status_OrderByInput = TypedDict(
     total=True
 )
 
+_Sale_counter_name_OrderByInput = TypedDict(
+    '_Sale_counter_name_OrderByInput',
+    {
+        'counter_name': 'SortOrder',
+    },
+    total=True
+)
+
 _Sale_created_at_OrderByInput = TypedDict(
     '_Sale_created_at_OrderByInput',
     {
@@ -10746,6 +10758,7 @@ SaleOrderByInput = Union[
     '_Sale_gst_total_OrderByInput',
     '_Sale_grand_total_OrderByInput',
     '_Sale_status_OrderByInput',
+    '_Sale_counter_name_OrderByInput',
     '_Sale_created_at_OrderByInput',
     '_Sale_RelevanceOrderByInput',
 ]
@@ -12512,6 +12525,7 @@ class SaleWhereInput(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatFilter']
     grand_total: Union[_float, 'types.FloatFilter']
     status: Union[_str, 'types.StringFilter']
+    counter_name: Union[None, _str, 'types.StringFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeFilter']
     items: 'SaleItemListRelationFilter'
     tenders: 'SaleTenderListRelationFilter'
@@ -12540,6 +12554,7 @@ class SaleWhereInputRecursive1(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatFilter']
     grand_total: Union[_float, 'types.FloatFilter']
     status: Union[_str, 'types.StringFilter']
+    counter_name: Union[None, _str, 'types.StringFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeFilter']
     items: 'SaleItemListRelationFilter'
     tenders: 'SaleTenderListRelationFilter'
@@ -12568,6 +12583,7 @@ class SaleWhereInputRecursive2(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatFilter']
     grand_total: Union[_float, 'types.FloatFilter']
     status: Union[_str, 'types.StringFilter']
+    counter_name: Union[None, _str, 'types.StringFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeFilter']
     items: 'SaleItemListRelationFilter'
     tenders: 'SaleTenderListRelationFilter'
@@ -12596,6 +12612,7 @@ class SaleWhereInputRecursive3(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatFilter']
     grand_total: Union[_float, 'types.FloatFilter']
     status: Union[_str, 'types.StringFilter']
+    counter_name: Union[None, _str, 'types.StringFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeFilter']
     items: 'SaleItemListRelationFilter'
     tenders: 'SaleTenderListRelationFilter'
@@ -12624,6 +12641,7 @@ class SaleWhereInputRecursive4(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatFilter']
     grand_total: Union[_float, 'types.FloatFilter']
     status: Union[_str, 'types.StringFilter']
+    counter_name: Union[None, _str, 'types.StringFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeFilter']
     items: 'SaleItemListRelationFilter'
     tenders: 'SaleTenderListRelationFilter'
@@ -12651,6 +12669,7 @@ class SaleScalarWhereWithAggregatesInput(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatWithAggregatesFilter']
     grand_total: Union[_float, 'types.FloatWithAggregatesFilter']
     status: Union[_str, 'types.StringWithAggregatesFilter']
+    counter_name: Union[_str, 'types.StringWithAggregatesFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeWithAggregatesFilter']
 
     AND: List['SaleScalarWhereWithAggregatesInputRecursive1']
@@ -12673,6 +12692,7 @@ class SaleScalarWhereWithAggregatesInputRecursive1(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatWithAggregatesFilter']
     grand_total: Union[_float, 'types.FloatWithAggregatesFilter']
     status: Union[_str, 'types.StringWithAggregatesFilter']
+    counter_name: Union[_str, 'types.StringWithAggregatesFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeWithAggregatesFilter']
 
     AND: List['SaleScalarWhereWithAggregatesInputRecursive2']
@@ -12695,6 +12715,7 @@ class SaleScalarWhereWithAggregatesInputRecursive2(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatWithAggregatesFilter']
     grand_total: Union[_float, 'types.FloatWithAggregatesFilter']
     status: Union[_str, 'types.StringWithAggregatesFilter']
+    counter_name: Union[_str, 'types.StringWithAggregatesFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeWithAggregatesFilter']
 
     AND: List['SaleScalarWhereWithAggregatesInputRecursive3']
@@ -12717,6 +12738,7 @@ class SaleScalarWhereWithAggregatesInputRecursive3(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatWithAggregatesFilter']
     grand_total: Union[_float, 'types.FloatWithAggregatesFilter']
     status: Union[_str, 'types.StringWithAggregatesFilter']
+    counter_name: Union[_str, 'types.StringWithAggregatesFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeWithAggregatesFilter']
 
     AND: List['SaleScalarWhereWithAggregatesInputRecursive4']
@@ -12739,6 +12761,7 @@ class SaleScalarWhereWithAggregatesInputRecursive4(TypedDict, total=False):
     gst_total: Union[_float, 'types.FloatWithAggregatesFilter']
     grand_total: Union[_float, 'types.FloatWithAggregatesFilter']
     status: Union[_str, 'types.StringWithAggregatesFilter']
+    counter_name: Union[_str, 'types.StringWithAggregatesFilter']
     created_at: Union[datetime.datetime, 'types.DateTimeWithAggregatesFilter']
 
 
@@ -12757,6 +12780,7 @@ class SaleGroupByOutput(TypedDict, total=False):
     gst_total: _float
     grand_total: _float
     status: _str
+    counter_name: _str
     created_at: datetime.datetime
     _sum: 'SaleSumAggregateOutput'
     _avg: 'SaleAvgAggregateOutput'
@@ -12802,6 +12826,7 @@ class SaleScalarAggregateOutput(TypedDict, total=False):
     gst_total: _float
     grand_total: _float
     status: _str
+    counter_name: _str
     created_at: datetime.datetime
 
 
@@ -12824,6 +12849,7 @@ class SaleMaxAggregateInput(TypedDict, total=False):
     gst_total: bool
     grand_total: bool
     status: bool
+    counter_name: bool
     created_at: bool
 
 
@@ -12842,6 +12868,7 @@ class SaleMinAggregateInput(TypedDict, total=False):
     gst_total: bool
     grand_total: bool
     status: bool
+    counter_name: bool
     created_at: bool
 
 
@@ -12876,6 +12903,7 @@ SaleCountAggregateInput = TypedDict(
         'gst_total': bool,
         'grand_total': bool,
         'status': bool,
+        'counter_name': bool,
         'created_at': bool,
         '_all': bool,
     },
@@ -12898,6 +12926,7 @@ SaleCountAggregateOutput = TypedDict(
         'gst_total': int,
         'grand_total': int,
         'status': int,
+        'counter_name': int,
         'created_at': int,
         '_all': int,
     },
@@ -12920,6 +12949,7 @@ SaleKeys = Literal[
     'gst_total',
     'grand_total',
     'status',
+    'counter_name',
     'created_at',
     'items',
     'tenders',
@@ -12939,6 +12969,7 @@ SaleScalarFieldKeys = Literal[
     'gst_total',
     'grand_total',
     'status',
+    'counter_name',
     'created_at',
 ]
 SaleScalarFieldKeysT = TypeVar('SaleScalarFieldKeysT', bound=SaleScalarFieldKeys)

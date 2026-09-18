@@ -131,3 +131,46 @@ def test_database_backed_admin_discount_approval(client):
     invalid_res = client.post("/api/v1/billing/approve-discount", json={"pin": "0000"})
     assert invalid_res.status_code == 401
 
+def test_cashier_cannot_login_as_admin(client):
+    # Priya is a cashier; attempting to login with role 'admin' must return 401, never 500
+    res = client.post("/api/v1/auth/login", json={"username": "priya.k", "pin": "1234", "role": "admin"})
+    assert res.status_code == 401
+    assert "privileges" in res.json().get("detail", "").lower()
+
+def test_admin_can_login_with_admin_or_cashier_role(client):
+    # Admin login with role 'admin'
+    admin_res = client.post("/api/v1/auth/login", json={"username": "owner.arjun", "pin": "9999", "role": "admin"})
+    assert admin_res.status_code == 200
+    assert admin_res.json()["role"] == "admin"
+
+    # Admin login with role 'cashier'
+    cashier_res = client.post("/api/v1/auth/login", json={"username": "owner.arjun", "pin": "9999", "role": "cashier"})
+    assert cashier_res.status_code == 200
+    assert cashier_res.json()["role"] == "admin"
+
+def test_login_validation_errors_never_return_500(client):
+    # Empty username and pin -> 400
+    res1 = client.post("/api/v1/auth/login", json={"username": "", "pin": "", "role": "cashier"})
+    assert res1.status_code == 400
+
+    # Whitespace username -> 400
+    res2 = client.post("/api/v1/auth/login", json={"username": "   ", "pin": "1234", "role": "cashier"})
+    assert res2.status_code == 400
+
+    # Whitespace pin -> 400
+    res3 = client.post("/api/v1/auth/login", json={"username": "priya.k", "pin": "   ", "role": "cashier"})
+    assert res3.status_code == 400
+
+    # Invalid role -> 400
+    res4 = client.post("/api/v1/auth/login", json={"username": "priya.k", "pin": "1234", "role": "superuser"})
+    assert res4.status_code == 400
+
+    # Nonexistent user -> 401, never 500
+    res5 = client.post("/api/v1/auth/login", json={"username": "definitely_not_a_user", "pin": "1234", "role": "cashier"})
+    assert res5.status_code == 401
+
+    # Inactive user -> 401, never 500
+    res6 = client.post("/api/v1/auth/login", json={"username": "meena.t", "pin": "3456", "role": "cashier"})
+    assert res6.status_code == 401
+
+

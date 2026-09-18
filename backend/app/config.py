@@ -6,7 +6,7 @@ if not os.getenv("DATABASE_URL"):
     os.environ["DATABASE_URL"] = DEFAULT_DATABASE_URL
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Greenfield Mart POS & Billing System (Phase 1)"
+    PROJECT_NAME: str = "Okuto Mart POS & Billing System (Phase 1)"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "greenfield-mart-pos-super-secret-key-phase-1-2026")

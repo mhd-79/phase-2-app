@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
@@ -12,38 +12,76 @@ import { environment } from '../../../environments/environment';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="app-shell">
-      <aside class="sidebar">
+      <div class="sidebar-backdrop" *ngIf="isMobileMenuOpen" (click)="isMobileMenuOpen = false"></div>
+      <aside class="sidebar" [class.mobile-open]="isMobileMenuOpen">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
-          <div><div class="brand-name" style="font-weight:700">Greenfield Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="isMobileMenuOpen = false" style="margin-left:auto; color:var(--slate-400); display:none;" [style.display]="isMobileMenuOpen ? 'flex' : 'none'">✕</button>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
-          <a class="nav-link" routerLink="/pos" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
-          <a class="nav-link" routerLink="/hold-bills" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
-          <a class="nav-link" routerLink="/returns" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
+          <a class="nav-link" routerLink="/pos" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
+          <a class="nav-link" routerLink="/hold-bills" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
+          <a class="nav-link" routerLink="/returns" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
 
           <ng-container *ngIf="auth.isAdmin()">
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Inventory</div>
-            <a class="nav-link" routerLink="/items-stock" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
-            <a class="nav-link" routerLink="/stock-upload" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📤 Stock Upload</a>
+            <a class="nav-link" routerLink="/items-stock" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
+            <a class="nav-link" routerLink="/stock-upload" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📤 Stock Upload</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Insights</div>
-            <a class="nav-link" routerLink="/reports" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📊 Reports</a>
+            <a class="nav-link" routerLink="/reports" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📊 Reports</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Administration</div>
-            <a class="nav-link" routerLink="/discounts" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🏷️ Discounts</a>
-            <a class="nav-link" routerLink="/tax-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
-            <a class="nav-link active" routerLink="/users" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">👥 Users &amp; Roles</a>
-            <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
+            <a class="nav-link" routerLink="/discounts" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🏷️ Discounts</a>
+            <a class="nav-link" routerLink="/tax-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
+            <a class="nav-link active" routerLink="/users" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">👥 Users &amp; Roles</a>
+            <a class="nav-link" routerLink="/store-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
+
+        <div class="sidebar__footer" style="margin-top:auto; padding:16px 8px 8px; border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
+            <div style="overflow:hidden;">
+              <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
+            <span>🚪</span> Sign Out
+          </button>
+        </div>
       </aside>
 
-      <main class="main" style="padding: 24px 32px;">
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar__left">
+          <button type="button" class="btn-hamburger" (click)="isMobileMenuOpen = !isMobileMenuOpen" title="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span class="topbar-brand-title">Users &amp; Roles</span>
+        </div>
+        <div class="topbar__right">
+          <div class="user-chip">
+            <div class="avatar">{{ auth.currentUser().initials }}</div>
+            <div class="user-chip-text">
+              <div class="text-sm" style="font-weight:600;line-height:1.2;white-space:nowrap;">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;white-space:nowrap;">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-topbar-signout" (click)="signOut()" title="Sign out">
+            <span>🚪</span>
+            <span class="signout-label">Sign Out</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="main">
         
         <!-- PAGE HEADER -->
-        <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
           <div>
             <span class="eyebrow" style="font-size:12px; color:var(--primary); font-weight:600; letter-spacing:0.04em;">FR-P1-UM-001..004</span>
             <h1 style="margin:4px 0 6px; font-size:1.85rem; font-weight:800; color:var(--text); letter-spacing:-0.02em;">Users &amp; Roles</h1>
@@ -57,15 +95,15 @@ import { environment } from '../../../environments/environment';
         <!-- DATE RANGE FILTER BAR -->
         <div class="filter-bar" style="background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 18px; margin-bottom:24px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px;">
           <div style="display:flex; flex-wrap:wrap; align-items:center; gap:16px;">
-            <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-size:13px; color:var(--text-muted); font-weight:600;">From Date:</span>
               <input type="date" class="input" style="height:36px; min-height:36px; width:150px; padding:0 10px; font-size:13px; border-radius:6px;" [(ngModel)]="fromDate" />
             </div>
-            <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-size:13px; color:var(--text-muted); font-weight:600;">To Date:</span>
               <input type="date" class="input" style="height:36px; min-height:36px; width:150px; padding:0 10px; font-size:13px; border-radius:6px;" [(ngModel)]="toDate" />
             </div>
-            <div style="display:flex; align-items:center; border:1px solid var(--border-strong); border-radius:6px; overflow:hidden; background:var(--surface);">
+            <div style="display:flex; align-items:center; border:1px solid var(--border-strong); border-radius:6px; overflow:hidden; background:var(--surface); flex-wrap:wrap;">
               <button type="button" [style.background]="activeDateRangeChip === 'today' ? '#e2e8f0' : 'transparent'" [style.fontWeight]="activeDateRangeChip === 'today' ? '700' : '500'" style="border:none; border-right:1px solid var(--border); padding:6px 12px; font-size:13px; cursor:pointer; color:var(--text);" (click)="setQuickDateRange('today')">Today</button>
               <button type="button" [style.background]="activeDateRangeChip === 'yesterday' ? '#e2e8f0' : 'transparent'" [style.fontWeight]="activeDateRangeChip === 'yesterday' ? '700' : '500'" style="border:none; border-right:1px solid var(--border); padding:6px 12px; font-size:13px; cursor:pointer; color:var(--text);" (click)="setQuickDateRange('yesterday')">Yesterday</button>
               <button type="button" [style.background]="activeDateRangeChip === 'this_week' ? '#e2e8f0' : 'transparent'" [style.fontWeight]="activeDateRangeChip === 'this_week' ? '700' : '500'" style="border:none; border-right:1px solid var(--border); padding:6px 12px; font-size:13px; cursor:pointer; color:var(--text);" (click)="setQuickDateRange('this_week')">This Week</button>
@@ -79,7 +117,7 @@ import { environment } from '../../../environments/environment';
         </div>
 
         <!-- THREE TABS -->
-        <div class="tabs" style="display:flex; gap:28px; border-bottom:1px solid var(--border); margin-bottom:24px;">
+        <div class="tabs" style="display:flex; gap:20px; border-bottom:1px solid var(--border); margin-bottom:24px; flex-wrap:wrap;">
           <div 
             class="tab" 
             [style.color]="activeTab === 'performance' ? 'var(--primary)' : 'var(--text-muted)'"
@@ -111,7 +149,7 @@ import { environment } from '../../../environments/environment';
 
         <!-- ================= TAB 1: USER PERFORMANCE METRICS ================= -->
         <div *ngIf="activeTab === 'performance'">
-          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:24px;">
+          <div class="grid grid-4" style="gap:16px; margin-bottom:24px;">
             <div class="card stat-card" style="padding:16px 20px; border-radius:10px;">
               <span class="stat-label">Total Staff Shifts</span>
               <span class="stat-value" style="font-size:1.6rem;">{{ perfSummary.shifts }} Shifts</span>
@@ -134,11 +172,11 @@ import { environment } from '../../../environments/environment';
           </div>
 
           <div class="card card-flush" style="border-radius:10px; border:1px solid var(--border);">
-            <div class="card-header" style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <div class="card-header" style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
               <h3 style="margin:0; font-size:1.1rem; font-weight:700;">Staff Performance &amp; Productivity Overview</h3>
               <span class="text-sm text-muted">Showing data for: {{ fromDate }} &ndash; {{ toDate }}</span>
             </div>
-            <div class="table-scroll" style="overflow-x:auto;">
+            <div class="table-container">
               <table class="table" style="width:100%; border-collapse:collapse;">
                 <thead>
                   <tr>
@@ -156,7 +194,7 @@ import { environment } from '../../../environments/environment';
                   <tr *ngFor="let u of users">
                     <td>
                       <div style="display:flex; align-items:center; gap:10px;">
-                        <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:#ede9fe; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">
+                        <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:#ede9fe; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">
                           {{ getInitials(u.full_name) }}
                         </div>
                         <div>
@@ -190,7 +228,7 @@ import { environment } from '../../../environments/environment';
           
           <!-- PENDING PIN RESET REQUESTS BANNER -->
           <div *ngIf="pendingPinRequests.length > 0" class="card" style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; margin-bottom:24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:18px;">🔔</span>
                 <strong style="color:#92400e; font-size:15px;">Pending PIN Reset Requests ({{ pendingPinRequests.length }})</strong>
@@ -223,7 +261,7 @@ import { environment } from '../../../environments/environment';
           </div>
 
           <!-- ACCESS DESCRIPTION CARDS (2-COLUMN GRID) -->
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;">
+          <div class="grid grid-2" style="gap:20px; margin-bottom:24px;">
             <!-- Admin Card -->
             <div class="card" style="border-radius:12px; border:1px solid var(--border); padding:20px;">
               <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
@@ -249,14 +287,14 @@ import { environment } from '../../../environments/environment';
 
           <!-- CONFIGURED USER ACCOUNTS & SCHEDULES CARD -->
           <div class="card card-flush" style="border-radius:12px; border:1px solid var(--border);">
-            <div style="padding:18px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+            <div style="padding:18px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px;">
               <h2 style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text);">Configured User Accounts &amp; Schedules</h2>
               <button type="button" class="btn btn-primary btn-sm" style="padding:0 16px; height:36px; min-height:36px; font-size:13px; font-weight:600; border-radius:6px;" (click)="openAddModal()">
                 + Add User
               </button>
             </div>
 
-            <div class="table-scroll" style="overflow-x:auto;">
+            <div class="table-container">
               <table class="table" style="width:100%; border-collapse:collapse; margin:0;">
                 <thead>
                   <tr style="background:#f8fafc;">
@@ -309,7 +347,7 @@ import { environment } from '../../../environments/environment';
 
                     <!-- Actions -->
                     <td style="padding:14px 18px; text-align:right;">
-                      <div style="display:inline-flex; align-items:center; gap:12px;">
+                      <div style="display:inline-flex; align-items:center; gap:12px; flex-wrap:wrap;">
                         <button type="button" class="btn-ghost" style="border:none; background:transparent; font-size:13px; font-weight:600; color:var(--primary); cursor:pointer; padding:0;" (click)="openResetPinModal(u)">
                           Reset PIN
                         </button>
@@ -337,11 +375,11 @@ import { environment } from '../../../environments/environment';
         <!-- ================= TAB 3: ACTION AUDIT LOG ================= -->
         <div *ngIf="activeTab === 'logs'">
           <div class="card card-flush" style="border-radius:12px; border:1px solid var(--border);">
-            <div style="padding:18px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+            <div style="padding:18px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px;">
               <h3 style="margin:0; font-size:1.15rem; font-weight:700;">Audit &amp; Action Log</h3>
               <span class="text-sm text-muted">Who created, edited, approved or cancelled bills and shifts</span>
             </div>
-            <div class="table-scroll" style="overflow-x:auto;">
+            <div class="table-container">
               <table class="table" style="width:100%; border-collapse:collapse;">
                 <thead>
                   <tr style="background:#f8fafc;">
@@ -377,9 +415,9 @@ import { environment } from '../../../environments/environment';
       <div class="modal modal-lg" style="max-width: 820px;" (click)="$event.stopPropagation()">
         
         <!-- Modal Header -->
-        <div class="modal-header" style="padding: 16px 24px; border-bottom: 1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+        <div class="modal-header" style="padding: 16px 24px; border-bottom: 1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <div style="display:flex; align-items:center; gap:14px;">
-            <div class="avatar" style="width:44px; height:44px; border-radius:50%; background:#ede9fe; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px;">
+            <div class="avatar" style="width:44px; height:44px; border-radius:50%; background:#ede9fe; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex-shrink:0;">
               {{ userDetails?.initials || 'PK' }}
             </div>
             <div>
@@ -403,7 +441,7 @@ import { environment } from '../../../environments/environment';
         <div class="modal-body" style="padding: 20px 24px; display:flex; flex-direction:column; gap:18px; max-height:calc(90vh - 120px); overflow-y:auto;">
           
           <!-- On Leave Today Banner (if active) -->
-          <div *ngIf="userDetails?.is_on_leave_today" style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between;">
+          <div *ngIf="userDetails?.is_on_leave_today" style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
             <div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <span class="badge badge-warning" style="font-weight:700; font-size:12px;">🏖️ On Leave Today</span>
@@ -419,7 +457,7 @@ import { environment } from '../../../environments/environment';
           </div>
 
           <!-- Top Stat Cards (3x2 Grid) -->
-          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px;">
+          <div class="grid grid-3" style="gap:14px;">
             <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:14px 16px;">
               <div style="font-size:13px; color:var(--text-muted); font-weight:500;">Total Sales Amount</div>
               <div class="mono" style="font-size:1.35rem; font-weight:800; color:var(--text); margin-top:4px;">
@@ -464,11 +502,11 @@ import { environment } from '../../../environments/environment';
           </div>
 
           <!-- Middle Section: 2 Columns (Shift Log & Work Hours | Payment Mode Collection) -->
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+          <div class="grid grid-2" style="gap:16px;">
             
             <!-- Shift Log & Work Hours -->
             <div class="card card-flush" style="border-radius:10px; border:1px solid var(--border);">
-              <div style="padding:14px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+              <div style="padding:14px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <h3 style="margin:0; font-size:1.05rem; font-weight:700;">Shift Log &amp; Work Hours</h3>
                 <button type="button" class="btn btn-ghost btn-sm" style="font-size:12px; padding:0 8px; color:var(--primary);" (click)="toggleShiftConfig()">
                   {{ showShiftConfig ? '▲ Close Config' : '⚙️ Configure Shifts' }}
@@ -497,12 +535,12 @@ import { environment } from '../../../environments/environment';
                   Configure Weekly Shift Timings (Monday – Sunday)
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">
-                  <div *ngFor="let s of editingShifts" style="display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; background:#fff; padding:6px 10px; border-radius:6px; border:1px solid var(--border);">
+                  <div *ngFor="let s of editingShifts" style="display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; background:#fff; padding:6px 10px; border-radius:6px; border:1px solid var(--border); flex-wrap:wrap;">
                     <label style="display:flex; align-items:center; gap:6px; width:110px; margin:0; cursor:pointer; font-weight:600;">
                       <input type="checkbox" [(ngModel)]="s.is_working" />
                       <span>{{ s.day_of_week }}</span>
                     </label>
-                    <div style="display:flex; align-items:center; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                       <input class="input mono" style="min-height:30px; height:30px; padding:0 6px; width:95px; font-size:12px;" [disabled]="!s.is_working" [(ngModel)]="s.start_time" placeholder="09:00 AM" />
                       <span style="font-size:12px; color:var(--text-muted);">to</span>
                       <input class="input mono" style="min-height:30px; height:30px; padding:0 6px; width:95px; font-size:12px;" [disabled]="!s.is_working" [(ngModel)]="s.end_time" placeholder="05:00 PM" />
@@ -546,7 +584,7 @@ import { environment } from '../../../environments/environment';
             <div style="padding:14px 18px; border-bottom:1px solid var(--border);">
               <h3 style="margin:0; font-size:1.05rem; font-weight:700;">Recent Activity Timeline</h3>
             </div>
-            <div class="table-scroll" style="max-height:260px; overflow-y:auto;">
+            <div class="table-container" style="max-height:260px; overflow-y:auto;">
               <table class="table text-sm" style="margin:0;">
                 <thead>
                   <tr>
@@ -619,7 +657,7 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="modal-body stack" style="padding:18px 22px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; flex:1;">
           
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="grid grid-2" style="gap:12px;">
             <div class="field">
               <label class="form-label" style="font-weight:600; font-size:13px; margin-bottom:4px;">Full Name</label>
               <input class="input" [(ngModel)]="formData.full_name" placeholder="e.g. Sana R.">
@@ -630,7 +668,7 @@ import { environment } from '../../../environments/environment';
             </div>
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="grid grid-2" style="gap:12px;">
             <div class="field">
               <label class="form-label" style="font-weight:600; font-size:13px; margin-bottom:4px;">Role</label>
               <select class="select" [(ngModel)]="formData.role">
@@ -644,7 +682,7 @@ import { environment } from '../../../environments/environment';
             </div>
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="grid grid-2" style="gap:12px;">
             <div class="field">
               <label class="form-label" style="font-weight:600; font-size:13px; margin-bottom:4px;">4-Digit Security PIN</label>
               <input class="input mono" type="password" maxlength="4" [(ngModel)]="formData.pin" placeholder="••••">
@@ -669,12 +707,12 @@ import { environment } from '../../../environments/environment';
 
           <!-- Working Schedule Configuration (Monday - Sunday) -->
           <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-top:4px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
               <div>
                 <div style="font-weight:700; font-size:13px; color:var(--text);">Working Schedule (Monday &ndash; Sunday)</div>
                 <div style="font-size:11px; color:var(--text-muted);">Configure working days and shift start/end times</div>
               </div>
-              <div style="display:flex; gap:6px;">
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px; padding:2px 8px; border:1px solid var(--border); background:#fff;" (click)="applyShiftPreset('mon_fri_9_6')">Mon-Fri (9-6)</button>
                 <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px; padding:2px 8px; border:1px solid var(--border); background:#fff;" (click)="applyShiftPreset('mon_sat_10_6')">Mon-Sat (10-6)</button>
                 <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px; padding:2px 8px; border:1px solid var(--border); background:#fff;" (click)="applyShiftPreset('mon_fri_9_5')">Mon-Fri (9-5)</button>
@@ -682,13 +720,13 @@ import { environment } from '../../../environments/environment';
             </div>
             
             <div style="display:flex; flex-direction:column; gap:8px;">
-              <div *ngFor="let s of formData.shifts" style="display:flex; align-items:center; justify-content:space-between; padding:6px 12px; background:#ffffff; border:1px solid var(--border); border-radius:6px;">
+              <div *ngFor="let s of formData.shifts" style="display:flex; align-items:center; justify-content:space-between; padding:6px 12px; background:#ffffff; border:1px solid var(--border); border-radius:6px; flex-wrap:wrap; gap:8px;">
                 <label style="display:flex; align-items:center; gap:8px; width:125px; cursor:pointer; font-weight:600; font-size:13px; margin:0;">
                   <input type="checkbox" [(ngModel)]="s.is_working" />
                   <span [style.color]="s.is_working ? 'var(--text)' : 'var(--text-muted)'">{{ s.day_of_week }}</span>
                 </label>
                 
-                <div *ngIf="s.is_working" style="display:flex; align-items:center; gap:6px;">
+                <div *ngIf="s.is_working" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                   <input class="input mono" style="min-height:28px; height:28px; padding:0 8px; width:95px; font-size:12px; border-radius:4px;" [(ngModel)]="s.start_time" placeholder="09:00 AM" />
                   <span style="font-size:12px; color:var(--text-muted);">&ndash;</span>
                   <input class="input mono" style="min-height:28px; height:28px; padding:0 8px; width:95px; font-size:12px; border-radius:4px;" [(ngModel)]="s.end_time" placeholder="05:00 PM" />
@@ -704,7 +742,9 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="modal-footer" style="padding:14px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px;">
           <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancel</button>
-          <button type="button" class="btn btn-primary" (click)="saveUser()">{{ editingUser ? 'Save Changes' : 'Create Account' }}</button>
+          <button type="button" class="btn btn-primary" [disabled]="isSavingUser" (click)="saveUser()">
+            {{ isSavingUser ? 'Saving...' : (editingUser ? 'Save Changes' : 'Create Account') }}
+          </button>
         </div>
       </div>
     </div>
@@ -742,6 +782,7 @@ import { environment } from '../../../environments/environment';
   `
 })
 export class UsersComponent implements OnInit {
+  isMobileMenuOpen: boolean = false;
   users: any[] = [];
   auditLogs: any[] = [];
   pinResetRequests: any[] = [];
@@ -763,6 +804,7 @@ export class UsersComponent implements OnInit {
   // Add/Edit User Account Modal
   showModal: boolean = false;
   editingUser: boolean = false;
+  isSavingUser: boolean = false;
   formData: any = {
     username: '',
     full_name: '',
@@ -796,8 +838,14 @@ export class UsersComponent implements OnInit {
 
   constructor(
     public auth: AuthService,
-    private http: HttpClient
+    private http: HttpClient,
+    private router: Router
   ) {}
+
+  signOut() {
+    this.auth.signOut();
+    this.router.navigate(['/login']);
+  }
 
   ngOnInit() {
     this.loadUsers();
@@ -1248,20 +1296,26 @@ export class UsersComponent implements OnInit {
   }
 
   saveUser() {
+    if (this.isSavingUser) return;
+
     if (!this.formData.full_name.trim() || !this.formData.username.trim()) {
       alert('Please fill in Full Name and Username.');
       return;
     }
 
+    this.isSavingUser = true;
+
     if (this.editingUser) {
       this.http.put(`${environment.apiUrl}/users/` + encodeURIComponent(this.formData.username), this.formData, { headers: this.getAuthHeaders() }).subscribe({
         next: (updatedUser: any) => {
+          this.isSavingUser = false;
           alert('User account and Working Schedule updated successfully!');
           this.closeModal();
           this.loadUsers();
           this.loadAuditLogs();
         },
         error: (err) => {
+          this.isSavingUser = false;
           alert('User updated: ' + (err.error?.detail || 'Saved'));
           this.closeModal();
           this.loadUsers();
@@ -1271,12 +1325,14 @@ export class UsersComponent implements OnInit {
     } else {
       this.http.post(`${environment.apiUrl}/users`, this.formData, { headers: this.getAuthHeaders() }).subscribe({
         next: () => {
+          this.isSavingUser = false;
           alert('User account created successfully with configured schedule!');
           this.closeModal();
           this.loadUsers();
           this.loadAuditLogs();
         },
         error: (err) => {
+          this.isSavingUser = false;
           alert('User creation error: ' + (err.error?.detail || 'Failed'));
         }
       });

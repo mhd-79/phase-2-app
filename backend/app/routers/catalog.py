@@ -6,6 +6,7 @@ import io
 from app.schemas import ItemSchema, ItemCreate, ItemUpdate, CategorySchema, CategoryCreate, UploadPreviewResult
 from app.security import get_current_user, require_admin
 from app.database import db
+from app.idempotency import idempotency_manager, generate_fingerprint
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -69,36 +70,42 @@ async def get_item_by_sku(sku: str):
     description="Admin-only endpoint to quick-add a single product item with SKU, barcode, name, category, pricing, tax rate, and opening quantity."
 )
 async def create_item(item: ItemCreate, user = Depends(require_admin)):
-    existing = await db.item.find_unique(where={"sku": item.sku})
-    if existing:
-        raise HTTPException(status_code=400, detail="Item SKU already exists")
-        
-    # Ensure category exists in DB
-    cat = await db.category.find_unique(where={"name": item.category_name})
-    if not cat:
-        await db.category.create(data={"name": item.category_name})
-        
-    i = await db.item.create(data={
-        "sku": item.sku,
-        "barcode": item.barcode,
-        "name": item.name,
-        "category_name": item.category_name,
-        "price": item.price,
-        "wholesale_price": item.wholesale_price,
-        "cost_price": item.cost_price,
-        "tax_rate": item.tax_rate,
-        "stock": item.stock,
-        "min_stock": item.min_stock,
-        "pricing_method": item.pricing_method,
-        "unit": item.unit,
-        "is_active": True
-    })
-    return ItemSchema(
-        sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
-        price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
-        tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
-        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active
-    )
+    idem_key = generate_fingerprint("create_item", user.username, item)
+
+    async def do_create():
+        existing = await db.item.find_unique(where={"sku": item.sku})
+        if existing:
+            raise HTTPException(status_code=400, detail="Item SKU already exists")
+            
+        # Ensure category exists in DB
+        cat = await db.category.find_unique(where={"name": item.category_name})
+        if not cat:
+            await db.category.create(data={"name": item.category_name})
+            
+        i = await db.item.create(data={
+            "sku": item.sku,
+            "barcode": item.barcode,
+            "name": item.name,
+            "category_name": item.category_name,
+            "price": item.price,
+            "wholesale_price": item.wholesale_price,
+            "cost_price": item.cost_price,
+            "tax_rate": item.tax_rate,
+            "stock": item.stock,
+            "min_stock": item.min_stock,
+            "pricing_method": item.pricing_method,
+            "unit": item.unit,
+            "is_active": True
+        })
+        return ItemSchema(
+            sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
+            price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
+            tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
+            pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active
+        )
+
+    res, _ = await idempotency_manager.execute(idem_key, do_create, status_code=status.HTTP_201_CREATED)
+    return res
 
 @router.put(
     "/items/{sku}",
@@ -245,51 +252,57 @@ async def upload_preview(file: UploadFile = File(...), user = Depends(require_ad
     description="Admin-only endpoint committing previewed CSV items and top-up stock quantities permanently to database."
 )
 async def upload_commit(payload: List[dict], user = Depends(require_admin)):
-    applied = 0
-    for r in payload:
-        status_val = r.get("status")
-        row = r.get("row", r) # support raw row or wrapped row
-        sku = row.get("sku")
-        if not sku or status_val == "error":
-            continue
-        
-        price = float(row.get("price", row.get("selling_price", 0)))
-        cost_price = float(row.get("cost_price", 0))
-        tax = float(row.get("tax_rate", 0))
-        stock = float(row.get("stock", row.get("opening_qty", 0)))
-        name = row.get("name", sku)
-        category = row.get("category_name", row.get("category", "Grocery"))
-        barcode = row.get("barcode", "")
-        unit = row.get("unit", "pcs")
-        pm = row.get("pricing_method", "qty")
-        
-        # Save category if new
-        existing_cat = await db.category.find_unique(where={"name": category})
-        if not existing_cat:
-            await db.category.create(data={"name": category})
-        
-        existing = await db.item.find_unique(where={"sku": sku})
-        if existing:
-            await db.item.update(where={"sku": sku}, data={
-                "stock": stock,
-                "price": price if price > 0 else existing.price,
-                "cost_price": cost_price if cost_price > 0 else existing.cost_price,
-                "tax_rate": tax
-            })
-        else:
-            await db.item.create(data={
-                "sku": sku,
-                "barcode": barcode,
-                "name": name,
-                "category_name": category,
-                "price": price,
-                "cost_price": cost_price,
-                "tax_rate": tax,
-                "stock": stock,
-                "min_stock": max(10.0, stock * 0.2),
-                "pricing_method": pm,
-                "unit": unit,
-                "is_active": True
-            })
-        applied += 1
-    return {"message": f"{applied} stock item(s) committed successfully", "applied_count": applied}
+    idem_key = generate_fingerprint("upload_commit", user.username, payload)
+
+    async def do_commit():
+        applied = 0
+        for r in payload:
+            status_val = r.get("status")
+            row = r.get("row", r) # support raw row or wrapped row
+            sku = row.get("sku")
+            if not sku or status_val == "error":
+                continue
+            
+            price = float(row.get("price", row.get("selling_price", 0)))
+            cost_price = float(row.get("cost_price", 0))
+            tax = float(row.get("tax_rate", 0))
+            stock = float(row.get("stock", row.get("opening_qty", 0)))
+            name = row.get("name", sku)
+            category = row.get("category_name", row.get("category", "Grocery"))
+            barcode = row.get("barcode", "")
+            unit = row.get("unit", "pcs")
+            pm = row.get("pricing_method", "qty")
+            
+            # Save category if new
+            existing_cat = await db.category.find_unique(where={"name": category})
+            if not existing_cat:
+                await db.category.create(data={"name": category})
+            
+            existing = await db.item.find_unique(where={"sku": sku})
+            if existing:
+                await db.item.update(where={"sku": sku}, data={
+                    "stock": stock,
+                    "price": price if price > 0 else existing.price,
+                    "cost_price": cost_price if cost_price > 0 else existing.cost_price,
+                    "tax_rate": tax
+                })
+            else:
+                await db.item.create(data={
+                    "sku": sku,
+                    "barcode": barcode,
+                    "name": name,
+                    "category_name": category,
+                    "price": price,
+                    "cost_price": cost_price,
+                    "tax_rate": tax,
+                    "stock": stock,
+                    "min_stock": max(10.0, stock * 0.2),
+                    "pricing_method": pm,
+                    "unit": unit,
+                    "is_active": True
+                })
+            applied += 1
+        return {"message": f"{applied} stock item(s) committed successfully", "applied_count": applied}
+
+    res, _ = await idempotency_manager.execute(idem_key, do_commit)
+    return res

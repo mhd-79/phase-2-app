@@ -140,7 +140,7 @@
     }
 
     return (
-      '<div style="text-align:center;margin-bottom:var(--space-3)"><strong>Greenfield Mart</strong><div class="text-xs text-muted">12, MG Road, Bengaluru &middot; GSTIN 29ABCDE1234F1Z5</div></div>' +
+      '<div style="text-align:center;margin-bottom:var(--space-3)"><strong>Okuto Mart</strong><div class="text-xs text-muted">12, MG Road, Bengaluru &middot; GSTIN 29ABCDE1234F1Z5</div></div>' +
       '<hr class="divider">' +
       '<div class="row-between text-sm"><span>Invoice</span><span class="mono">' + record.invoiceNo + '</span></div>' +
       '<div class="row-between text-sm"><span>Date</span><span class="mono">' + new Date(record.time).toLocaleString() + '</span></div>' +

@@ -30,67 +30,105 @@ interface TenderLine {
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="app-shell">
+      <!-- SIDEBAR BACKDROP FOR MOBILE -->
+      <div class="sidebar-backdrop" *ngIf="isMobileMenuOpen" [class.open]="isMobileMenuOpen" (click)="isMobileMenuOpen = false"></div>
+
       <!-- SIDEBAR -->
-      <aside class="sidebar">
+      <aside class="sidebar" [class.mobile-open]="isMobileMenuOpen">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
-          <div><div class="brand-name" style="font-weight:700">Greenfield Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="isMobileMenuOpen = false" style="margin-left:auto; color:var(--slate-400); display:none;" [style.display]="isMobileMenuOpen ? 'flex' : 'none'">✕</button>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
-          <a class="nav-link active" routerLink="/pos" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">
+          <a class="nav-link active" routerLink="/pos" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">
             <span>🛒</span> Billing
           </a>
-          <a class="nav-link" routerLink="/hold-bills" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+          <a class="nav-link" routerLink="/hold-bills" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
             <span>⏸️</span> Hold &amp; Recall
           </a>
-          <a class="nav-link" routerLink="/returns" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+          <a class="nav-link" routerLink="/returns" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
             <span>🔄</span> Returns
           </a>
 
           <ng-container *ngIf="auth.isAdmin()">
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Inventory</div>
-            <a class="nav-link" routerLink="/items-stock" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/items-stock" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📦</span> Items &amp; Stock
             </a>
-            <a class="nav-link" routerLink="/stock-upload" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/stock-upload" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📤</span> Stock Upload
             </a>
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Insights</div>
-            <a class="nav-link" routerLink="/reports" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/reports" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📊</span> Reports
             </a>
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Administration</div>
-            <a class="nav-link" routerLink="/discounts" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/discounts" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>🏷️</span> Discounts
             </a>
-            <a class="nav-link" routerLink="/tax-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/tax-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📜</span> Tax Configuration
             </a>
-            <a class="nav-link" routerLink="/users" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/users" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>👥</span> Users &amp; Roles
             </a>
-            <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/store-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>⚙️</span> Store Settings
             </a>
           </ng-container>
         </nav>
+
+        <div class="sidebar__footer" style="margin-top:auto; padding:16px 8px 8px; border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
+            <div style="overflow:hidden;">
+              <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }} &middot; {{ selectedCounter }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
+            <span>🚪</span> Sign Out
+          </button>
+        </div>
       </aside>
 
       <!-- TOPBAR -->
       <header class="topbar">
-        <div class="row">
-          <span style="font-weight:700; color:var(--primary)">Greenfield Mart POS</span>
+        <div class="topbar__left">
+          <button type="button" class="btn-hamburger" (click)="isMobileMenuOpen = !isMobileMenuOpen" title="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span class="topbar-brand-title">Okuto Mart POS</span>
         </div>
-        <div class="row" style="display:flex; gap:12px; align-items:center;">
-          <div class="user-chip" style="display:flex; gap:8px; align-items:center;">
-            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">{{ auth.currentUser().initials }}</div>
-            <div>
-              <div class="text-sm" style="font-weight:600;line-height:1.2">{{ auth.currentUser().fullName }}</div>
-              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;">{{ auth.currentUser().role }} &middot; Counter 1</div>
+        <div class="topbar__right">
+          <!-- Active Billing Counter Selector Dropdown -->
+          <div class="counter-selector-box" title="Active billing counter">
+            <span style="font-size:13px;">🖥️</span>
+            <label for="billingCounterSelect" class="text-xs" style="color:var(--text-muted); font-weight:600; margin:0; white-space:nowrap;">Counter:</label>
+            <select
+              id="billingCounterSelect"
+              [(ngModel)]="selectedCounter"
+              (ngModelChange)="onCounterChange($event)"
+              style="background:transparent; color:var(--text); border:none; font-size:12px; font-weight:600; outline:none; cursor:pointer; padding:2px 4px; max-width:140px; text-overflow:ellipsis;">
+              <option *ngFor="let c of availableCounters" [value]="c.counter_name" style="background:#1e293b; color:#f8fafc;">
+                {{ c.counter_name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="user-chip">
+            <div class="avatar">{{ auth.currentUser().initials }}</div>
+            <div class="user-chip-text">
+              <div class="text-sm" style="font-weight:600;line-height:1.2;white-space:nowrap;">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;white-space:nowrap;">{{ auth.currentUser().role }} &middot; {{ selectedCounter }}</div>
             </div>
           </div>
-          <button class="btn btn-ghost btn-sm" (click)="signOut()" title="Sign out">Sign Out</button>
+          <button type="button" class="btn-topbar-signout" (click)="signOut()" title="Sign out">
+            <span>🚪</span>
+            <span class="signout-label">Sign Out</span>
+          </button>
         </div>
       </header>
 
@@ -130,8 +168,8 @@ interface TenderLine {
           <aside class="cart-panel">
             <!-- TOP HOLD & RECALL BUTTONS (FIGURE 1) -->
             <div style="display:flex; justify-content:flex-end; gap:8px; padding:12px 16px 4px;">
-              <button class="btn btn-secondary btn-sm" style="border-radius:8px; display:flex; align-items:center; gap:6px; font-weight:500;" [disabled]="cart.length === 0" (click)="holdBill()">
-                <span style="font-size:13px;">⏸️</span> Hold Bill
+              <button class="btn btn-secondary btn-sm" style="border-radius:8px; display:flex; align-items:center; gap:6px; font-weight:500;" [disabled]="cart.length === 0 || isHoldingBill" (click)="holdBill()">
+                <span style="font-size:13px;">⏸️</span> {{ isHoldingBill ? 'Holding...' : 'Hold Bill' }}
               </button>
               <button class="btn btn-secondary btn-sm" style="border-radius:8px; font-weight:500;" (click)="openRecallModal()">
                 Recall Bill
@@ -231,7 +269,7 @@ interface TenderLine {
             <div class="amount" style="font-size:2.2rem; font-weight:800; color:#0f172a; margin-top:2px;">₹{{ grandTotal.toFixed(2) }}</div>
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+          <div class="pay-modal-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
             <!-- LEFT COLUMN: MODE SELECTION & NUMPAD -->
             <div>
               <!-- TENDER MODE CHIPS -->
@@ -298,8 +336,8 @@ interface TenderLine {
 
         <div class="modal-footer" style="padding:16px 24px; display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border);">
           <button class="btn btn-secondary" (click)="closePaymentModal()">Cancel</button>
-          <button class="btn" [style.background]="remainingAmount <= 0 ? '#7cdac0' : '#cbd5e1'" [style.color]="remainingAmount <= 0 ? '#fff' : '#64748b'" style="font-weight:700; border:none; padding:10px 20px; border-radius:8px;" [disabled]="remainingAmount > 0" (click)="completeSale()">
-            Complete Sale
+          <button class="btn" [style.background]="remainingAmount <= 0 && !isCompletingSale ? '#7cdac0' : '#cbd5e1'" [style.color]="remainingAmount <= 0 && !isCompletingSale ? '#fff' : '#64748b'" style="font-weight:700; border:none; padding:10px 20px; border-radius:8px;" [disabled]="remainingAmount > 0 || isCompletingSale || cart.length === 0" (click)="completeSale()">
+            {{ isCompletingSale ? '⏳ Processing Sale...' : 'Complete Sale' }}
           </button>
         </div>
       </div>
@@ -354,7 +392,9 @@ interface TenderLine {
         </div>
         <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
           <button class="btn btn-secondary" (click)="showApprovalModal = false">Cancel</button>
-          <button class="btn btn-primary" (click)="approveDiscount()">Authorize</button>
+          <button class="btn btn-primary" [disabled]="isApprovingDiscount" (click)="approveDiscount()">
+            {{ isApprovingDiscount ? 'Authorizing...' : 'Authorize' }}
+          </button>
         </div>
       </div>
     </div>
@@ -367,31 +407,33 @@ interface TenderLine {
           <button class="btn btn-ghost btn-sm" (click)="showRecallModal = false">✕</button>
         </div>
         <div class="modal-body">
-          <table class="table" *ngIf="heldBillsList.length > 0">
-            <thead>
-              <tr>
-                <th>Bill Ref</th>
-                <th>Held At</th>
-                <th class="num">Items</th>
-                <th class="num">Total</th>
-                <th style="text-align:right;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let h of heldBillsList">
-                <td><strong class="mono">{{ formatRef(h.id) }}</strong></td>
-                <td>{{ h.time | date:'short' }}</td>
-                <td class="num mono">{{ h.itemCount || (h.lines ? h.lines.length : 0) }}</td>
-                <td class="num mono">₹{{ (h.total || 0).toFixed(2) }}</td>
-                <td>
-                  <div style="display:flex; justify-content:flex-end; gap:8px;">
-                    <button class="btn btn-primary btn-sm" (click)="resumeHeldBill(h)">Resume</button>
-                    <button class="btn btn-ghost btn-sm text-danger" (click)="discardHeldBill(h.id)">Discard</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-container" *ngIf="heldBillsList.length > 0">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Bill Ref</th>
+                  <th>Held At</th>
+                  <th class="num">Items</th>
+                  <th class="num">Total</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let h of heldBillsList">
+                  <td><strong class="mono">{{ formatRef(h.id) }}</strong></td>
+                  <td>{{ h.time | date:'short' }}</td>
+                  <td class="num mono">{{ h.itemCount || (h.lines ? h.lines.length : 0) }}</td>
+                  <td class="num mono">₹{{ (h.total || 0).toFixed(2) }}</td>
+                  <td>
+                    <div style="display:flex; justify-content:flex-end; gap:8px;">
+                      <button class="btn btn-primary btn-sm" (click)="resumeHeldBill(h)">Resume</button>
+                      <button class="btn btn-ghost btn-sm text-danger" (click)="discardHeldBill(h.id)">Discard</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div *ngIf="heldBillsList.length === 0" style="text-align:center; padding:32px; color:var(--text-muted);">
             No bills currently on hold.
           </div>
@@ -410,7 +452,7 @@ interface TenderLine {
           <button class="btn btn-ghost btn-sm" (click)="showReceiptModal = false">✕</button>
         </div>
         <div class="modal-body" style="font-family:monospace; background:#fafafa; border:1px solid #e2e8f0; padding:16px; border-radius:8px; font-size:12px;">
-          <div style="text-align:center; font-weight:700; font-size:14px; margin-bottom:8px;">Greenfield Mart</div>
+          <div style="text-align:center; font-weight:700; font-size:14px; margin-bottom:8px;">Okuto Mart</div>
           <div style="text-align:center; margin-bottom:12px;">Invoice: {{ completedSaleData.invoice_no }} &middot; {{ completedSaleData.time | date:'short' }}</div>
           <div style="border-bottom:1px dashed #cbd5e1; margin-bottom:8px;"></div>
           <div *ngFor="let l of completedSaleData.lines" style="display:flex; justify-content:space-between; margin-bottom:4px;">
@@ -488,6 +530,7 @@ interface TenderLine {
   `
 })
 export class PosComponent implements OnInit {
+  isMobileMenuOpen: boolean = false;
   userRole: string = 'cashier';
   userName: string = 'Priya K.';
   userInitials: string = 'PK';
@@ -516,10 +559,20 @@ export class PosComponent implements OnInit {
   keypadInputString: string = '0';
   tenders: TenderLine[] = [{ mode: 'Cash', amount: 0 }];
 
+  // DUPLICATE PROTECTION & IDEMPOTENCY FLAGS
+  isCompletingSale: boolean = false;
+  isHoldingBill: boolean = false;
+  isApprovingDiscount: boolean = false;
+  currentSaleTxId: string = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
   // RECEIPT STATE
   showReceiptModal: boolean = false;
   completedSaleData: any = null;
   pricingMode: 'exclusive' | 'inclusive' = 'exclusive';
+
+  // ACTIVE BILLING COUNTER (FIGURE 1 & CASH DRAWER INTEGRATION)
+  availableCounters: any[] = [];
+  selectedCounter: string = 'Counter 1 - Main Express';
 
   constructor(
     public auth: AuthService,
@@ -533,6 +586,7 @@ export class PosComponent implements OnInit {
     this.userRole = active?.role || 'cashier';
     this.userName = active?.fullName || 'Priya K.';
     this.userInitials = active?.initials || 'PK';
+    this.loadBillingCounters();
     this.loadTaxSettings();
     this.loadCategories();
     this.loadCatalog();
@@ -541,6 +595,37 @@ export class PosComponent implements OnInit {
     if (recallId) {
       this.recallBillDirect(recallId);
     }
+  }
+
+  loadBillingCounters() {
+    const saved = localStorage.getItem('pos_active_counter');
+    if (saved) {
+      this.selectedCounter = saved;
+    }
+    this.http.get<any[]>(`${environment.apiUrl}/billing/counters`).subscribe({
+      next: (counters) => {
+        if (counters && counters.length > 0) {
+          this.availableCounters = counters;
+          const match = counters.find(c => c.counter_name === this.selectedCounter);
+          if (!match) {
+            this.selectedCounter = counters[0].counter_name;
+            localStorage.setItem('pos_active_counter', this.selectedCounter);
+          }
+        } else {
+          this.availableCounters = [{ id: 'c1', counter_name: this.selectedCounter }];
+        }
+      },
+      error: () => {
+        if (!this.availableCounters || this.availableCounters.length === 0) {
+          this.availableCounters = [{ id: 'c1', counter_name: this.selectedCounter }];
+        }
+      }
+    });
+  }
+
+  onCounterChange(newCounter: string) {
+    this.selectedCounter = newCounter;
+    localStorage.setItem('pos_active_counter', newCounter);
   }
 
   loadTaxSettings() {
@@ -874,13 +959,16 @@ export class PosComponent implements OnInit {
 
   // --- FIGURE 1: HOLD & RECALL METHODS ---
   holdBill() {
-    if (this.cart.length === 0) return;
+    if (this.cart.length === 0 || this.isHoldingBill) return;
+    this.isHoldingBill = true;
+
     const payload = {
       lines: this.cart,
       discount: this.appliedDiscount,
       item_count: this.totalItemsCount,
       itemCount: this.totalItemsCount,
-      total: this.grandTotal
+      total: this.grandTotal,
+      idempotency_key: 'hold_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)
     };
 
     const token = localStorage.getItem('pos_token');
@@ -888,11 +976,13 @@ export class PosComponent implements OnInit {
 
     this.http.post<any>(`${environment.apiUrl}/billing/held-bills`, payload, { headers }).subscribe({
       next: () => {
+        this.isHoldingBill = false;
         alert('Bill placed on hold successfully!');
         this.cart = [];
         this.appliedDiscount = null;
       },
       error: (err) => {
+        this.isHoldingBill = false;
         let msg = 'Failed to hold bill';
         if (err.error) {
           if (typeof err.error.detail === 'string') {
@@ -1004,13 +1094,15 @@ export class PosComponent implements OnInit {
   }
 
   approveDiscount() {
-    if (!this.adminPinInput.trim()) {
-      alert('Please enter Admin PIN');
+    if (!this.adminPinInput.trim() || this.isApprovingDiscount) {
+      if (!this.adminPinInput.trim()) alert('Please enter Admin PIN');
       return;
     }
+    this.isApprovingDiscount = true;
 
     this.http.post<any>(`${environment.apiUrl}/billing/approve-discount`, { pin: this.adminPinInput }).subscribe({
       next: (res) => {
+        this.isApprovingDiscount = false;
         if (res.approved) {
           this.showApprovalModal = false;
           this.adminPinInput = '';
@@ -1021,14 +1113,8 @@ export class PosComponent implements OnInit {
         }
       },
       error: () => {
-        if (this.adminPinInput === '9999' || this.adminPinInput.length >= 4) {
-          this.showApprovalModal = false;
-          this.adminPinInput = '';
-          const val = Number(this.discountValueInput || 0);
-          this.commitDiscount(this.discountType, val);
-        } else {
-          alert('Invalid Admin PIN entered');
-        }
+        this.isApprovingDiscount = false;
+        alert('Invalid Admin PIN entered. Only active Admin credentials can authorize this discount.');
       }
     });
   }
@@ -1123,7 +1209,8 @@ export class PosComponent implements OnInit {
   }
 
   completeSale() {
-    if (this.remainingAmount > 0) return;
+    if (this.remainingAmount > 0 || this.isCompletingSale || this.cart.length === 0) return;
+    this.isCompletingSale = true;
 
     const salePayload = {
       lines: this.cart.map(l => ({
@@ -1137,12 +1224,16 @@ export class PosComponent implements OnInit {
       })),
       pricing_mode: this.pricingMode,
       manual_discount: this.appliedDiscount ? { type: this.appliedDiscount.type, value: this.appliedDiscount.value } : { type: 'percent', value: 0 },
-      tenders: this.tenders.map(t => ({ mode: t.mode, amount: t.amount }))
+      tenders: this.tenders.map(t => ({ mode: t.mode, amount: t.amount })),
+      idempotency_key: this.currentSaleTxId,
+      counter_name: this.selectedCounter
     };
 
     const token = localStorage.getItem('pos_token');
     const user = this.auth.currentUser();
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      'Idempotency-Key': this.currentSaleTxId
+    };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (user?.role) headers['X-User-Role'] = user.role;
     if (user?.username) headers['X-Username'] = user.username;
@@ -1154,8 +1245,12 @@ export class PosComponent implements OnInit {
         this.showReceiptModal = true;
         this.cart = [];
         this.appliedDiscount = null;
+        this.currentSaleTxId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        this.isCompletingSale = false;
+        this.loadCatalog(); // refresh catalog stock counts
       },
       error: (err) => {
+        this.isCompletingSale = false;
         let msg = 'Failed to complete sale transaction';
         if (err.error?.detail) {
           msg = typeof err.error.detail === 'string' ? err.error.detail : JSON.stringify(err.error.detail);
@@ -1172,13 +1267,14 @@ export class PosComponent implements OnInit {
 
     const receiptHtml = this.completedSaleData.receipt_html || `
       <div style="text-align:center;margin-bottom:12px">
-        <strong>Greenfield Mart</strong>
+        <strong>Okuto Mart</strong>
         <div style="font-size:11px;color:#666">12, MG Road, Bengaluru &middot; GSTIN 29ABCDE1234F1Z5</div>
       </div>
       <hr style="border:none;border-top:1px dashed #999;margin:8px 0">
       <div style="display:flex;justify-content:space-between;font-size:12px"><span>Invoice</span><span>${this.completedSaleData.invoice_no}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:12px"><span>Date</span><span>${new Date(this.completedSaleData.time).toLocaleString()}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:12px"><span>Cashier</span><span>${this.completedSaleData.cashier_name || this.completedSaleData.cashier_username || 'Priya K.'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span>Counter</span><span>${this.completedSaleData.counter_name || this.selectedCounter || 'Counter 1 - Main Express'}</span></div>
       <hr style="border:none;border-top:1px dashed #999;margin:8px 0">
       ${(this.completedSaleData.lines || []).map((l: any) => `
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
