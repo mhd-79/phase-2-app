@@ -22,6 +22,11 @@ COPY . .
 RUN python -m prisma generate --schema=./prisma/schema.prisma
 RUN python -m prisma py fetch
 
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]
+
+
 EXPOSE 8000
 
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
