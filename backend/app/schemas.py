@@ -237,6 +237,7 @@ class SaleCreate(BaseModel):
     manual_discount: Optional[ManualDiscountInput] = Field(None, description="Bill-level manual discount")
     tenders: List[TenderInput] = Field(..., description="Payment tender breakup list")
     idempotency_key: Optional[str] = Field(None, description="Optional client transaction idempotency key to prevent duplicate checkouts")
+    counter_name: Optional[str] = Field(None, description="Active billing counter name where checkout occurred", example="Counter 1 - Main Express")
 
 class SaleReturnCreate(BaseModel):
     invoice_no: str = Field(..., description="Target invoice number to return", example="INV-FY26-01025")

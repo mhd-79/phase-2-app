@@ -82,6 +82,7 @@ model Sale {
   gst_total             Float
   grand_total           Float
   status                String       @default("COMPLETED") // "COMPLETED" | "RETURNED" | "PARTIALLY_RETURNED"
+  counter_name          String?      @default("Counter 1 - Main Express")
   created_at            DateTime     @default(now())
   items                 SaleItem[]
   tenders               SaleTender[]

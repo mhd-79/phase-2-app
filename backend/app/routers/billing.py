@@ -53,6 +53,23 @@ async def generate_next_return_no() -> str:
             return candidate
         seq_no += 1
 
+@router.get(
+    "/counters",
+    summary="List Active Billing Counters",
+    description="Returns all active configured store cash counters for counter selection in the POS billing interface."
+)
+async def get_billing_counters(user = Depends(get_current_user)):
+    counters = await db.cashcounter.find_many(where={"is_active": True})
+    return [
+        {
+            "id": c.id,
+            "counter_name": c.counter_name,
+            "opening_float": c.opening_float,
+            "is_active": c.is_active
+        }
+        for c in counters
+    ]
+
 @router.post(
     "/calculate-totals",
     summary="Compute Cart Totals and Tax Breakup",
@@ -122,11 +139,13 @@ async def create_sale(
                 raise HTTPException(status_code=400, detail=f"Insufficient stock for {line.name} (Available: {item.stock})")
                 
         invoice_no = await generate_next_invoice_no()
+        counter_name = (req.counter_name or "Counter 1 - Main Express").strip()
         
         sale = await db.sale.create(data={
             "invoice_no": invoice_no,
             "created_by_username": user.username,
             "pricing_mode": pricing_mode,
+            "counter_name": counter_name,
             "subtotal_original": totals["subtotal_original"],
             "auto_discount_total": totals["auto_discount_total"],
             "manual_discount_total": totals["manual_discount_total"],
@@ -176,7 +195,11 @@ async def create_sale(
             await db.auditlog.create(data={
                 "username": user.username,
                 "action": "Bill completed",
-                "details_json": json.dumps({"reference": invoice_no, "grand_total": sale.grand_total})
+                "details_json": json.dumps({
+                    "reference": invoice_no,
+                    "grand_total": sale.grand_total,
+                    "counter": counter_name
+                })
             })
         except Exception as e:
             print(f"Audit log notice: {e}")
@@ -188,6 +211,7 @@ async def create_sale(
             "cashier_username": user.username,
             "cashier_name": user.full_name,
             "pricing_mode": sale.pricing_mode,
+            "counter_name": counter_name,
             "lines": saved_items,
             "tenders": saved_tenders,
             "subtotal_original": sale.subtotal_original,
