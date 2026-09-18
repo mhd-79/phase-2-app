@@ -12,30 +12,31 @@ import { environment } from '../../../environments/environment';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="app-shell">
-      <aside class="sidebar">
+      <div class="sidebar-backdrop" *ngIf="isMobileMenuOpen" (click)="isMobileMenuOpen = false"></div>
+      <aside class="sidebar" [class.mobile-open]="isMobileMenuOpen">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
           <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
-          <a class="nav-link" routerLink="/pos" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
-          <a class="nav-link" routerLink="/hold-bills" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
-          <a class="nav-link" routerLink="/returns" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
+          <a class="nav-link" routerLink="/pos" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
+          <a class="nav-link" routerLink="/hold-bills" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
+          <a class="nav-link" routerLink="/returns" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
 
           <ng-container *ngIf="auth.isAdmin()">
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Inventory</div>
-            <a class="nav-link" routerLink="/items-stock" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
-            <a class="nav-link active" routerLink="/stock-upload" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">📤 Stock Upload</a>
+            <a class="nav-link" routerLink="/items-stock" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
+            <a class="nav-link active" routerLink="/stock-upload" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">📤 Stock Upload</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Insights</div>
-            <a class="nav-link" routerLink="/reports" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📊 Reports</a>
+            <a class="nav-link" routerLink="/reports" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📊 Reports</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Administration</div>
-            <a class="nav-link" routerLink="/discounts" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🏷️ Discounts</a>
-            <a class="nav-link" routerLink="/tax-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
-            <a class="nav-link" routerLink="/users" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">👥 Users &amp; Roles</a>
-            <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
+            <a class="nav-link" routerLink="/discounts" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🏷️ Discounts</a>
+            <a class="nav-link" routerLink="/tax-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
+            <a class="nav-link" routerLink="/users" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">👥 Users &amp; Roles</a>
+            <a class="nav-link" routerLink="/store-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
 
@@ -53,7 +54,31 @@ import { environment } from '../../../environments/environment';
         </div>
       </aside>
 
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar__left">
+          <button type="button" class="btn-hamburger" (click)="isMobileMenuOpen = !isMobileMenuOpen" title="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span class="topbar-brand-title">Stock Upload</span>
+        </div>
+        <div class="topbar__right">
+          <div class="user-chip">
+            <div class="avatar">{{ auth.currentUser().initials }}</div>
+            <div class="user-chip-text">
+              <div class="text-sm" style="font-weight:600;line-height:1.2;white-space:nowrap;">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;white-space:nowrap;">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-topbar-signout" (click)="signOut()" title="Sign out">
+            <span>🚪</span>
+            <span class="signout-label">Sign Out</span>
+          </button>
+        </div>
+      </header>
+
       <main class="main">
+
         <div class="page-header">
           <div>
             <span class="eyebrow">FR-P1-STK-001, 006</span>
@@ -68,7 +93,7 @@ import { environment } from '../../../environments/environment';
               <h3>Upload a CSV Stock File</h3>
               <p class="text-sm text-muted">Required Phase 1 columns: sku, barcode, name, category_name, cost_price, price, wholesale_price, tax_rate, stock, min_stock, pricing_method, unit</p>
             </div>
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn btn-secondary" (click)="downloadSample()">Download CSV Template</button>
               <button class="btn btn-secondary" (click)="loadSampleFile()">Load Sample Data</button>
               <label class="btn btn-primary" style="cursor:pointer">
@@ -82,44 +107,46 @@ import { environment } from '../../../environments/environment';
 
         <!-- PREVIEW TABLE -->
         <div *ngIf="previewRows.length > 0" class="card card-flush">
-          <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <h3>Pre-Commit Upload Preview</h3>
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <span class="badge badge-neutral">Total: {{ previewSummary.total_rows }}</span>
               <span class="badge badge-success">New: {{ previewSummary.new_count }}</span>
               <span class="badge badge-warning">Updates: {{ previewSummary.update_count }}</span>
               <span *ngIf="previewSummary.error_count > 0" class="badge badge-danger">Errors: {{ previewSummary.error_count }}</span>
             </div>
           </div>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Name</th>
-                <th>Category</th>
-                <th class="num">Selling Price</th>
-                <th class="num">Cost Price</th>
-                <th class="num">Opening Qty</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of previewRows">
-                <td><strong class="mono">{{ item.row.sku }}</strong></td>
-                <td>{{ item.row.name }}</td>
-                <td><span class="badge badge-neutral">{{ item.row.category_name }}</span></td>
-                <td class="num mono">₹{{ (item.row.price || 0).toFixed(2) }}</td>
-                <td class="num mono">₹{{ (item.row.cost_price || 0).toFixed(2) }}</td>
-                <td class="num mono">{{ item.row.stock }} {{ item.row.unit || 'pcs' }}</td>
-                <td>
-                  <span class="badge" [class.badge-success]="item.status === 'new'" [class.badge-warning]="item.status === 'update'" [class.badge-danger]="item.status === 'error'">
-                    {{ item.status === 'new' ? 'New SKU' : (item.status === 'update' ? 'Stock Refresh' : 'Invalid') }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div style="padding:16px 20px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th class="num">Selling Price</th>
+                  <th class="num">Cost Price</th>
+                  <th class="num">Opening Qty</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of previewRows">
+                  <td><strong class="mono">{{ item.row.sku }}</strong></td>
+                  <td>{{ item.row.name }}</td>
+                  <td><span class="badge badge-neutral">{{ item.row.category_name }}</span></td>
+                  <td class="num mono">₹{{ (item.row.price || 0).toFixed(2) }}</td>
+                  <td class="num mono">₹{{ (item.row.cost_price || 0).toFixed(2) }}</td>
+                  <td class="num mono">{{ item.row.stock }} {{ item.row.unit || 'pcs' }}</td>
+                  <td>
+                    <span class="badge" [class.badge-success]="item.status === 'new'" [class.badge-warning]="item.status === 'update'" [class.badge-danger]="item.status === 'error'">
+                      {{ item.status === 'new' ? 'New SKU' : (item.status === 'update' ? 'Stock Refresh' : 'Invalid') }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:16px 20px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <p class="text-sm text-muted">Review preview data before committing changes permanently to PostgreSQL database.</p>
             <button class="btn btn-success btn-lg" [disabled]="isCommittingStock || previewRows.length === 0" (click)="commitUpload()">
               {{ isCommittingStock ? 'Committing Stock Updates...' : 'Commit Upload to Database' }}
@@ -131,6 +158,7 @@ import { environment } from '../../../environments/environment';
   `
 })
 export class StockUploadComponent implements OnInit {
+  isMobileMenuOpen: boolean = false;
   fileName: string = '';
   previewRows: any[] = [];
   previewSummary: any = { total_rows: 0, new_count: 0, update_count: 0, error_count: 0 };

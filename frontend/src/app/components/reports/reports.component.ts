@@ -12,30 +12,35 @@ import { environment } from '../../../environments/environment';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="app-shell">
-      <aside class="sidebar">
+      <!-- SIDEBAR BACKDROP FOR MOBILE -->
+      <div class="sidebar-backdrop" *ngIf="isMobileMenuOpen" [class.open]="isMobileMenuOpen" (click)="isMobileMenuOpen = false"></div>
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar" [class.mobile-open]="isMobileMenuOpen">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
           <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="isMobileMenuOpen = false" style="margin-left:auto; color:var(--slate-400); display:none;" [style.display]="isMobileMenuOpen ? 'flex' : 'none'">✕</button>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
-          <a class="nav-link" routerLink="/pos" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
-          <a class="nav-link" routerLink="/hold-bills" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
-          <a class="nav-link" routerLink="/returns" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
+          <a class="nav-link" routerLink="/pos" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
+          <a class="nav-link" routerLink="/hold-bills" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
+          <a class="nav-link" routerLink="/returns" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
 
           <ng-container *ngIf="auth.isAdmin()">
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Inventory</div>
-            <a class="nav-link" routerLink="/items-stock" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
-            <a class="nav-link" routerLink="/stock-upload" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📤 Stock Upload</a>
+            <a class="nav-link" routerLink="/items-stock" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
+            <a class="nav-link" routerLink="/stock-upload" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📤 Stock Upload</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Insights</div>
-            <a class="nav-link active" routerLink="/reports" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">📊 Reports</a>
+            <a class="nav-link active" routerLink="/reports" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">📊 Reports</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Administration</div>
-            <a class="nav-link" routerLink="/discounts" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🏷️ Discounts</a>
-            <a class="nav-link" routerLink="/tax-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
-            <a class="nav-link" routerLink="/users" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">👥 Users &amp; Roles</a>
-            <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
+            <a class="nav-link" routerLink="/discounts" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🏷️ Discounts</a>
+            <a class="nav-link" routerLink="/tax-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
+            <a class="nav-link" routerLink="/users" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">👥 Users &amp; Roles</a>
+            <a class="nav-link" routerLink="/store-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
 
@@ -53,6 +58,29 @@ import { environment } from '../../../environments/environment';
         </div>
       </aside>
 
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar__left">
+          <button type="button" class="btn-hamburger" (click)="isMobileMenuOpen = !isMobileMenuOpen" title="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span class="topbar-brand-title">Reports &amp; Analytics</span>
+        </div>
+        <div class="topbar__right">
+          <div class="user-chip">
+            <div class="avatar">{{ auth.currentUser().initials }}</div>
+            <div class="user-chip-text">
+              <div class="text-sm" style="font-weight:600;line-height:1.2;white-space:nowrap;">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;white-space:nowrap;">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-topbar-signout" (click)="signOut()" title="Sign out">
+            <span>🚪</span>
+            <span class="signout-label">Sign Out</span>
+          </button>
+        </div>
+      </header>
+
       <main class="main">
         <div class="page-header">
           <div>
@@ -64,14 +92,14 @@ import { environment } from '../../../environments/environment';
 
         <!-- DATE FILTER BAR -->
         <div class="filter-bar" style="background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-          <div class="chip-group" style="display:flex; gap:6px; align-items:center;">
+          <div class="chip-group" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
             <button class="chip" [class.active]="activeDateFilter === 'today'" (click)="setDateFilter('today')">Today</button>
             <button class="chip" [class.active]="activeDateFilter === 'week'" (click)="setDateFilter('week')">This Week</button>
             <button class="chip" [class.active]="activeDateFilter === 'month'" (click)="setDateFilter('month')">This Month</button>
             <button class="chip" [class.active]="activeDateFilter === 'custom'" (click)="setDateFilter('custom')">Custom Range</button>
           </div>
           
-          <div *ngIf="activeDateFilter === 'custom'" style="display:flex; gap:8px; align-items:center;">
+          <div *ngIf="activeDateFilter === 'custom'" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <input type="date" class="input input-sm" [(ngModel)]="startDate" (change)="onCustomDateChange()">
             <span style="font-size:12px; color:var(--text-muted)">to</span>
             <input type="date" class="input input-sm" [(ngModel)]="endDate" (change)="onCustomDateChange()">
@@ -83,7 +111,7 @@ import { environment } from '../../../environments/environment';
         </div>
 
         <!-- NAVIGATION TABS -->
-        <div class="tabs" style="display:flex; gap:12px; border-bottom:1px solid var(--border); margin-bottom:20px;">
+        <div class="tabs">
           <div class="tab" [class.active]="activeTab === 'zreport'" (click)="switchTab('zreport')">Daily Sales (Z-Report)</div>
           <div class="tab" [class.active]="activeTab === 'itemsales'" (click)="switchTab('itemsales')">Sales by Item</div>
           <div class="tab" [class.active]="activeTab === 'cashdrawer'" (click)="switchTab('cashdrawer')">Cash Drawer</div>
@@ -92,7 +120,7 @@ import { environment } from '../../../environments/environment';
 
         <!-- TAB 1: Z-REPORT & COMPLETED TRANSACTIONS -->
         <div *ngIf="activeTab === 'zreport'">
-          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:20px;">
+          <div class="grid-4" style="margin-bottom:20px;">
             <div class="card stat-card"><div class="stat-label">Total Sales Revenue</div><div class="stat-value">₹{{ (zReportSummary?.total_sales || totalRevenue).toFixed(2) }}</div></div>
             <div class="card stat-card"><div class="stat-label">Transactions Count</div><div class="stat-value">{{ zReportSummary?.bill_count || transactions.length }}</div></div>
             <div class="card stat-card"><div class="stat-label">GST Tax Total</div><div class="stat-value">₹{{ (zReportSummary?.total_tax || totalTax).toFixed(2) }}</div></div>
@@ -100,120 +128,126 @@ import { environment } from '../../../environments/environment';
           </div>
 
           <!-- Payment Breakup Pills -->
-          <div *ngIf="zReportSummary?.payment_breakup" class="card" style="margin-bottom:16px; padding:12px 16px;">
-            <span class="text-xs font-semibold text-muted" style="margin-right:12px;">Payment Mode Breakup:</span>
-            <span class="badge badge-neutral" style="margin-right:8px; font-size:13px;">💵 Cash: ₹{{ (zReportSummary.payment_breakup.Cash || 0).toFixed(2) }}</span>
-            <span class="badge badge-neutral" style="margin-right:8px; font-size:13px;">💳 Card: ₹{{ (zReportSummary.payment_breakup.Card || 0).toFixed(2) }}</span>
+          <div *ngIf="zReportSummary?.payment_breakup" class="card" style="margin-bottom:16px; padding:12px 16px; display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span class="text-xs font-semibold text-muted" style="margin-right:6px;">Payment Mode Breakup:</span>
+            <span class="badge badge-neutral" style="font-size:13px;">💵 Cash: ₹{{ (zReportSummary.payment_breakup.Cash || 0).toFixed(2) }}</span>
+            <span class="badge badge-neutral" style="font-size:13px;">💳 Card: ₹{{ (zReportSummary.payment_breakup.Card || 0).toFixed(2) }}</span>
             <span class="badge badge-neutral" style="font-size:13px;">📱 UPI: ₹{{ (zReportSummary.payment_breakup.UPI || 0).toFixed(2) }}</span>
           </div>
 
-          <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div class="card card-flush">
+            <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
               <h3>Completed Transactions</h3>
-              <span class="text-xs text-muted">Click 'Inspect' to view full receipt breakdown</span>
+              <span class="text-xs text-muted">Click 'Inspect' to view receipt</span>
             </div>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Invoice No</th>
-                  <th>Date &amp; Time</th>
-                  <th>Cashier</th>
-                  <th>Payment Mode</th>
-                  <th class="num">Items</th>
-                  <th class="num">Grand Total</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let tx of transactions">
-                  <td><strong class="mono">{{ tx.invoice_no }}</strong></td>
-                  <td>{{ tx.created_at | date:'medium' }}</td>
-                  <td>{{ tx.cashier_name || tx.cashier_username || 'Priya K.' }}</td>
-                  <td><span class="badge badge-neutral">{{ tx.payment_mode || 'Cash' }}</span></td>
-                  <td class="num mono">{{ tx.item_count || tx.items_count || 1 }}</td>
-                  <td class="num mono"><strong>₹{{ (tx.grand_total || 0).toFixed(2) }}</strong></td>
-                  <td><button class="btn btn-secondary btn-sm" (click)="inspectInvoice(tx)">Inspect</button></td>
-                </tr>
-                <tr *ngIf="transactions.length === 0">
-                  <td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted);">No completed transactions found for this date range.</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Invoice No</th>
+                    <th>Date &amp; Time</th>
+                    <th>Cashier</th>
+                    <th>Payment Mode</th>
+                    <th class="num">Items</th>
+                    <th class="num">Grand Total</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let tx of transactions">
+                    <td><strong class="mono">{{ tx.invoice_no }}</strong></td>
+                    <td>{{ tx.created_at | date:'medium' }}</td>
+                    <td>{{ tx.cashier_name || tx.cashier_username || 'Priya K.' }}</td>
+                    <td><span class="badge badge-neutral">{{ tx.payment_mode || 'Cash' }}</span></td>
+                    <td class="num mono">{{ tx.item_count || tx.items_count || 1 }}</td>
+                    <td class="num mono"><strong>₹{{ (tx.grand_total || 0).toFixed(2) }}</strong></td>
+                    <td><button class="btn btn-secondary btn-sm" (click)="inspectInvoice(tx)">Inspect</button></td>
+                  </tr>
+                  <tr *ngIf="transactions.length === 0">
+                    <td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted);">No completed transactions found for this date range.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         <!-- TAB 2: SALES BY ITEM WITH DYNAMIC COLUMN SORTING -->
-        <div *ngIf="activeTab === 'itemsales'" class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+        <div *ngIf="activeTab === 'itemsales'" class="card card-flush">
+          <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid var(--border);">
             <h3>Item-wise Sales Breakdown</h3>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <select class="select select-sm" [(ngModel)]="selectedCategory" (change)="loadItemSales()">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <select class="select select-sm" [(ngModel)]="selectedCategory" (change)="loadItemSales()" style="width:auto; min-width:140px;">
                 <option value="All">All Categories</option>
                 <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
               </select>
               <input class="input input-sm" style="max-width:220px;" [(ngModel)]="itemSearchQuery" (ngModelChange)="loadItemSales()" placeholder="Filter items...">
             </div>
           </div>
-          <table class="table">
-            <thead>
-              <tr>
-                <th (click)="sortItemSales('sku')" style="cursor:pointer; user-select:none;">SKU {{ getSortIndicator('sku') }}</th>
-                <th (click)="sortItemSales('name')" style="cursor:pointer; user-select:none;">Item Name {{ getSortIndicator('name') }}</th>
-                <th (click)="sortItemSales('category')" style="cursor:pointer; user-select:none;">Category {{ getSortIndicator('category') }}</th>
-                <th (click)="sortItemSales('qty')" style="cursor:pointer; user-select:none;" class="num">Qty Sold {{ getSortIndicator('qty') }}</th>
-                <th (click)="sortItemSales('revenue')" style="cursor:pointer; user-select:none;" class="num">Sales Revenue {{ getSortIndicator('revenue') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of filteredItemSales">
-                <td><span class="mono">{{ item.sku }}</span></td>
-                <td><strong>{{ item.name }}</strong></td>
-                <td><span class="badge badge-neutral">{{ item.category }}</span></td>
-                <td class="num mono">{{ item.qty || item.qty_sold }} {{ item.unit || 'pcs' }}</td>
-                <td class="num mono">₹{{ (item.revenue || item.total_revenue || 0).toFixed(2) }}</td>
-              </tr>
-              <tr *ngIf="filteredItemSales.length === 0">
-                <td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted);">No sales data matching criteria for this period.</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th (click)="sortItemSales('sku')" style="cursor:pointer; user-select:none;">SKU {{ getSortIndicator('sku') }}</th>
+                  <th (click)="sortItemSales('name')" style="cursor:pointer; user-select:none;">Item Name {{ getSortIndicator('name') }}</th>
+                  <th (click)="sortItemSales('category')" style="cursor:pointer; user-select:none;">Category {{ getSortIndicator('category') }}</th>
+                  <th (click)="sortItemSales('qty')" style="cursor:pointer; user-select:none;" class="num">Qty Sold {{ getSortIndicator('qty') }}</th>
+                  <th (click)="sortItemSales('revenue')" style="cursor:pointer; user-select:none;" class="num">Sales Revenue {{ getSortIndicator('revenue') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of filteredItemSales">
+                  <td><span class="mono">{{ item.sku }}</span></td>
+                  <td><strong>{{ item.name }}</strong></td>
+                  <td><span class="badge badge-neutral">{{ item.category }}</span></td>
+                  <td class="num mono">{{ item.qty || item.qty_sold }} {{ item.unit || 'pcs' }}</td>
+                  <td class="num mono">₹{{ (item.revenue || item.total_revenue || 0).toFixed(2) }}</td>
+                </tr>
+                <tr *ngIf="filteredItemSales.length === 0">
+                  <td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted);">No sales data matching criteria for this period.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- TAB 3: CASH DRAWER COUNTER MANAGEMENT -->
         <div *ngIf="activeTab === 'cashdrawer'">
-          <div class="card" style="margin-bottom:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div class="card card-flush" style="margin-bottom:20px;">
+            <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:12px;">
               <div>
-                <h3>Cash Drawer Counters</h3>
-                <p class="text-xs text-muted">Configure store registers and verify expected vs counted drawer cash.</p>
+                <h3 style="margin:0;">Cash Drawer Counters</h3>
+                <p class="text-xs text-muted" style="margin-top:2px;">Configure store registers and verify expected vs counted drawer cash.</p>
               </div>
               <button *ngIf="auth.isAdmin()" class="btn btn-primary btn-sm" (click)="showAddCounter = true">+ Add Counter</button>
             </div>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Counter Name</th>
-                  <th class="num">Opening Float</th>
-                  <th class="num">Today's Cash Sales</th>
-                  <th class="num">Expected Drawer Cash</th>
-                  <th>Notes</th>
-                  <th *ngIf="auth.isAdmin()">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let c of counters">
-                  <td><strong>{{ c.counter_name }}</strong></td>
-                  <td class="num mono">₹{{ c.opening_float.toFixed(2) }}</td>
-                  <td class="num mono">₹{{ (c.cash_sales_today || 0).toFixed(2) }}</td>
-                  <td class="num mono" style="font-weight:700; color:var(--primary);">₹{{ (c.expected_cash || c.opening_float).toFixed(2) }}</td>
-                  <td><span class="text-xs text-muted">{{ c.notes || 'Main POS Counter' }}</span></td>
-                  <td *ngIf="auth.isAdmin()"><button class="btn btn-secondary btn-sm" (click)="openEditFloatModal(c)">Edit Float</button></td>
-                </tr>
-                <tr *ngIf="counters.length === 0">
-                  <td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted);">No cash counters configured.</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Counter Name</th>
+                    <th class="num">Opening Float</th>
+                    <th class="num">Today's Cash Sales</th>
+                    <th class="num">Expected Drawer Cash</th>
+                    <th>Notes</th>
+                    <th *ngIf="auth.isAdmin()">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of counters">
+                    <td><strong>{{ c.counter_name }}</strong></td>
+                    <td class="num mono">₹{{ c.opening_float.toFixed(2) }}</td>
+                    <td class="num mono">₹{{ (c.cash_sales_today || 0).toFixed(2) }}</td>
+                    <td class="num mono" style="font-weight:700; color:var(--primary);">₹{{ (c.expected_cash || c.opening_float).toFixed(2) }}</td>
+                    <td><span class="text-xs text-muted">{{ c.notes || 'Main POS Counter' }}</span></td>
+                    <td *ngIf="auth.isAdmin()"><button class="btn btn-secondary btn-sm" (click)="openEditFloatModal(c)">Edit Float</button></td>
+                  </tr>
+                  <tr *ngIf="counters.length === 0">
+                    <td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted);">No cash counters configured.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -234,7 +268,7 @@ import { environment } from '../../../environments/environment';
             </div>
           </div>
 
-          <div *ngIf="aiData" style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+          <div *ngIf="aiData" class="grid-2" style="gap:20px;">
             <div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h4>Ranked Product Performance</h4>
@@ -281,8 +315,8 @@ import { environment } from '../../../environments/environment';
     </div>
 
     <!-- INVOICE INSPECTION MODAL -->
-    <div class="modal-overlay" [class.open]="selectedInvoice">
-      <div class="modal modal-lg" *ngIf="selectedInvoice" style="max-width:600px;">
+    <div class="modal-overlay" *ngIf="selectedInvoice" [class.open]="selectedInvoice">
+      <div class="modal modal-lg" style="max-width:600px;">
         <div class="modal-header">
           <div>
             <h3>Invoice Details #{{ selectedInvoice.invoice_no }}</h3>
@@ -291,29 +325,31 @@ import { environment } from '../../../environments/environment';
           <button class="btn btn-ghost btn-sm" (click)="selectedInvoice = null">✕</button>
         </div>
         <div class="modal-body stack" style="gap:16px;">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Item Name</th>
-                <th class="num">Qty</th>
-                <th class="num">Unit Price</th>
-                <th class="num">Tax</th>
-                <th class="num">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let line of selectedInvoice.lines || selectedInvoice.items || []">
-                <td>
-                  <div><strong>{{ line.name }}</strong></div>
-                  <div class="text-xs text-muted mono">{{ line.sku }}</div>
-                </td>
-                <td class="num mono">{{ line.qty }}</td>
-                <td class="num mono">₹{{ (line.unit_price || line.price || 0).toFixed(2) }}</td>
-                <td class="num mono">{{ line.tax_rate || 0 }}%</td>
-                <td class="num mono">₹{{ (line.final_amount || (line.price * line.qty) || 0).toFixed(2) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th class="num">Qty</th>
+                  <th class="num">Unit Price</th>
+                  <th class="num">Tax</th>
+                  <th class="num">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let line of selectedInvoice.lines || selectedInvoice.items || []">
+                  <td>
+                    <div><strong>{{ line.name }}</strong></div>
+                    <div class="text-xs text-muted mono">{{ line.sku }}</div>
+                  </td>
+                  <td class="num mono">{{ line.qty }}</td>
+                  <td class="num mono">₹{{ (line.unit_price || line.price || 0).toFixed(2) }}</td>
+                  <td class="num mono">{{ line.tax_rate || 0 }}%</td>
+                  <td class="num mono">₹{{ (line.final_amount || (line.price * line.qty) || 0).toFixed(2) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 16px;">
             <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
@@ -344,7 +380,7 @@ import { environment } from '../../../environments/environment';
     </div>
 
     <!-- ADD COUNTER MODAL -->
-    <div class="modal-overlay" [class.open]="showAddCounter">
+    <div class="modal-overlay" *ngIf="showAddCounter" [class.open]="showAddCounter">
       <div class="modal" style="max-width:400px;">
         <div class="modal-header">
           <h3>Add New Cash Counter</h3>
@@ -374,8 +410,8 @@ import { environment } from '../../../environments/environment';
     </div>
 
     <!-- EDIT FLOAT MODAL -->
-    <div class="modal-overlay" [class.open]="editingCounter">
-      <div class="modal" style="max-width:400px;" *ngIf="editingCounter">
+    <div class="modal-overlay" *ngIf="editingCounter" [class.open]="editingCounter">
+      <div class="modal" style="max-width:400px;">
         <div class="modal-header">
           <h3>Edit Opening Float: {{ editingCounter.counter_name }}</h3>
           <button class="btn btn-ghost btn-sm" (click)="editingCounter = null">✕</button>
@@ -397,6 +433,7 @@ import { environment } from '../../../environments/environment';
   `
 })
 export class ReportsComponent implements OnInit {
+  isMobileMenuOpen: boolean = false;
   activeDateFilter: string = 'today';
   activeTab: string = 'zreport';
   startDate: string = '';

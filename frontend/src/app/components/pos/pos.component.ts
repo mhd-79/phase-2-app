@@ -30,47 +30,51 @@ interface TenderLine {
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="app-shell">
+      <!-- SIDEBAR BACKDROP FOR MOBILE -->
+      <div class="sidebar-backdrop" *ngIf="isMobileMenuOpen" [class.open]="isMobileMenuOpen" (click)="isMobileMenuOpen = false"></div>
+
       <!-- SIDEBAR -->
-      <aside class="sidebar">
+      <aside class="sidebar" [class.mobile-open]="isMobileMenuOpen">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
           <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="isMobileMenuOpen = false" style="margin-left:auto; color:var(--slate-400); display:none;" [style.display]="isMobileMenuOpen ? 'flex' : 'none'">✕</button>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
-          <a class="nav-link active" routerLink="/pos" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">
+          <a class="nav-link active" routerLink="/pos" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">
             <span>🛒</span> Billing
           </a>
-          <a class="nav-link" routerLink="/hold-bills" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+          <a class="nav-link" routerLink="/hold-bills" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
             <span>⏸️</span> Hold &amp; Recall
           </a>
-          <a class="nav-link" routerLink="/returns" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+          <a class="nav-link" routerLink="/returns" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
             <span>🔄</span> Returns
           </a>
 
           <ng-container *ngIf="auth.isAdmin()">
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Inventory</div>
-            <a class="nav-link" routerLink="/items-stock" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/items-stock" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📦</span> Items &amp; Stock
             </a>
-            <a class="nav-link" routerLink="/stock-upload" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/stock-upload" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📤</span> Stock Upload
             </a>
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Insights</div>
-            <a class="nav-link" routerLink="/reports" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/reports" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📊</span> Reports
             </a>
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Administration</div>
-            <a class="nav-link" routerLink="/discounts" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/discounts" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>🏷️</span> Discounts
             </a>
-            <a class="nav-link" routerLink="/tax-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/tax-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>📜</span> Tax Configuration
             </a>
-            <a class="nav-link" routerLink="/users" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/users" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>👥</span> Users &amp; Roles
             </a>
-            <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
+            <a class="nav-link" routerLink="/store-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">
               <span>⚙️</span> Store Settings
             </a>
           </ng-container>
@@ -81,7 +85,7 @@ interface TenderLine {
             <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">{{ auth.currentUser().initials }}</div>
             <div style="overflow:hidden;">
               <div class="text-sm" style="font-weight:600; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; color:var(--slate-200);">{{ auth.currentUser().fullName }}</div>
-              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize; color:var(--slate-400);">{{ auth.currentUser().role }} &middot; {{ selectedCounter }}</div>
             </div>
           </div>
           <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; color:#f87171; border:1px solid rgba(239,68,68,0.2);">
@@ -92,18 +96,39 @@ interface TenderLine {
 
       <!-- TOPBAR -->
       <header class="topbar">
-        <div class="row">
-          <span style="font-weight:700; color:var(--primary)">Okuto Mart POS</span>
+        <div class="topbar__left">
+          <button type="button" class="btn-hamburger" (click)="isMobileMenuOpen = !isMobileMenuOpen" title="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span class="topbar-brand-title">Okuto Mart POS</span>
         </div>
-        <div class="row" style="display:flex; gap:12px; align-items:center;">
-          <div class="user-chip" style="display:flex; gap:8px; align-items:center;">
-            <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">{{ auth.currentUser().initials }}</div>
-            <div>
-              <div class="text-sm" style="font-weight:600;line-height:1.2">{{ auth.currentUser().fullName }}</div>
-              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;">{{ auth.currentUser().role }} &middot; Counter 1</div>
+        <div class="topbar__right">
+          <!-- Active Billing Counter Selector Dropdown -->
+          <div class="counter-selector-box" title="Active billing counter">
+            <span style="font-size:13px;">🖥️</span>
+            <label for="billingCounterSelect" class="text-xs" style="color:var(--text-muted); font-weight:600; margin:0; white-space:nowrap;">Counter:</label>
+            <select
+              id="billingCounterSelect"
+              [(ngModel)]="selectedCounter"
+              (ngModelChange)="onCounterChange($event)"
+              style="background:transparent; color:var(--text); border:none; font-size:12px; font-weight:600; outline:none; cursor:pointer; padding:2px 4px; max-width:140px; text-overflow:ellipsis;">
+              <option *ngFor="let c of availableCounters" [value]="c.counter_name" style="background:#1e293b; color:#f8fafc;">
+                {{ c.counter_name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="user-chip">
+            <div class="avatar">{{ auth.currentUser().initials }}</div>
+            <div class="user-chip-text">
+              <div class="text-sm" style="font-weight:600;line-height:1.2;white-space:nowrap;">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;white-space:nowrap;">{{ auth.currentUser().role }} &middot; {{ selectedCounter }}</div>
             </div>
           </div>
-          <button class="btn btn-ghost btn-sm" (click)="signOut()" title="Sign out">Sign Out</button>
+          <button type="button" class="btn-topbar-signout" (click)="signOut()" title="Sign out">
+            <span>🚪</span>
+            <span class="signout-label">Sign Out</span>
+          </button>
         </div>
       </header>
 
@@ -244,7 +269,7 @@ interface TenderLine {
             <div class="amount" style="font-size:2.2rem; font-weight:800; color:#0f172a; margin-top:2px;">₹{{ grandTotal.toFixed(2) }}</div>
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+          <div class="pay-modal-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
             <!-- LEFT COLUMN: MODE SELECTION & NUMPAD -->
             <div>
               <!-- TENDER MODE CHIPS -->
@@ -382,31 +407,33 @@ interface TenderLine {
           <button class="btn btn-ghost btn-sm" (click)="showRecallModal = false">✕</button>
         </div>
         <div class="modal-body">
-          <table class="table" *ngIf="heldBillsList.length > 0">
-            <thead>
-              <tr>
-                <th>Bill Ref</th>
-                <th>Held At</th>
-                <th class="num">Items</th>
-                <th class="num">Total</th>
-                <th style="text-align:right;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let h of heldBillsList">
-                <td><strong class="mono">{{ formatRef(h.id) }}</strong></td>
-                <td>{{ h.time | date:'short' }}</td>
-                <td class="num mono">{{ h.itemCount || (h.lines ? h.lines.length : 0) }}</td>
-                <td class="num mono">₹{{ (h.total || 0).toFixed(2) }}</td>
-                <td>
-                  <div style="display:flex; justify-content:flex-end; gap:8px;">
-                    <button class="btn btn-primary btn-sm" (click)="resumeHeldBill(h)">Resume</button>
-                    <button class="btn btn-ghost btn-sm text-danger" (click)="discardHeldBill(h.id)">Discard</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-container" *ngIf="heldBillsList.length > 0">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Bill Ref</th>
+                  <th>Held At</th>
+                  <th class="num">Items</th>
+                  <th class="num">Total</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let h of heldBillsList">
+                  <td><strong class="mono">{{ formatRef(h.id) }}</strong></td>
+                  <td>{{ h.time | date:'short' }}</td>
+                  <td class="num mono">{{ h.itemCount || (h.lines ? h.lines.length : 0) }}</td>
+                  <td class="num mono">₹{{ (h.total || 0).toFixed(2) }}</td>
+                  <td>
+                    <div style="display:flex; justify-content:flex-end; gap:8px;">
+                      <button class="btn btn-primary btn-sm" (click)="resumeHeldBill(h)">Resume</button>
+                      <button class="btn btn-ghost btn-sm text-danger" (click)="discardHeldBill(h.id)">Discard</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div *ngIf="heldBillsList.length === 0" style="text-align:center; padding:32px; color:var(--text-muted);">
             No bills currently on hold.
           </div>
@@ -503,6 +530,7 @@ interface TenderLine {
   `
 })
 export class PosComponent implements OnInit {
+  isMobileMenuOpen: boolean = false;
   userRole: string = 'cashier';
   userName: string = 'Priya K.';
   userInitials: string = 'PK';
@@ -542,6 +570,10 @@ export class PosComponent implements OnInit {
   completedSaleData: any = null;
   pricingMode: 'exclusive' | 'inclusive' = 'exclusive';
 
+  // ACTIVE BILLING COUNTER (FIGURE 1 & CASH DRAWER INTEGRATION)
+  availableCounters: any[] = [];
+  selectedCounter: string = 'Counter 1 - Main Express';
+
   constructor(
     public auth: AuthService,
     private http: HttpClient,
@@ -554,6 +586,7 @@ export class PosComponent implements OnInit {
     this.userRole = active?.role || 'cashier';
     this.userName = active?.fullName || 'Priya K.';
     this.userInitials = active?.initials || 'PK';
+    this.loadBillingCounters();
     this.loadTaxSettings();
     this.loadCategories();
     this.loadCatalog();
@@ -562,6 +595,37 @@ export class PosComponent implements OnInit {
     if (recallId) {
       this.recallBillDirect(recallId);
     }
+  }
+
+  loadBillingCounters() {
+    const saved = localStorage.getItem('pos_active_counter');
+    if (saved) {
+      this.selectedCounter = saved;
+    }
+    this.http.get<any[]>(`${environment.apiUrl}/billing/counters`).subscribe({
+      next: (counters) => {
+        if (counters && counters.length > 0) {
+          this.availableCounters = counters;
+          const match = counters.find(c => c.counter_name === this.selectedCounter);
+          if (!match) {
+            this.selectedCounter = counters[0].counter_name;
+            localStorage.setItem('pos_active_counter', this.selectedCounter);
+          }
+        } else {
+          this.availableCounters = [{ id: 'c1', counter_name: this.selectedCounter }];
+        }
+      },
+      error: () => {
+        if (!this.availableCounters || this.availableCounters.length === 0) {
+          this.availableCounters = [{ id: 'c1', counter_name: this.selectedCounter }];
+        }
+      }
+    });
+  }
+
+  onCounterChange(newCounter: string) {
+    this.selectedCounter = newCounter;
+    localStorage.setItem('pos_active_counter', newCounter);
   }
 
   loadTaxSettings() {
@@ -1161,7 +1225,8 @@ export class PosComponent implements OnInit {
       pricing_mode: this.pricingMode,
       manual_discount: this.appliedDiscount ? { type: this.appliedDiscount.type, value: this.appliedDiscount.value } : { type: 'percent', value: 0 },
       tenders: this.tenders.map(t => ({ mode: t.mode, amount: t.amount })),
-      idempotency_key: this.currentSaleTxId
+      idempotency_key: this.currentSaleTxId,
+      counter_name: this.selectedCounter
     };
 
     const token = localStorage.getItem('pos_token');
@@ -1209,6 +1274,7 @@ export class PosComponent implements OnInit {
       <div style="display:flex;justify-content:space-between;font-size:12px"><span>Invoice</span><span>${this.completedSaleData.invoice_no}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:12px"><span>Date</span><span>${new Date(this.completedSaleData.time).toLocaleString()}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:12px"><span>Cashier</span><span>${this.completedSaleData.cashier_name || this.completedSaleData.cashier_username || 'Priya K.'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span>Counter</span><span>${this.completedSaleData.counter_name || this.selectedCounter || 'Counter 1 - Main Express'}</span></div>
       <hr style="border:none;border-top:1px dashed #999;margin:8px 0">
       ${(this.completedSaleData.lines || []).map((l: any) => `
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">

@@ -13,30 +13,31 @@ import { environment } from '../../../environments/environment';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="app-shell">
-      <aside class="sidebar">
+      <div class="sidebar-backdrop" *ngIf="isMobileMenuOpen" (click)="isMobileMenuOpen = false"></div>
+      <aside class="sidebar" [class.mobile-open]="isMobileMenuOpen">
         <div class="sidebar__brand">
           <div class="logo-mark">GM</div>
           <div><div class="brand-name" style="font-weight:700">Okuto Mart</div><div class="brand-tag" style="font-size:11px;color:var(--slate-400)">Phase 1 &middot; Core Billing</div></div>
         </div>
         <nav class="sidebar__nav" style="margin-top:20px; display:flex; flex-direction:column; gap:6px;">
           <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Billing</div>
-          <a class="nav-link" routerLink="/pos" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
-          <a class="nav-link" routerLink="/hold-bills" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
-          <a class="nav-link" routerLink="/returns" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
+          <a class="nav-link" routerLink="/pos" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🛒 Billing</a>
+          <a class="nav-link" routerLink="/hold-bills" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⏸️ Hold &amp; Recall</a>
+          <a class="nav-link" routerLink="/returns" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">🔄 Returns</a>
 
           <ng-container *ngIf="auth.isAdmin()">
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Inventory</div>
-            <a class="nav-link" routerLink="/items-stock" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
-            <a class="nav-link" routerLink="/stock-upload" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📤 Stock Upload</a>
+            <a class="nav-link" routerLink="/items-stock" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📦 Items &amp; Stock</a>
+            <a class="nav-link" routerLink="/stock-upload" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📤 Stock Upload</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Insights</div>
-            <a class="nav-link" routerLink="/reports" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📊 Reports</a>
+            <a class="nav-link" routerLink="/reports" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📊 Reports</a>
 
             <div class="sidebar__section-label" style="font-size:11px; text-transform:uppercase; color:var(--slate-400); margin:12px 8px 4px;">Administration</div>
-            <a class="nav-link active" routerLink="/discounts" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">🏷️ Discounts</a>
-            <a class="nav-link" routerLink="/tax-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
-            <a class="nav-link" routerLink="/users" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">👥 Users &amp; Roles</a>
-            <a class="nav-link" routerLink="/store-settings" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
+            <a class="nav-link active" routerLink="/discounts" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; background:var(--primary); color:#fff;">🏷️ Discounts</a>
+            <a class="nav-link" routerLink="/tax-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">📜 Tax Configuration</a>
+            <a class="nav-link" routerLink="/users" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">👥 Users &amp; Roles</a>
+            <a class="nav-link" routerLink="/store-settings" (click)="isMobileMenuOpen = false" style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:8px; color:var(--slate-200);">⚙️ Store Settings</a>
           </ng-container>
         </nav>
 
@@ -54,7 +55,31 @@ import { environment } from '../../../environments/environment';
         </div>
       </aside>
 
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar__left">
+          <button type="button" class="btn-hamburger" (click)="isMobileMenuOpen = !isMobileMenuOpen" title="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span class="topbar-brand-title">Discounts &amp; Rules</span>
+        </div>
+        <div class="topbar__right">
+          <div class="user-chip">
+            <div class="avatar">{{ auth.currentUser().initials }}</div>
+            <div class="user-chip-text">
+              <div class="text-sm" style="font-weight:600;line-height:1.2;white-space:nowrap;">{{ auth.currentUser().fullName }}</div>
+              <div class="text-xs text-muted" style="line-height:1.2; text-transform:capitalize;white-space:nowrap;">{{ auth.currentUser().role }}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-topbar-signout" (click)="signOut()" title="Sign out">
+            <span>🚪</span>
+            <span class="signout-label">Sign Out</span>
+          </button>
+        </div>
+      </header>
+
       <main class="main">
+
         <div class="page-header">
           <div>
             <span class="eyebrow">FR-P1-DISC-001..004</span>
@@ -65,43 +90,45 @@ import { environment } from '../../../environments/environment';
         </div>
 
         <div class="card">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Rule Name</th>
-                <th>Type</th>
-                <th>Value</th>
-                <th>Applies To</th>
-                <th>Start Date</th>
-                <th>End Date</th>
-                <th>Status</th>
-                <th style="text-align:right;">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let r of rules">
-                <td><strong>{{ r.name }}</strong></td>
-                <td>{{ r.type === 'percent' ? 'Percentage (%)' : 'Fixed Amount (₹)' }}</td>
-                <td>{{ r.type === 'percent' ? r.value + '%' : '₹' + r.value }}</td>
-                <td>{{ r.applies_to === 'all' ? 'All Products' : ('Selected (' + (r.product_skus?.length || 0) + ' items)') }}</td>
-                <td>{{ r.start_date || '—' }}</td>
-                <td>{{ r.end_date || '—' }}</td>
-                <td>
-                  <span class="badge" [class.badge-success]="r.status === 'active'" [class.badge-neutral]="r.status !== 'active'">
-                    {{ r.status === 'active' ? 'Active' : 'Inactive' }}
-                  </span>
-                </td>
-                <td style="text-align:right;">
-                  <button type="button" class="btn btn-ghost btn-sm" (click)="openEditModal(r)">Edit</button>
-                </td>
-              </tr>
-              <tr *ngIf="rules.length === 0">
-                <td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted)">
-                  No discount rules configured yet. Click "+ Add Discount Rule" to create one.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Rule Name</th>
+                  <th>Type</th>
+                  <th>Value</th>
+                  <th>Applies To</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let r of rules">
+                  <td><strong>{{ r.name }}</strong></td>
+                  <td>{{ r.type === 'percent' ? 'Percentage (%)' : 'Fixed Amount (₹)' }}</td>
+                  <td>{{ r.type === 'percent' ? r.value + '%' : '₹' + r.value }}</td>
+                  <td>{{ r.applies_to === 'all' ? 'All Products' : ('Selected (' + (r.product_skus?.length || 0) + ' items)') }}</td>
+                  <td>{{ r.start_date || '—' }}</td>
+                  <td>{{ r.end_date || '—' }}</td>
+                  <td>
+                    <span class="badge" [class.badge-success]="r.status === 'active'" [class.badge-neutral]="r.status !== 'active'">
+                      {{ r.status === 'active' ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td style="text-align:right;">
+                    <button type="button" class="btn btn-ghost btn-sm" (click)="openEditModal(r)">Edit</button>
+                  </td>
+                </tr>
+                <tr *ngIf="rules.length === 0">
+                  <td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted)">
+                    No discount rules configured yet. Click "+ Add Discount Rule" to create one.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
 
@@ -126,7 +153,7 @@ import { environment } from '../../../environments/environment';
             <div class="form-grid">
               <div class="field">
                 <label style="font-weight:600; color:var(--text);">Discount Type</label>
-                <div class="row" style="display:flex; align-items:center; gap:var(--space-4); margin-top:4px;">
+                <div class="row" style="display:flex; align-items:center; gap:var(--space-4); margin-top:4px; flex-wrap:wrap;">
                   <label class="checkbox-row" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
                     <input type="radio" name="modalDiscountType" value="percent" [(ngModel)]="formType" />
                     <span>Percentage (%)</span>
@@ -147,7 +174,7 @@ import { environment } from '../../../environments/environment';
             <!-- Applicable Products -->
             <div class="field">
               <label style="font-weight:600; color:var(--text);">Applicable Products</label>
-              <div class="row" style="display:flex; align-items:center; gap:var(--space-4); margin-top:4px;">
+              <div class="row" style="display:flex; align-items:center; gap:var(--space-4); margin-top:4px; flex-wrap:wrap;">
                 <label class="checkbox-row" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
                   <input type="radio" name="modalApplicableScope" value="all" [(ngModel)]="formAppliesTo" />
                   <span>All Products</span>
@@ -197,7 +224,7 @@ import { environment } from '../../../environments/environment';
             </div>
           </div>
 
-          <div class="modal-footer" style="padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap:var(--space-3);">
+          <div class="modal-footer" style="padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap:var(--space-3); flex-wrap:wrap;">
             <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancel</button>
             <button type="button" class="btn btn-primary" (click)="saveDiscount()" [disabled]="saving">
               {{ saving ? 'Saving...' : (editingDiscountId ? 'Save Changes' : 'Save Discount') }}
@@ -209,6 +236,7 @@ import { environment } from '../../../environments/environment';
   `
 })
 export class DiscountsComponent implements OnInit {
+  isMobileMenuOpen: boolean = false;
   rules: any[] = [];
   catalogItems: any[] = [];
 
