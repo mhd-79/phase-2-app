@@ -122,6 +122,7 @@ async def health_check():
         "status": "healthy",
         "database": "Railway PostgreSQL",
         "db_connected": db.is_connected(),
-        "users_count": users_count
+        "users_count": users_count,
+        "user_count": users_count
     }
 
