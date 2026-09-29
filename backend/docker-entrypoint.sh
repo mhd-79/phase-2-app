@@ -1,8 +1,11 @@
 #!/bin/sh
 set -e
 
+echo "Generating Prisma Client..."
+python -m prisma generate --schema=./prisma/schema.prisma
+
 echo "Syncing schema to Railway PostgreSQL..."
-python -m prisma db push --schema=./prisma/schema.prisma --accept-data-loss --skip-generate
+python -m prisma db push --schema=./prisma/schema.prisma --accept-data-loss
 
 if [ "$RUN_SEED" = "true" ]; then
   echo "Seeding database..."
