@@ -4,11 +4,8 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database import connect_db, disconnect_db, db
-from app.routers import (
-    auth, catalog, billing, discounts, users, settings as settings_router, reports,
-    vendors, purchase_orders, grn, purchase_returns, stock_adjustments, batches, reorder_alerts, stock_audit, reports_p2, ai_insights
-)
-from seed import seed_all
+from app.routers import auth, catalog, billing, discounts, users, settings as settings_router, reports
+from seed_db import seed_all_sample_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,7 +13,10 @@ async def lifespan(app: FastAPI):
     masked = db_url[:30] + "..." if len(db_url) > 30 else db_url
     print(f"Connecting to database: {masked}")
     await connect_db()
-    await seed_all()
+    try:
+        await seed_all_sample_data()
+    except Exception as e:
+        print(f"Data seed notice: {e}")
     yield
     await disconnect_db()
 
@@ -41,17 +41,6 @@ app.include_router(discounts.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(settings_router.router, prefix=settings.API_V1_STR)
 app.include_router(reports.router, prefix=settings.API_V1_STR)
-app.include_router(vendors.router, prefix=settings.API_V1_STR)
-app.include_router(purchase_orders.router, prefix=settings.API_V1_STR)
-app.include_router(grn.router, prefix=settings.API_V1_STR)
-app.include_router(purchase_returns.router, prefix=settings.API_V1_STR)
-app.include_router(stock_adjustments.router, prefix=settings.API_V1_STR)
-app.include_router(batches.router, prefix=settings.API_V1_STR)
-app.include_router(reorder_alerts.router, prefix=settings.API_V1_STR)
-app.include_router(stock_audit.router, prefix=settings.API_V1_STR)
-app.include_router(reports_p2.router, prefix=settings.API_V1_STR)
-app.include_router(ai_insights.router, prefix=settings.API_V1_STR)
-
 
 @app.get("/")
 async def root():
@@ -62,6 +51,7 @@ async def root():
         "docs": "/docs"
     }
 
+@app.get(f"{settings.API_V1_STR}/health")
 @app.get("/health")
 async def health():
     db_connected = db.is_connected()
@@ -74,7 +64,8 @@ async def health():
     return {
         "status": "healthy",
         "database": "Railway PostgreSQL",
-        "db_connected": db.is_connected(),
-        "users_count": users_count,
-        "user_count": users_count
+        "db_connected": db_connected,
+        "users_count": user_count,
+        "user_count": user_count
     }
+
