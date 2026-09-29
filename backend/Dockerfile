@@ -4,7 +4,7 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DATABASE_URL="postgresql://postgres:GNiwpCEjQkvHMkpgZYolRFGIzhsIWNbb@postgres.railway.internal:5432/railway" \
+    DATABASE_URL="postgresql://postgres:XAFLEVfbowMOWMCwWEUUoDniKYxXSjzC@postgres.railway.internal:5432/railway" \
     SECRET_KEY="greenfield-mart-pos-super-secret-key-phase-1-2026"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -85,7 +85,7 @@ async def login(req: LoginRequest):
         logger.warning(f"Login failed: invalid PIN for user '{username}'")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or PIN"
+            detail="Invalid username or PIN" 
         )
 
     # 6. Verify role authorization if role is specified
