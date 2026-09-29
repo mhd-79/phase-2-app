@@ -1,100 +1,38 @@
-import json
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+
 from app.config import settings
 from app.database import connect_db, disconnect_db, db
-from app.security import get_pin_hash
-from app.routers import auth, catalog, billing, discounts, users, settings as settings_router, reports
-
-tags_metadata = [
-    {
-        "name": "Auth",
-        "description": "Authentication endpoints for Cashier & Admin staff login via PIN / username."
-    },
-    {
-        "name": "Billing & POS",
-        "description": "Point-of-Sale checkout billing, invoice creation, invoice search, returns & refunds, stock deduction, and hold/recall."
-    },
-    {
-        "name": "Catalog",
-        "description": "Product master data, SKU catalog management, category management, bulk CSV stock upload template, preview & commit."
-    },
-    {
-        "name": "Reports",
-        "description": "Daily Sales (Z-Report), Completed Transactions inspection, Item-wise Sales breakdown, Cash Drawer multi-counter management, Tax summary, and AI Insights."
-    },
-    {
-        "name": "Users",
-        "description": "Staff user account administration, PIN management, role access control, Auto-Lock configuration, and audit action logs."
-    },
-    {
-        "name": "Discounts",
-        "description": "Promotional discount rule management (flat & percentage rates)."
-    },
-    {
-        "name": "Settings",
-        "description": "Store profile configuration (address, GSTIN, pricing mode, idle timeout) and database backup."
-    }
-]
-
-async def seed_data():
-    from seed_db import seed_all_sample_data
-    await seed_all_sample_data()
+from app.routers import (
+    auth, catalog, billing, discounts, users, settings as settings_router, reports,
+    vendors, purchase_orders, grn, purchase_returns, stock_adjustments, batches, reorder_alerts, stock_audit, reports_p2, ai_insights
+)
+from seed import seed_all
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    db_url = settings.DATABASE_URL
+    masked = db_url[:30] + "..." if len(db_url) > 30 else db_url
+    print(f"Connecting to database: {masked}")
     await connect_db()
-    try:
-        await seed_data()
-    except Exception as e:
-        print(f"Data seed notice: {e}")
+    await seed_all()
     yield
     await disconnect_db()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Full Swagger/OpenAPI documentation for Okuto Mart Phase 1 Billing & POS REST API engine. Supports fast checkout, tax breakdown, stock deduction, returns, multi-counter cash drawers, custom categories, stock upload, auto-lock timeouts, and AI best-selling insights.",
     version=settings.VERSION,
-    openapi_tags=tags_metadata,
     lifespan=lifespan
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://ravishing-intuition-production-4f12.up.railway.app",
-        "https://harmonious-courtesy-production-5b4d.up.railway.app",
-        "http://localhost:4200",
-        "http://localhost:8000",
-        "http://127.0.0.1:4200",
-        "http://127.0.0.1:8000"
-    ],
-    allow_origin_regex=r"https://.*\.railway\.app",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.middleware("http")
-async def db_session_middleware(request, call_next):
-    if not db.is_connected():
-        try:
-            await connect_db()
-        except Exception as e:
-            print(f"DB auto-connect notice: {e}", flush=True)
-    return await call_next(request)
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    import traceback
-    trace = traceback.format_exc()
-    print(f"UNHANDLED ERROR: {request.method} {request.url}\n{trace}", flush=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": f"Internal Server Error: {str(exc)}", "type": type(exc).__name__, "traceback": trace}
-    )
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(catalog.router, prefix=settings.API_V1_STR)
@@ -103,21 +41,36 @@ app.include_router(discounts.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(settings_router.router, prefix=settings.API_V1_STR)
 app.include_router(reports.router, prefix=settings.API_V1_STR)
+app.include_router(vendors.router, prefix=settings.API_V1_STR)
+app.include_router(purchase_orders.router, prefix=settings.API_V1_STR)
+app.include_router(grn.router, prefix=settings.API_V1_STR)
+app.include_router(purchase_returns.router, prefix=settings.API_V1_STR)
+app.include_router(stock_adjustments.router, prefix=settings.API_V1_STR)
+app.include_router(batches.router, prefix=settings.API_V1_STR)
+app.include_router(reorder_alerts.router, prefix=settings.API_V1_STR)
+app.include_router(stock_audit.router, prefix=settings.API_V1_STR)
+app.include_router(reports_p2.router, prefix=settings.API_V1_STR)
+app.include_router(ai_insights.router, prefix=settings.API_V1_STR)
 
-@app.get("/", summary="System Health & API Root", description="Returns API operational status and link to interactive Swagger documentation.")
+
+@app.get("/")
 async def root():
     return {
         "status": "online",
         "app": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "docs": "/docs",
-        "db_connected": db.is_connected()
+        "docs": "/docs"
     }
 
-@app.get(f"{settings.API_V1_STR}/health", summary="DB Health Check")
-async def health_check():
-    await connect_db()
-    users_count = await db.user.count()
+@app.get("/health")
+async def health():
+    db_connected = db.is_connected()
+    user_count = None
+    if db_connected:
+        try:
+            user_count = await db.user.count()
+        except Exception:
+            pass
     return {
         "status": "healthy",
         "database": "Railway PostgreSQL",
@@ -125,4 +78,3 @@ async def health_check():
         "users_count": users_count,
         "user_count": users_count
     }
-
