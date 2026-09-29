@@ -228,6 +228,12 @@ async def seed_all_sample_data(disconnect_at_end: bool = False):
     await connect_db()
     print("Connected to database. Inserting prototype sample data...")
 
+    # Enable extensions for Railway monitoring if available
+    try:
+        await db.execute_raw("CREATE EXTENSION IF NOT EXISTS pg_stat_statements;")
+    except Exception as e:
+        print(f"pg_stat_statements notice: {e}", flush=True)
+
     # 1. Users
     for u in DEMO_USERS:
         existing = await db.user.find_unique(where={"username": u["username"]})
