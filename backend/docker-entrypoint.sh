@@ -2,11 +2,7 @@
 set -e
 
 echo "Running migrations..."
-npx prisma migrate deploy
+python -m prisma db push --skip-generate
 
-if [ "$RUN_SEED" = "true" ]; then
-  echo "Seeding database..."
-  npx prisma db seed
-fi
-
-exec "$@"
+echo "Starting server..."
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000
