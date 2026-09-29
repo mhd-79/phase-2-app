@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-echo "Running migrations..."
-npx prisma migrate deploy
+echo "Syncing schema to Railway PostgreSQL..."
+python -m prisma db push --schema=./prisma/schema.prisma --accept-data-loss
 
 if [ "$RUN_SEED" = "true" ]; then
   echo "Seeding database..."
-  npx prisma db seed
+  python seed_db.py
 fi
 
 exec "$@"

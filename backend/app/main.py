@@ -120,7 +120,7 @@ async def health_check():
     users_count = await db.user.count()
     return {
         "status": "healthy",
-        "database": "Neon PostgreSQL",
+        "database": "Railway PostgreSQL",
         "db_connected": db.is_connected(),
         "users_count": users_count
     }
