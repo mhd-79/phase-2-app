@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Adjustment — Greenfield Mart POS</title>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-role="admin">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="logo-mark">GM</div>
+      <div><div class="brand-name">Greenfield Mart</div><div class="brand-tag">Phase 2 &middot; Vendor &amp; Stock</div></div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="sidebar__section-label">Billing</div>
+      <a class="nav-link" href="pos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.4a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+        Billing
+      </a>
+      <a class="nav-link" href="hold-bills.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        Hold &amp; Recall
+      </a>
+      <a class="nav-link" href="returns.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Returns
+      </a>
+      <div class="sidebar__section-label">Inventory</div>
+      <a class="nav-link" href="items-stock.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l2-4h14l2 4M9 12h6"/></svg>
+        Items &amp; Stock
+      </a>
+      <a class="nav-link" href="stock-upload.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        Stock Upload
+      </a>
+      <div class="sidebar__section-label">Procurement</div>
+      <a class="nav-link" href="vendors.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6"/></svg>
+        Vendors
+      </a>
+      <a class="nav-link" href="purchase-orders.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8 11h8M8 15h5"/></svg>
+        Purchase Orders
+      </a>
+      <a class="nav-link" href="purchase-returns.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Purchase Returns
+      </a>
+      <div class="sidebar__section-label">Stock Maintenance</div>
+      <a class="nav-link active" href="stock-adjustment.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h6"/><circle cx="18" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+        Stock Adjustment
+      </a>
+      <a class="nav-link" href="batch-expiry.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Batch &amp; Expiry
+      </a>
+      <a class="nav-link" href="reorder-alerts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        Reorder Alerts
+      </a>
+      <a class="nav-link" href="stock-audit.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Physical Audit
+      </a>
+      <div class="sidebar__section-label">Insights</div>
+      <a class="nav-link" href="reports.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Reports
+      </a>
+      <div class="sidebar__section-label">Administration</div>
+      <a class="nav-link" href="tax-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Tax Configuration
+      </a>
+      <a class="nav-link" href="users.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M16 14c2.8.3 5 2.6 5 6"/></svg>
+        Users &amp; Roles
+      </a>
+      <a class="nav-link" href="store-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.6 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+        Store Settings
+      </a>
+    </nav>
+    <div class="sidebar__footer">v2.0 &middot; Phase 2 prototype</div>
+  </aside>
+
+  <header class="topbar">
+    <div class="row">
+      <div class="role-switch">
+        <button data-role="cashier">Cashier</button>
+        <button data-role="admin" class="active">Admin</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="icon-btn" title="Lock screen" onclick="document.getElementById('lockOverlay').classList.add('open')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">AM</div>
+        <div>
+          <div class="text-sm user-chip-name" style="font-weight:600;line-height:1.2">Arjun M.</div>
+          <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">Admin &middot; Store Manager</div>
+        </div>
+      </div>
+      <a class="icon-btn" href="login.html" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">FR-P2-STK-001</span>
+        <h1>Stock Adjustment</h1>
+        <p>Manually correct stock for damage, loss or theft. Every adjustment requires a reason and is logged for audit.</p>
+      </div>
+      
+    </div>
+
+
+    <div class="grid grid-2" style="align-items:start">
+      <div class="card">
+        <div class="field"><label>Item</label><select class="select" id="adjItem" onchange="onAdjItemChange()"></select></div>
+        <div class="row-between" style="margin-top:var(--space-3)"><span class="text-muted">Current Stock on Hand</span><strong class="mono" id="adjCurrentStock">0</strong></div>
+        <div class="form-grid" style="margin-top:var(--space-4)">
+          <div class="field"><label>Direction</label>
+            <select class="select" id="adjDirection"><option value="-1">Decrease (damage / loss / theft)</option><option value="1">Increase (found stock / correction)</option></select>
+          </div>
+          <div class="field"><label>Quantity</label><input class="input" id="adjQty" type="number" min="1" value="1"></div>
+        </div>
+        <div class="field" style="margin-top:var(--space-4)"><label>Reason</label>
+          <select class="select" id="adjReason"><option>Damaged / broken</option><option>Theft / shrinkage</option><option>Expired write-off</option><option>Count correction</option><option>Other</option></select>
+        </div>
+        <div class="field" style="margin-top:var(--space-3)"><label>Notes (optional)</label><textarea class="textarea" id="adjNotes" placeholder="Any additional context for the audit trail"></textarea></div>
+        <p class="hint" style="margin-top:var(--space-3)">Recorded as approved by the signed-in Admin, per NFR-P2-002 approval audit trail.</p>
+        <button class="btn btn-danger btn-lg btn-block" style="margin-top:var(--space-4)" onclick="submitAdjustment()">Record Adjustment</button>
+      </div>
+      <div class="card" style="background:var(--primary-subtle);border-color:var(--primary-border)">
+        <h4 style="color:var(--primary-hover)">Why this matters</h4>
+        <p class="text-sm" style="margin-top:var(--space-2)">Phase 1 had no way to correct stock outside a full re-upload. Every adjustment here updates <a href="items-stock.html" style="text-decoration:underline">Items &amp; Stock</a> immediately and appears in the log below and in Reports &rarr; Stock Valuation.</p>
+      </div>
+    </div>
+
+    <div class="card card-flush" style="margin-top:var(--space-5)">
+      <div class="card-header"><h3>Adjustment Log</h3></div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>ID</th><th>Item</th><th class="num">Change</th><th>Reason</th><th>Approved By</th><th>Date</th></tr></thead>
+          <tbody id="adjTbody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="adjEmpty"><p class="text-sm">No adjustments recorded yet this session.</p></div>
+    </div>
+  
+  </main>
+</div>
+
+
+
+<div class="lock-overlay" id="lockOverlay">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  <h2>Screen Locked</h2>
+  <p class="text-sm" style="color:var(--slate-400)">Idle timeout reached. Re-enter your PIN to continue.</p>
+  <input class="input input-lg" id="lockPinInput" type="password" maxlength="6" placeholder="••••" style="max-width:220px;text-align:center;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);color:#fff">
+  <button class="btn btn-primary btn-lg" onclick="unlockScreen()">Unlock</button>
+</div>
+
+<div class="toast-stack"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+
+  function itemOptions() {
+    var sel = document.getElementById('adjItem');
+    sel.innerHTML = '';
+    window.getLiveCatalog().forEach(function (i) {
+      var opt = document.createElement('option'); opt.value = i.sku; opt.textContent = i.name + ' (' + i.sku + ')'; sel.appendChild(opt);
+    });
+    onAdjItemChange();
+  }
+  window.onAdjItemChange = function () {
+    var item = window.getLiveCatalog().find(function (i) { return i.sku === document.getElementById('adjItem').value; });
+    document.getElementById('adjCurrentStock').textContent = item ? item.stock : 0;
+  };
+  window.submitAdjustment = function () {
+    var sku = document.getElementById('adjItem').value;
+    var item = window.getLiveCatalog().find(function (i) { return i.sku === sku; });
+    var dir = parseInt(document.getElementById('adjDirection').value, 10);
+    var qty = parseInt(document.getElementById('adjQty').value, 10) || 0;
+    if (qty <= 0) { showToast('Enter a quantity', 'warning'); return; }
+    var delta = dir * qty;
+    var reason = document.getElementById('adjReason').value;
+    var id = window.recordStockAdjustment(sku, item.name, delta, reason, 'Arjun M.');
+    showToast(id + ' recorded — stock updated');
+    onAdjItemChange();
+    document.getElementById('adjQty').value = 1;
+    document.getElementById('adjNotes').value = '';
+    renderLog();
+  };
+  function renderLog() {
+    var log = window.getStockAdjustments();
+    var tbody = document.getElementById('adjTbody');
+    var empty = document.getElementById('adjEmpty');
+    if (log.length === 0) { tbody.closest('.table-scroll').style.display = 'none'; empty.style.display = 'block'; return; }
+    tbody.closest('.table-scroll').style.display = ''; empty.style.display = 'none';
+    tbody.innerHTML = '';
+    log.slice().reverse().forEach(function (a) {
+      var tr = document.createElement('tr');
+      var sign = a.delta > 0 ? '+' : '';
+      tr.innerHTML = '<td class="mono">' + a.id + '</td><td>' + a.name + '</td><td class="num mono" style="color:' + (a.delta > 0 ? 'var(--success-700)' : 'var(--danger-700)') + '">' + sign + a.delta + '</td><td>' + a.reason + '</td><td>' + a.approvedBy + '</td><td>' + a.date + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+  itemOptions();
+  renderLog();
+  
+</script>
+</body>
+</html>

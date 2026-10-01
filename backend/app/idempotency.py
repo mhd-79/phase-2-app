@@ -1,98 +1,93 @@
-import asyncio
-import hashlib
-import json
 import time
-from typing import Any, Callable, Dict, Optional, Tuple
-
-class IdempotencyRecord:
-    def __init__(self, data: Any, status_code: int = 200, expires_at: float = 0.0):
-        self.data = data
-        self.status_code = status_code
-        self.expires_at = expires_at
+import asyncio
+from typing import Dict, Any, Optional
+from fastapi import Request, HTTPException, status
 
 class IdempotencyManager:
     """
-    Manages in-memory concurrency locks and response caches for idempotent operations.
-    Ensures that if duplicate requests arrive simultaneously:
-    1. Only the first request executes the transaction / database writes.
-    2. Concurrent requests await the first request's completion.
-    3. All subsequent requests within TTL receive the exact same response without re-executing.
+    In-memory idempotency and in-flight request lock manager.
+    Protects single-response actions from concurrent and duplicate submissions.
     """
-    def __init__(self, default_ttl: int = 60):
-        self._default_ttl = default_ttl
-        self._cache: Dict[str, IdempotencyRecord] = {}
-        self._locks: Dict[str, asyncio.Lock] = {}
-        self._global_lock = asyncio.Lock()
+    def __init__(self, ttl_seconds: int = 120):
+        self.ttl_seconds = ttl_seconds
+        self._in_flight: Dict[str, float] = {}
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._lock = asyncio.Lock()
 
-    def _cleanup_expired(self):
-        now = time.time()
-        expired = [k for k, v in self._cache.items() if v.expires_at < now]
-        for k in expired:
+    def _cleanup(self, now: float):
+        # Remove expired records
+        expired_in_flight = [k for k, t in self._in_flight.items() if now - t > self.ttl_seconds]
+        for k in expired_in_flight:
+            self._in_flight.pop(k, None)
+
+        expired_cache = [k for k, v in self._cache.items() if now - v["timestamp"] > self.ttl_seconds]
+        for k in expired_cache:
             self._cache.pop(k, None)
-            self._locks.pop(k, None)
 
-    async def get_lock(self, key: str) -> asyncio.Lock:
-        async with self._global_lock:
-            self._cleanup_expired()
-            if key not in self._locks:
-                self._locks[key] = asyncio.Lock()
-            return self._locks[key]
+    async def acquire_lock(self, key: str) -> bool:
+        """
+        Acquires an in-flight lock for the given key.
+        Returns True if acquired, False if already in-flight or already completed.
+        """
+        async with self._lock:
+            now = time.time()
+            self._cleanup(now)
+            if key in self._in_flight or key in self._cache:
+                return False
+            self._in_flight[key] = now
+            return True
 
-    def get_cached(self, key: str) -> Optional[Tuple[Any, int]]:
-        record = self._cache.get(key)
-        if record and record.expires_at > time.time():
-            return record.data, record.status_code
+    async def release_lock(self, key: str, response_data: Optional[Dict[str, Any]] = None):
+        """
+        Releases the in-flight lock and optionally saves the response to cache.
+        """
+        async with self._lock:
+            now = time.time()
+            self._in_flight.pop(key, None)
+            if response_data is not None:
+                self._cache[key] = {
+                    "timestamp": now,
+                    "data": response_data
+                }
+
+    async def get_cached(self, key: str) -> Optional[Dict[str, Any]]:
+        async with self._lock:
+            now = time.time()
+            entry = self._cache.get(key)
+            if entry and (now - entry["timestamp"] <= self.ttl_seconds):
+                return entry["data"]
+            return None
+
+idempotency_manager = IdempotencyManager()
+
+async def enforce_idempotency(request: Request, action_type: str, body_identifier: Optional[str] = None):
+    """
+    Extracts Idempotency-Key header or derives a key from action_type + body_identifier.
+    Rejects duplicate execution.
+    """
+    idempotency_key = request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key")
+    if not idempotency_key and body_identifier:
+        idempotency_key = f"{action_type}:{body_identifier}"
+    
+    if not idempotency_key:
         return None
-
-    def store_response(self, key: str, data: Any, status_code: int = 200, ttl: Optional[int] = None):
-        ttl_val = ttl if ttl is not None else self._default_ttl
-        self._cache[key] = IdempotencyRecord(
-            data=data,
-            status_code=status_code,
-            expires_at=time.time() + ttl_val
+        
+    full_key = f"{action_type}:{idempotency_key}"
+    
+    # Check if previously completed
+    cached = await idempotency_manager.get_cached(full_key)
+    if cached:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Duplicate action rejected: '{action_type}' with key '{idempotency_key}' was already processed."
         )
 
-    async def execute(self, key: str, action: Callable, status_code: int = 200, ttl: Optional[int] = None) -> Tuple[Any, bool]:
-        """
-        Executes action with concurrency locking and caching.
-        Returns (result, was_cached: bool).
-        """
-        # Fast path check before lock
-        cached = self.get_cached(key)
-        if cached is not None:
-            return cached[0], True
-
-        lock = await self.get_lock(key)
-        async with lock:
-            # Double check after acquiring lock
-            cached = self.get_cached(key)
-            if cached is not None:
-                return cached[0], True
-
-            # Execute action
-            result = await action()
-            self.store_response(key, result, status_code=status_code, ttl=ttl)
-            return result, False
-
-# Global singleton
-idempotency_manager = IdempotencyManager(default_ttl=60)
-
-def generate_fingerprint(prefix: str, user: str, payload: Any) -> str:
-    """
-    Generates a deterministic SHA256 key from action prefix, username, and payload data.
-    """
-    try:
-        if hasattr(payload, "model_dump"):
-            serialized = json.dumps(payload.model_dump(), sort_keys=True, default=str)
-        elif hasattr(payload, "dict"):
-            serialized = json.dumps(payload.dict(), sort_keys=True, default=str)
-        elif isinstance(payload, (dict, list)):
-            serialized = json.dumps(payload, sort_keys=True, default=str)
-        else:
-            serialized = str(payload)
-    except Exception:
-        serialized = str(payload)
-    
-    raw = f"{prefix}:{user}:{serialized}"
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    return f"{prefix}:{digest}"
+    # Acquire lock
+    acquired = await idempotency_manager.acquire_lock(full_key)
+    if not acquired:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Duplicate action rejected: '{action_type}' is currently in progress."
+        )
+        
+    return full_key

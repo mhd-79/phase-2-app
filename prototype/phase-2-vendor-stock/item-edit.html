@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add / Edit Item — Greenfield Mart POS</title>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-role="admin">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="logo-mark">GM</div>
+      <div><div class="brand-name">Greenfield Mart</div><div class="brand-tag">Phase 2 &middot; Vendor &amp; Stock</div></div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="sidebar__section-label">Billing</div>
+      <a class="nav-link" href="pos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.4a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+        Billing
+      </a>
+      <a class="nav-link" href="hold-bills.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        Hold &amp; Recall
+      </a>
+      <a class="nav-link" href="returns.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Returns
+      </a>
+      <div class="sidebar__section-label">Inventory</div>
+      <a class="nav-link active" href="items-stock.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l2-4h14l2 4M9 12h6"/></svg>
+        Items &amp; Stock
+      </a>
+      <a class="nav-link" href="stock-upload.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        Stock Upload
+      </a>
+      <div class="sidebar__section-label">Procurement</div>
+      <a class="nav-link" href="vendors.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6"/></svg>
+        Vendors
+      </a>
+      <a class="nav-link" href="purchase-orders.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8 11h8M8 15h5"/></svg>
+        Purchase Orders
+      </a>
+      <a class="nav-link" href="purchase-returns.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Purchase Returns
+      </a>
+      <div class="sidebar__section-label">Stock Maintenance</div>
+      <a class="nav-link" href="stock-adjustment.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h6"/><circle cx="18" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+        Stock Adjustment
+      </a>
+      <a class="nav-link" href="batch-expiry.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Batch &amp; Expiry
+      </a>
+      <a class="nav-link" href="reorder-alerts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        Reorder Alerts
+      </a>
+      <a class="nav-link" href="stock-audit.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Physical Audit
+      </a>
+      <div class="sidebar__section-label">Insights</div>
+      <a class="nav-link" href="reports.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Reports
+      </a>
+      <div class="sidebar__section-label">Administration</div>
+      <a class="nav-link" href="discounts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 8-9 9-8-8V3a1 1 0 011-1h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        Discounts
+      </a>
+      <a class="nav-link" href="tax-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Tax Configuration
+      </a>
+      <a class="nav-link" href="users.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M16 14c2.8.3 5 2.6 5 6"/></svg>
+        Users &amp; Roles
+      </a>
+      <a class="nav-link" href="store-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.6 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+        Store Settings
+      </a>
+    </nav>
+    <div class="sidebar__footer">v2.0 &middot; Phase 2 prototype</div>
+  </aside>
+
+  <header class="topbar">
+    <div class="row">
+      <div class="role-switch">
+        <button data-role="cashier">Cashier</button>
+        <button data-role="admin" class="active">Admin</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="icon-btn" title="Lock screen" onclick="document.getElementById('lockOverlay').classList.add('open')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">AM</div>
+        <div>
+          <div class="text-sm user-chip-name" style="font-weight:600;line-height:1.2">Arjun M.</div>
+          <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">Admin &middot; Store Manager</div>
+        </div>
+      </div>
+      <a class="icon-btn" href="login.html" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">FR-P1-STK-002</span>
+        <h1 id="pageTitle">Add Item</h1>
+        <p>Add or edit one item's core details and stock quantity directly — for items not covered by a bulk upload.</p>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-secondary" href="items-stock.html">Cancel</a>
+      </div>
+    </div>
+
+    <div class="card" style="max-width:760px">
+      <form class="stack" onsubmit="return saveItem(event)">
+        <div class="form-grid">
+          <div class="field"><label for="fSku">SKU</label><input class="input" id="fSku" placeholder="e.g. GRO-007"></div>
+          <div class="field"><label for="fBarcode">Barcode</label><input class="input" id="fBarcode" placeholder="EAN/UPC"></div>
+        </div>
+        <div class="field"><label for="fName">Item Name</label><input class="input" id="fName" placeholder="e.g. Multigrain Bread 400g" required></div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="fCategory">Category</label>
+            <div class="row" style="gap:var(--space-2)">
+              <select class="select" id="fCategory" style="flex:1"></select>
+              <button type="button" class="btn btn-secondary" onclick="openModal('addCategoryModal')">+ New</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="fTax">Tax Rate</label>
+            <select class="select" id="fTax">
+              <option value="0">GST 0%</option>
+              <option value="5">GST 5%</option>
+              <option value="12">GST 12%</option>
+              <option value="18">GST 18%</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Pricing Method</label>
+          <div class="row" style="gap:var(--space-4)">
+            <label class="checkbox-row"><input type="radio" name="fPricingMethod" value="qty" checked onchange="onPricingMethodChange()"> Price by Quantity</label>
+            <label class="checkbox-row"><input type="radio" name="fPricingMethod" value="weight" onchange="onPricingMethodChange()"> Price by Weight</label>
+          </div>
+          <span class="hint">Quantity items are sold in pieces (pcs). Weight items are sold and stocked in kilograms (kg), with grams accepted at billing.</span>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label for="fCost">Cost Price (₹)</label><input class="input" id="fCost" type="number" min="0" step="0.01"></div>
+          <div class="field"><label for="fPrice" id="fPriceLabel">Selling Price / MRP (₹ per pc)</label><input class="input" id="fPrice" type="number" min="0" step="0.01" required></div>
+        </div>
+        <div class="field">
+          <label for="fWholesalePrice" id="fWholesaleLabel">Wholesale Price (₹ per pc)</label>
+          <input class="input" id="fWholesalePrice" type="number" min="0" step="0.01" placeholder="Optional — for bulk/wholesale customers">
+          <span class="hint">Kept separate from Selling Price / MRP. Editing one never changes the other.</span>
+        </div>
+        <div class="field">
+          <label for="fMin">Low-Stock Threshold</label>
+          <input class="input" id="fMin" type="number" min="0" placeholder="e.g. 15">
+          <span class="hint">Item is flagged "Low Stock" at or below this level. Stock quantity is managed via Stock Upload and Stock Adjustments.</span>
+        </div>
+        <div class="row" style="justify-content:flex-end;gap:var(--space-3);margin-top:var(--space-2)">
+          <a class="btn btn-secondary" href="items-stock.html">Discard</a>
+          <button type="submit" class="btn btn-primary">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="addCategoryModal">
+  <div class="modal">
+    <div class="modal-header"><h3>New Category</h3><button class="icon-btn" onclick="closeModal('addCategoryModal')">✕</button></div>
+    <div class="modal-body stack">
+      <div class="field"><label for="newCategoryName">Category Name</label><input class="input" id="newCategoryName" placeholder="e.g. Frozen Foods"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('addCategoryModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewCategory()">Add Category</button>
+    </div>
+  </div>
+</div>
+
+<div class="lock-overlay" id="lockOverlay">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  <h2>Screen Locked</h2>
+  <p class="text-sm" style="color:var(--slate-400)">Idle timeout reached. Re-enter your PIN to continue.</p>
+  <input class="input input-lg" id="lockPinInput" type="password" maxlength="6" placeholder="••••" style="max-width:220px;text-align:center;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);color:#fff">
+  <button class="btn btn-primary btn-lg" onclick="unlockScreen()">Unlock</button>
+</div>
+
+<div class="toast-stack"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  var catSel = document.getElementById("fCategory");
+  function populateCategories(selected) {
+    catSel.innerHTML = "";
+    window.getLiveCategories().forEach(function (c) {
+      var opt = document.createElement("option"); opt.value = c; opt.textContent = c; catSel.appendChild(opt);
+    });
+    if (selected) catSel.value = selected;
+  }
+  populateCategories();
+
+  function saveNewCategory() {
+    var name = document.getElementById("newCategoryName").value.trim();
+    if (!name) { showToast("Enter a category name", "warning"); return; }
+    if (!window.addCategory(name)) { showToast("That category already exists", "warning"); return; }
+    populateCategories(name);
+    document.getElementById("newCategoryName").value = "";
+    closeModal("addCategoryModal");
+    showToast("Category added");
+  }
+
+  function onPricingMethodChange() {
+    var isWeight = document.querySelector('input[name="fPricingMethod"]:checked').value === "weight";
+    document.getElementById("fPriceLabel").textContent = isWeight ? "Selling Price / MRP (₹ per kg)" : "Selling Price / MRP (₹ per pc)";
+    document.getElementById("fWholesaleLabel").textContent = isWeight ? "Wholesale Price (₹ per kg)" : "Wholesale Price (₹ per pc)";
+  }
+
+  var editingSku = new URLSearchParams(window.location.search).get("sku");
+  if (editingSku) {
+    var item = window.findItemBySku(editingSku);
+    if (item) {
+      document.getElementById("pageTitle").textContent = "Edit Item";
+      document.getElementById("fSku").value = item.sku;
+      document.getElementById("fSku").disabled = true;
+      document.getElementById("fBarcode").value = item.barcode || "";
+      document.getElementById("fName").value = item.name;
+      populateCategories(item.category);
+      document.getElementById("fTax").value = String(item.tax);
+      document.getElementById("fCost").value = Math.round(item.price * 0.7);
+      document.getElementById("fPrice").value = item.price;
+      document.getElementById("fWholesalePrice").value = item.wholesalePrice || "";
+      document.getElementById("fMin").value = item.min;
+      var methodRadio = document.querySelector('input[name="fPricingMethod"][value="' + (item.pricingMethod === "weight" ? "weight" : "qty") + '"]');
+      if (methodRadio) methodRadio.checked = true;
+      onPricingMethodChange();
+    }
+  }
+
+  function saveItem(e) {
+    e.preventDefault();
+    var sku = document.getElementById("fSku").value.trim() || ("ITM-" + Date.now().toString().slice(-6));
+    var pricingMethod = document.querySelector('input[name="fPricingMethod"]:checked').value;
+    var existingItem = editingSku ? window.findItemBySku(editingSku) : null;
+    var currentStock = existingItem ? (existingItem.stock || 0) : 0;
+    var record = {
+      sku: sku,
+      barcode: document.getElementById("fBarcode").value.trim(),
+      name: document.getElementById("fName").value.trim(),
+      category: catSel.value,
+      tax: parseFloat(document.getElementById("fTax").value),
+      price: parseFloat(document.getElementById("fPrice").value) || 0,
+      wholesalePrice: parseFloat(document.getElementById("fWholesalePrice").value) || 0,
+      pricingMethod: pricingMethod,
+      unit: pricingMethod === "weight" ? "kg" : "pcs",
+      stock: currentStock,
+      min: parseInt(document.getElementById("fMin").value, 10) || 0
+    };
+    var isBase = window.POS_CATALOG.some(function (i) { return i.sku === sku; });
+    if (isBase) { window.upsertItemFields(sku, record); }
+    else { window.upsertCustomItem(record); }
+    showToast("Item saved");
+    setTimeout(function () { window.location.href = "items-stock.html"; }, 500);
+    return false;
+  }
+</script>
+</body>
+</html>

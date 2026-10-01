@@ -7,27 +7,34 @@ generator client {
   provider             = "prisma-client-py"
   interface            = "asyncio"
   recursive_type_depth = 5
-  output               = "../app/generated/prisma"
 }
 
 model User {
-  id                String       @id @default(uuid())
-  username          String       @unique
-  pin_hash          String
-  role              String       // "admin" | "cashier"
-  full_name         String
-  sub_text          String
-  auto_lock_minutes Int          @default(15)
-  is_active         Boolean      @default(true)
-  created_at        DateTime     @default(now())
-  updated_at        DateTime     @updatedAt
-  sales             Sale[]
-  returns           SaleReturn[]
-  held_bills        HeldBill[]
-  audit_logs        AuditLog[]
-  shift_schedules   UserShiftSchedule[]
-  leave_records     UserLeave[]
-  pin_reset_requests PinResetRequest[]
+  id           String     @id @default(uuid())
+  username     String     @unique
+  pin_hash     String
+  role         String     // "admin" | "cashier"
+  full_name    String
+  sub_text     String
+  is_active    Boolean    @default(true)
+  auto_lock    String     @default("2 min")
+  schedule_json String?
+  phase_access Int        @default(2) // 1 = Phase 1 features only, 2 = Phase 1 + Phase 2 (applies to admins)
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
+  sales        Sale[]
+  returns      SaleReturn[]
+  held_bills   HeldBill[]
+  audit_logs   AuditLog[]
+}
+
+model CashCounter {
+  id            String   @id @default(uuid())
+  counter_name  String   @unique
+  opening_float Float    @default(2000.0)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 }
 
 model Category {
@@ -37,21 +44,143 @@ model Category {
 }
 
 model Item {
-  sku            String   @id
-  barcode        String
-  name           String
-  category_name  String
-  price          Float
-  wholesale_price Float?
-  cost_price     Float    @default(0.0)
-  tax_rate       Float
-  stock          Float
-  min_stock      Float    @default(10.0)
-  pricing_method String   @default("qty") // "qty" | "weight"
-  unit           String   @default("pcs") // "pcs" | "kg"
-  is_active      Boolean  @default(true)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  sku                 String   @id
+  barcode             String
+  name                String
+  category_name       String
+  price               Float
+  wholesale_price     Float?
+  cost_price          Float    @default(0.0)
+  landed_cost         Float    @default(0.0)
+  tax_rate            Float
+  stock               Float
+  min_stock           Float    @default(10.0)
+  pricing_method      String   @default("qty") // "qty" | "weight"
+  unit                String   @default("pcs") // "pcs" | "kg"
+  preferred_vendor_id String?
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+}
+
+model Vendor {
+  id               String           @id
+  name             String
+  category         String
+  contact          String
+  phone            String
+  email            String
+  terms            String           // "Net 15", "Net 30", "Net 45", "Net 7", "Due on Delivery"
+  status           String           @default("Active") // "Active" | "Inactive"
+  payable          Float            @default(0.0)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  purchase_orders  PurchaseOrder[]
+  goods_receipts   GoodsReceiptNote[]
+  purchase_returns PurchaseReturn[]
+  vendor_payments  VendorPayment[]
+}
+
+model PurchaseOrder {
+  id             String              @id
+  vendor_id      String
+  vendor         Vendor              @relation(fields: [vendor_id], references: [id])
+  date           String
+  expected       String
+  status         String              @default("Pending Approval") // "Draft", "Pending Approval", "Approved", "Partially Received", "Received", "Closed"
+  approved_by    String?
+  created_at     DateTime            @default(now())
+  updated_at     DateTime            @updatedAt
+  lines          PurchaseOrderLine[]
+  goods_receipts GoodsReceiptNote[]
+}
+
+model PurchaseOrderLine {
+  id           String        @id @default(uuid())
+  po_id        String
+  po           PurchaseOrder @relation(fields: [po_id], references: [id], onDelete: Cascade)
+  sku          String
+  name         String
+  ordered_qty  Float
+  received_qty Float         @default(0.0)
+  cost         Float
+}
+
+model GoodsReceiptNote {
+  id                    String                 @id
+  po_id                 String?
+  po                    PurchaseOrder?         @relation(fields: [po_id], references: [id])
+  vendor_id             String
+  vendor                Vendor                 @relation(fields: [vendor_id], references: [id])
+  date                  String
+  total                 Float
+  landed_cost_allocation Float                 @default(0.0)
+  created_at            DateTime               @default(now())
+  lines                 GoodsReceiptNoteLine[]
+}
+
+model GoodsReceiptNoteLine {
+  id     String           @id @default(uuid())
+  grn_id String
+  grn    GoodsReceiptNote @relation(fields: [grn_id], references: [id], onDelete: Cascade)
+  sku    String
+  name   String
+  qty    Float
+  cost   Float
+}
+
+model PurchaseReturn {
+  id         String               @id // Debit note ID e.g. DN-1001
+  vendor_id  String
+  vendor     Vendor               @relation(fields: [vendor_id], references: [id])
+  date       String
+  reason     String
+  total      Float
+  created_at DateTime             @default(now())
+  lines      PurchaseReturnLine[]
+}
+
+model PurchaseReturnLine {
+  id            String         @id @default(uuid())
+  return_id     String
+  return_record PurchaseReturn @relation(fields: [return_id], references: [id], onDelete: Cascade)
+  sku           String
+  name          String
+  qty           Float
+  cost          Float
+}
+
+model VendorPayment {
+  id         String   @id // e.g. PMT-1001
+  vendor_id  String
+  vendor     Vendor   @relation(fields: [vendor_id], references: [id])
+  date       String
+  amount     Float
+  mode       String   // "Bank Transfer", "Cheque", "UPI", "Cash"
+  created_at DateTime @default(now())
+}
+
+model StockAdjustment {
+  id          String   @id // e.g. ADJ-0091
+  sku         String
+  name        String
+  delta       Float
+  reason      String
+  notes       String?
+  approved_by String
+  date        String
+  created_at  DateTime @default(now())
+}
+
+model Batch {
+  id          String   @id @default(uuid())
+  sku         String
+  name        String
+  batch_no    String
+  mfg_date    String
+  expiry_date String
+  qty         Float
+  created_at  DateTime @default(now())
 }
 
 model Discount {
@@ -82,7 +211,6 @@ model Sale {
   gst_total             Float
   grand_total           Float
   status                String       @default("COMPLETED") // "COMPLETED" | "RETURNED" | "PARTIALLY_RETURNED"
-  counter_name          String?      @default("Counter 1 - Main Express")
   created_at            DateTime     @default(now())
   items                 SaleItem[]
   tenders               SaleTender[]
@@ -173,49 +301,3 @@ model AuditLog {
   timestamp    DateTime @default(now())
 }
 
-model CashCounter {
-  id            String   @id @default(uuid())
-  counter_name  String   @unique
-  opening_float Float    @default(2000.0)
-  counted_cash  Float?
-  notes         String?
-  is_active     Boolean  @default(true)
-  updated_at    DateTime @updatedAt
-}
-
-model UserShiftSchedule {
-  id          String   @id @default(uuid())
-  username    String
-  user        User     @relation(fields: [username], references: [username], onDelete: Cascade)
-  day_of_week String
-  is_working  Boolean  @default(true)
-  start_time  String   @default("09:00 AM")
-  end_time    String   @default("05:00 PM")
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  @@unique([username, day_of_week])
-}
-
-model UserLeave {
-  id         String   @id @default(uuid())
-  username   String
-  user       User     @relation(fields: [username], references: [username], onDelete: Cascade)
-  leave_date String
-  reason     String
-  created_by String
-  created_at DateTime @default(now())
-
-  @@unique([username, leave_date])
-}
-
-model PinResetRequest {
-  id           String    @id @default(uuid())
-  username     String
-  user         User      @relation(fields: [username], references: [username], onDelete: Cascade)
-  status       String    @default("PENDING") // "PENDING" | "RESOLVED" | "REJECTED"
-  reason       String?
-  requested_at DateTime  @default(now())
-  resolved_at  DateTime?
-  resolved_by  String?
-}

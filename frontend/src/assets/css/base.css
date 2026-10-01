@@ -111,11 +111,4 @@ h4 { font-size: var(--text-md); font-weight: 600; }
 .wrap { flex-wrap: wrap; }
 .spacer { flex: 1; }
 
-/* ---------------- Responsive breakpoints ---------------- */
-/* Mobile app-shell/grid overrides live at the end of components.css —
-   they must load after the unconditional .sidebar__nav/.nav-link rules
-   there so they win the cascade at matching specificity (source order
-   is the tiebreaker; a media query alone does not raise specificity). */
-
-/* ---------------- Utility: horizontal scroll wrapper ---------------- */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }

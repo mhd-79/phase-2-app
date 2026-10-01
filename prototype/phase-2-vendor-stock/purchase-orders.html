@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Purchase Orders — Greenfield Mart POS</title>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-role="admin">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="logo-mark">GM</div>
+      <div><div class="brand-name">Greenfield Mart</div><div class="brand-tag">Phase 2 &middot; Vendor &amp; Stock</div></div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="sidebar__section-label">Billing</div>
+      <a class="nav-link" href="pos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.4a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+        Billing
+      </a>
+      <a class="nav-link" href="hold-bills.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        Hold &amp; Recall
+      </a>
+      <a class="nav-link" href="returns.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Returns
+      </a>
+      <div class="sidebar__section-label">Inventory</div>
+      <a class="nav-link" href="items-stock.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l2-4h14l2 4M9 12h6"/></svg>
+        Items &amp; Stock
+      </a>
+      <a class="nav-link" href="stock-upload.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        Stock Upload
+      </a>
+      <div class="sidebar__section-label">Procurement</div>
+      <a class="nav-link" href="vendors.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6"/></svg>
+        Vendors
+      </a>
+      <a class="nav-link active" href="purchase-orders.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8 11h8M8 15h5"/></svg>
+        Purchase Orders
+      </a>
+      <a class="nav-link" href="purchase-returns.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Purchase Returns
+      </a>
+      <div class="sidebar__section-label">Stock Maintenance</div>
+      <a class="nav-link" href="stock-adjustment.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h6"/><circle cx="18" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+        Stock Adjustment
+      </a>
+      <a class="nav-link" href="batch-expiry.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Batch &amp; Expiry
+      </a>
+      <a class="nav-link" href="reorder-alerts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        Reorder Alerts
+      </a>
+      <a class="nav-link" href="stock-audit.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Physical Audit
+      </a>
+      <div class="sidebar__section-label">Insights</div>
+      <a class="nav-link" href="reports.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Reports
+      </a>
+      <div class="sidebar__section-label">Administration</div>
+      <a class="nav-link" href="tax-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Tax Configuration
+      </a>
+      <a class="nav-link" href="users.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M16 14c2.8.3 5 2.6 5 6"/></svg>
+        Users &amp; Roles
+      </a>
+      <a class="nav-link" href="store-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.6 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+        Store Settings
+      </a>
+    </nav>
+    <div class="sidebar__footer">v2.0 &middot; Phase 2 prototype</div>
+  </aside>
+
+  <header class="topbar">
+    <div class="row">
+      <div class="role-switch">
+        <button data-role="cashier">Cashier</button>
+        <button data-role="admin" class="active">Admin</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="icon-btn" title="Lock screen" onclick="document.getElementById('lockOverlay').classList.add('open')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">AM</div>
+        <div>
+          <div class="text-sm user-chip-name" style="font-weight:600;line-height:1.2">Arjun M.</div>
+          <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">Admin &middot; Store Manager</div>
+        </div>
+      </div>
+      <a class="icon-btn" href="login.html" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">FR-P2-PUR-002, 004</span>
+        <h1>Purchase Orders</h1>
+        <p>Create a purchase order and route it through approval, or record stock received without a prior PO.</p>
+      </div>
+      <div class="page-actions">
+    <button class="btn btn-secondary" onclick="openDirectReceiptModal()">+ Direct Stock Receipt</button>
+    <button class="btn btn-primary" onclick="openNewPoModal()">+ New Purchase Order</button>
+  </div>
+    </div>
+
+
+    <div class="card card-flush">
+      <div class="card-header">
+        <h3>All Purchase Orders</h3>
+        <div class="row wrap" style="gap:var(--space-2)">
+          <select class="select" id="statusFilter" style="width:180px">
+            <option value="">All Statuses</option>
+            <option>Draft</option><option>Pending Approval</option><option>Approved</option>
+            <option>Partially Received</option><option>Received</option><option>Closed</option>
+          </select>
+          <input class="input" id="searchBox" placeholder="Search PO # or vendor" style="width:220px">
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>PO #</th><th>Vendor</th><th>Date</th><th>Expected</th><th class="num">Lines</th><th class="num">Total Value</th><th>Status</th><th></th></tr></thead>
+          <tbody id="poTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  
+  </main>
+</div>
+
+
+<div class="modal-overlay" id="newPoModal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3>New Purchase Order</h3><button class="icon-btn" onclick="closeModal('newPoModal')">✕</button></div>
+    <div class="modal-body stack">
+      <div class="field"><label>Vendor</label><select class="select" id="poVendor"></select></div>
+      <div class="field"><label>Expected Delivery</label><input class="input" type="date" id="poExpected" value="2026-09-12"></div>
+      <div>
+        <div class="row-between" style="margin-bottom:var(--space-2)"><label style="font-weight:600;font-size:var(--text-sm)">Line Items</label><button class="btn btn-ghost btn-sm" onclick="addPoLineRow()">+ Add Line</button></div>
+        <div id="poLines" class="stack" style="gap:var(--space-2)"></div>
+      </div>
+      <div class="row-between"><span class="text-muted">Order Total</span><strong class="mono" id="poLineTotal">₹0.00</strong></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('newPoModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewPo()">Create &amp; Send for Approval</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="directReceiptModal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3>Direct / Ad-hoc Stock Receipt</h3><button class="icon-btn" onclick="closeModal('directReceiptModal')">✕</button></div>
+    <div class="modal-body stack">
+      <p class="text-sm text-muted">For stock received without a prior purchase order — e.g. a walk-in or informal supplier drop-off (FR-P2-PUR-004).</p>
+      <div class="field"><label>Vendor / Supplier</label><select class="select" id="drVendor"></select></div>
+      <div>
+        <div class="row-between" style="margin-bottom:var(--space-2)"><label style="font-weight:600;font-size:var(--text-sm)">Items Received</label><button class="btn btn-ghost btn-sm" onclick="addDrLineRow()">+ Add Line</button></div>
+        <div id="drLines" class="stack" style="gap:var(--space-2)"></div>
+      </div>
+      <div class="row-between"><span class="text-muted">Receipt Total</span><strong class="mono" id="drLineTotal">₹0.00</strong></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('directReceiptModal')">Cancel</button>
+      <button class="btn btn-success" onclick="submitDirectReceipt()">Receive Stock</button>
+    </div>
+  </div>
+</div>
+  
+
+<div class="lock-overlay" id="lockOverlay">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  <h2>Screen Locked</h2>
+  <p class="text-sm" style="color:var(--slate-400)">Idle timeout reached. Re-enter your PIN to continue.</p>
+  <input class="input input-lg" id="lockPinInput" type="password" maxlength="6" placeholder="••••" style="max-width:220px;text-align:center;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);color:#fff">
+  <button class="btn btn-primary btn-lg" onclick="unlockScreen()">Unlock</button>
+</div>
+
+<div class="toast-stack"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+
+  function statusBadge(status) {
+    var map = { Draft: 'badge-neutral', 'Pending Approval': 'badge-warning', Approved: 'badge-info', 'Partially Received': 'badge-warning', Received: 'badge-success', Closed: 'badge-success' };
+    return '<span class="badge ' + (map[status] || 'badge-neutral') + '">' + status + '</span>';
+  }
+  function lineTotal(po) { return po.lines.reduce(function (s, l) { return s + l.orderedQty * l.cost; }, 0); }
+
+  function renderTable() {
+    var statusF = document.getElementById('statusFilter').value;
+    var term = document.getElementById('searchBox').value.trim().toLowerCase();
+    var pos = window.getPurchaseOrders().filter(function (p) {
+      var vendor = window.getVendorById(p.vendorId);
+      var vname = vendor ? vendor.name : '';
+      var m1 = !statusF || p.status === statusF;
+      var m2 = !term || p.id.toLowerCase().indexOf(term) > -1 || vname.toLowerCase().indexOf(term) > -1;
+      return m1 && m2;
+    }).sort(function (a, b) { return b.id.localeCompare(a.id); });
+    var tbody = document.getElementById('poTbody');
+    tbody.innerHTML = '';
+    pos.forEach(function (p) {
+      var vendor = window.getVendorById(p.vendorId);
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="mono">' + p.id + '</td>' +
+        '<td>' + (vendor ? vendor.name : p.vendorId) + '</td>' +
+        '<td>' + p.date + '</td>' +
+        '<td>' + p.expected + '</td>' +
+        '<td class="num">' + p.lines.length + '</td>' +
+        '<td class="num mono">₹' + lineTotal(p).toLocaleString('en-IN') + '</td>' +
+        '<td>' + statusBadge(p.status) + '</td>' +
+        '<td><a class="btn btn-ghost btn-sm" href="po-detail.html?po=' + p.id + '">View</a></td>';
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('statusFilter').addEventListener('change', renderTable);
+  document.getElementById('searchBox').addEventListener('input', renderTable);
+
+  function vendorOptions(selectEl, selectedId) {
+    selectEl.innerHTML = '';
+    window.getVendors().forEach(function (v) {
+      var opt = document.createElement('option');
+      opt.value = v.id; opt.textContent = v.name + ' (' + v.category + ')';
+      if (v.id === selectedId) opt.selected = true;
+      selectEl.appendChild(opt);
+    });
+  }
+
+  function itemSelectHtml(name, selectedSku) {
+    var opts = window.getLiveCatalog().map(function (i) {
+      return '<option value="' + i.sku + '"' + (i.sku === selectedSku ? ' selected' : '') + '>' + i.name + ' (' + i.sku + ')</option>';
+    }).join('');
+    return '<select class="select line-item-select" data-role="' + name + '" onchange="onLineItemChange(this)">' + opts + '</select>';
+  }
+
+  function makeLineRow(container, prefillSku, prefillQty, prefillCost) {
+    var row = document.createElement('div');
+    row.className = 'row';
+    row.style.gap = 'var(--space-2)';
+    var item = window.getLiveCatalog().find(function (i) { return i.sku === prefillSku; }) || window.getLiveCatalog()[0];
+    row.innerHTML =
+      '<div style="flex:2">' + itemSelectHtml('item', item.sku) + '</div>' +
+      '<input class="input qty-input" type="number" min="1" value="' + (prefillQty || 10) + '" style="width:90px" placeholder="Qty" oninput="recalcTotals()">' +
+      '<input class="input cost-input" type="number" min="0" step="0.01" value="' + (prefillCost || Math.round(item.price * 0.65)) + '" style="width:110px" placeholder="Unit Cost" oninput="recalcTotals()">' +
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="this.parentElement.remove(); recalcTotals();">✕</button>';
+    container.appendChild(row);
+  }
+  window.onLineItemChange = function (sel) {
+    var sku = sel.value;
+    var item = window.getLiveCatalog().find(function (i) { return i.sku === sku; });
+    var row = sel.closest('.row');
+    if (item) row.querySelector('.cost-input').value = Math.round(item.price * 0.65);
+    recalcTotals();
+  };
+  window.addPoLineRow = function () { makeLineRow(document.getElementById('poLines')); };
+  window.addDrLineRow = function () { makeLineRow(document.getElementById('drLines')); };
+
+  function collectLines(containerId) {
+    return Array.prototype.map.call(document.querySelectorAll('#' + containerId + ' .row'), function (row) {
+      var sku = row.querySelector('.line-item-select').value;
+      var item = window.getLiveCatalog().find(function (i) { return i.sku === sku; });
+      return { sku: sku, name: item ? item.name : sku, qty: parseInt(row.querySelector('.qty-input').value, 10) || 0, cost: parseFloat(row.querySelector('.cost-input').value) || 0 };
+    });
+  }
+  window.recalcTotals = function () {
+    var poTotal = collectLines('poLines').reduce(function (s, l) { return s + l.qty * l.cost; }, 0);
+    var drTotal = collectLines('drLines').reduce(function (s, l) { return s + l.qty * l.cost; }, 0);
+    var poEl = document.getElementById('poLineTotal'); if (poEl) poEl.textContent = '₹' + poTotal.toFixed(2);
+    var drEl = document.getElementById('drLineTotal'); if (drEl) drEl.textContent = '₹' + drTotal.toFixed(2);
+  };
+
+  window.openNewPoModal = function (prefillVendor, prefillSku, prefillQty, prefillCost) {
+    var vendorSel = document.getElementById('poVendor');
+    vendorOptions(vendorSel, prefillVendor);
+    var container = document.getElementById('poLines');
+    container.innerHTML = '';
+    makeLineRow(container, prefillSku, prefillQty, prefillCost);
+    recalcTotals();
+    openModal('newPoModal');
+  };
+  window.openDirectReceiptModal = function () {
+    vendorOptions(document.getElementById('drVendor'));
+    var container = document.getElementById('drLines');
+    container.innerHTML = '';
+    makeLineRow(container);
+    recalcTotals();
+    openModal('directReceiptModal');
+  };
+
+  window.submitNewPo = function () {
+    var lines = collectLines('poLines').filter(function (l) { return l.qty > 0; });
+    if (lines.length === 0) { showToast('Add at least one line item', 'warning'); return; }
+    var po = window.createPurchaseOrder({ vendorId: document.getElementById('poVendor').value, expected: document.getElementById('poExpected').value, lines: lines });
+    showToast(po.id + ' created and sent for approval');
+    closeModal('newPoModal');
+    renderTable();
+  };
+  window.submitDirectReceipt = function () {
+    var lines = collectLines('drLines').filter(function (l) { return l.qty > 0; });
+    if (lines.length === 0) { showToast('Add at least one line item', 'warning'); return; }
+    var grnId = window.recordDirectReceipt(document.getElementById('drVendor').value, lines);
+    showToast('Stock received — ' + grnId + ' logged, quantities updated');
+    closeModal('directReceiptModal');
+    renderTable();
+  };
+
+  (function initFromQuery() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('prefillVendor')) {
+      openNewPoModal(params.get('prefillVendor'), params.get('prefillSku'), parseInt(params.get('prefillQty'), 10), parseFloat(params.get('prefillCost')));
+      window.history.replaceState({}, '', 'purchase-orders.html');
+    }
+  })();
+
+  renderTable();
+  
+</script>
+</body>
+</html>
