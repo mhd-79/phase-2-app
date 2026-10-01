@@ -1,0 +1,317 @@
+<main class="main">
+  <div class="page-header">
+    <div>
+      <span class="eyebrow">FR-P1-POS-001..010</span>
+      <h1>Billing</h1>
+      <p>Scan, search or tap to build the bill. Barcode-to-line-item in under a second.</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-secondary" [disabled]="isHoldingBill || cart().length === 0" (click)="holdBill()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        {{ isHoldingBill ? 'Parking...' : 'Hold Bill' }}
+      </button>
+      <a class="btn btn-secondary" routerLink="/hold-bills">Recall Bill</a>
+    </div>
+  </div>
+
+  <div class="pos-layout">
+    <section class="pos-catalog">
+      <div class="scan-bar">
+        <input class="input input-lg" [(ngModel)]="scanInput" (keydown)="onScanKeydown($event)" placeholder="Scan barcode or search item name / SKU, then press Enter" autofocus>
+        <button class="btn btn-secondary btn-lg" style="min-width:56px;padding:0" title="Weighing scale input" (click)="openScaleModal('DAI-003')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3M5 8l14 0M4 8l2 11a2 2 0 002 2h8a2 2 0 002-2l2-11"/></svg>
+        </button>
+      </div>
+
+      <div class="category-rail">
+        @for (cat of categories(); track cat) {
+          <button type="button" class="chip" [class.active]="activeCategory() === cat" (click)="activeCategory.set(cat)">{{ cat }}</button>
+        }
+      </div>
+
+      <div class="item-grid">
+        @for (item of filteredCatalog(); track item.sku) {
+          <button type="button" class="item-card" [class.low-stock]="item.stock > 0 && item.stock <= item.min" [class.out-of-stock]="item.stock === 0" [disabled]="item.stock === 0" (click)="addToCart(item.sku)">
+            <span class="item-name">{{ item.name }}</span>
+            <span class="item-meta">{{ item.sku }} &middot; {{ item.stock === 0 ? 'Out of stock' : (item.pricingMethod === 'weight' ? item.stock.toFixed(2) + ' kg in stock' : item.stock + ' in stock') }}</span>
+            @if (priceListMode === 'wholesale' && (item.wholesalePrice || item.price) < item.price) {
+              <span class="item-price">
+                <span style="text-decoration:line-through;font-size:var(--text-xs);color:var(--text-muted);margin-right:4px">₹{{ item.price.toFixed(2) }}</span>
+                ₹{{ (item.wholesalePrice || item.price).toFixed(2) }}{{ item.pricingMethod === 'weight' ? ' /kg' : '' }} (Wholesale)
+              </span>
+            } @else {
+              <span class="item-price">₹{{ getItemPrice(item).toFixed(2) }}{{ item.pricingMethod === 'weight' ? ' /kg' : '' }}</span>
+            }
+          </button>
+        }
+      </div>
+    </section>
+
+    <aside class="cart-panel">
+      <div class="cart-header">
+        <h3>Current Bill</h3>
+        <div class="row" style="gap:var(--space-2)">
+          <span class="badge badge-neutral">{{ pricingMode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span>
+          @if (priceListMode === 'wholesale') {
+            <span class="badge badge-warning">Wholesale</span>
+          }
+          <span class="badge badge-primary">{{ cart().length }} items</span>
+        </div>
+      </div>
+
+      <div class="cart-lines">
+        @if (cart().length === 0) {
+          <div class="empty-state"><p>Scan or tap an item to start a bill.</p></div>
+        }
+        @for (line of cart(); track line.sku) {
+          <div class="cart-line">
+            <div class="line-info">
+              <div class="line-name" style="display:flex;align-items:center;gap:var(--space-1);flex-wrap:wrap">
+                <span>{{ line.name }}</span>
+                <button type="button" 
+                        class="badge" 
+                        [ngClass]="line.priceType === 'wholesale' ? 'badge-warning' : 'badge-neutral'" 
+                        (click)="toggleLinePriceType(line)"
+                        style="font-size:10px;padding:2px 7px;margin-left:4px;cursor:pointer;border:none;border-radius:12px;font-weight:600;display:inline-flex;align-items:center;gap:3px;vertical-align:middle"
+                        title="Click to toggle MRP / Wholesale for this item">
+                  {{ line.priceType === 'wholesale' ? 'Wholesale' : 'MRP' }}
+                  <span style="font-size:8px;opacity:0.7">⇄</span>
+                </button>
+              </div>
+              <div class="line-sub">
+                @if (line.priceType === 'wholesale' && (line.mrp || 0) > line.price) {
+                  <span class="mono" style="text-decoration:line-through;color:var(--text-muted);margin-right:4px">₹{{ (line.mrp || line.price).toFixed(2) }}</span>
+                  <span class="mono font-bold" style="color:var(--primary)">₹{{ line.price.toFixed(2) }}</span>
+                } @else {
+                  <span class="mono">₹{{ line.price.toFixed(2) }}</span>
+                }
+                {{ line.pricingMethod === 'weight' ? '/kg' : '' }} &times; {{ line.unit === 'kg' ? line.qty.toFixed(3) + ' kg' : line.qty + ' pcs' }} &middot; GST {{ line.tax }}%
+              </div>
+            </div>
+            @if (line.pricingMethod === 'weight') {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="openScaleModal(line.sku)">Edit</button>
+            } @else {
+              <div class="qty-stepper">
+                <button type="button" (click)="changeQty(line.sku, -1)">−</button>
+                <span>{{ line.qty }}</span>
+                <button type="button" (click)="changeQty(line.sku, 1)">+</button>
+              </div>
+            }
+            <div class="line-total">₹{{ (line.price * line.qty).toFixed(2) }}</div>
+            <button type="button" class="line-remove" (click)="removeLine(line.sku)">✕</button>
+          </div>
+        }
+      </div>
+
+      <div class="cart-summary">
+        <div class="summary-row"><span>Taxable Amount</span><span class="mono">₹{{ calcTaxable().toFixed(2) }}</span></div>
+        <div class="summary-row"><span>GST Amount</span><span class="mono">₹{{ calcGstTotal().toFixed(2) }}</span></div>
+        @if (calcDiscountAmount() > 0) {
+          <div class="summary-row" style="color:var(--success-700)"><span>Discount</span><span class="mono">−₹{{ calcDiscountAmount().toFixed(2) }}</span></div>
+        }
+        <div class="summary-row total"><span>Grand Total</span><span class="mono">₹{{ calcGrandTotal().toFixed(2) }}</span></div>
+      </div>
+
+      <div class="cart-actions">
+        <button class="btn btn-secondary btn-sm" (click)="showDiscountModal = true">Discount</button>
+        <button class="btn btn-secondary btn-sm" (click)="openPriceListModal()">Price List: {{ priceListMode === 'wholesale' ? 'Wholesale' : 'MRP' }}</button>
+      </div>
+
+      <div class="cart-checkout">
+        <button class="btn btn-primary btn-lg btn-block" [disabled]="cart().length === 0" (click)="openPayment()">Charge &amp; Pay</button>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<!-- Price List Modal -->
+<div class="modal-overlay" [class.open]="showPriceListModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Select Price List</h3><button class="icon-btn" (click)="showPriceListModal = false">✕</button></div>
+    <div class="modal-body stack">
+      <label class="checkbox-row"><input type="radio" name="priceList" value="mrp" [(ngModel)]="tempPriceListMode"> MRP (Retail) — default</label>
+      <label class="checkbox-row"><input type="radio" name="priceList" value="wholesale" [(ngModel)]="tempPriceListMode"> Wholesale price list</label>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" (click)="applyPriceList()">Apply</button></div>
+  </div>
+</div>
+
+<!-- Discount Modal -->
+<div class="modal-overlay" [class.open]="showDiscountModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Bill Discount</h3><button class="icon-btn" (click)="showDiscountModal = false">✕</button></div>
+    <div class="modal-body stack">
+      <div class="row" style="gap:var(--space-4)">
+        <label class="checkbox-row"><input type="radio" name="discType" value="percent" [(ngModel)]="discType"> Percentage (%)</label>
+        <label class="checkbox-row"><input type="radio" name="discType" value="flat" [(ngModel)]="discType"> Flat amount (₹)</label>
+      </div>
+      <div class="field">
+        <label for="discValInput">Value</label>
+        <input class="input input-lg" id="discValInput" type="number" min="0" [(ngModel)]="discValue" placeholder="e.g. 10">
+        <span class="hint">Discounts above 10% (or ₹200 flat) require Admin approval.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" (click)="clearDiscount()">Remove Discount</button>
+      <button class="btn btn-primary" (click)="stageDiscount()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Approval Modal -->
+<div class="modal-overlay" [class.open]="showApprovalModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Admin Approval Required</h3><button class="icon-btn" (click)="showApprovalModal = false">✕</button></div>
+    <div class="modal-body stack">
+      <p class="text-sm text-muted">This discount exceeds cashier limit. Enter Admin PIN to authorize.</p>
+      <div class="field"><label for="approvalPin">Admin PIN</label><input class="input input-lg" id="approvalPin" type="password" maxlength="6" [(ngModel)]="approvalPin" placeholder="••••"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showApprovalModal = false">Cancel</button>
+      <button class="btn btn-primary" (click)="approveDiscount()">Authorize</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scale Modal -->
+<div class="modal-overlay" [class.open]="showScaleModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Weighing Scale</h3><button class="icon-btn" (click)="showScaleModal = false">✕</button></div>
+    <div class="modal-body stack">
+      <div class="pay-amount-display">
+        <div class="label">Scale Reading</div>
+        <div class="amount">{{ scaleReadingText }}</div>
+      </div>
+      <div class="row" style="gap:var(--space-3);align-items:center">
+        <button type="button" class="btn btn-secondary" (click)="connectScale()">Connect Scale</button>
+        <span class="badge" [class.badge-success]="scaleConnected" [class.badge-neutral]="!scaleConnected">{{ scaleConnected ? 'Connected' : 'Not connected' }}</span>
+      </div>
+      <div class="field">
+        <label for="manualWeightInput">Manual Weight Entry (kg)</label>
+        <input class="input input-lg mono" id="manualWeightInput" type="number" min="0.001" step="0.001" [(ngModel)]="manualWeightInput" placeholder="e.g. 0.500">
+        <span class="hint">Enter kilograms (e.g. 0.250 for 250 g).</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showScaleModal = false">Cancel</button>
+      <button class="btn btn-primary" (click)="confirmScaleWeight()">Add to Bill</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-overlay" [class.open]="showPaymentModal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3>Charge &amp; Pay</h3><button class="icon-btn" (click)="showPaymentModal = false">✕</button></div>
+    <div class="modal-body">
+      <div class="pay-amount-display">
+        <div class="label">Amount Due</div>
+        <div class="amount">₹{{ calcGrandTotal().toFixed(2) }}</div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="tender-tabs">
+            <button type="button" class="chip" [class.active]="tenders[activeTenderIndex].mode === 'Cash'" (click)="setTenderMode('Cash')">Cash</button>
+            <button type="button" class="chip" [class.active]="tenders[activeTenderIndex].mode === 'Card'" (click)="setTenderMode('Card')">Card</button>
+            <button type="button" class="chip" [class.active]="tenders[activeTenderIndex].mode === 'UPI'" (click)="setTenderMode('UPI')">UPI</button>
+          </div>
+          <div class="numpad">
+            <button (click)="numpadPress('1')">1</button><button (click)="numpadPress('2')">2</button><button (click)="numpadPress('3')">3</button>
+            <button (click)="numpadPress('4')">4</button><button (click)="numpadPress('5')">5</button><button (click)="numpadPress('6')">6</button>
+            <button (click)="numpadPress('7')">7</button><button (click)="numpadPress('8')">8</button><button (click)="numpadPress('9')">9</button>
+            <button (click)="numpadPress('C')">C</button><button (click)="numpadPress('0')">0</button><button (click)="numpadPress('back')">⌫</button>
+          </div>
+          <button class="btn btn-secondary btn-block" style="margin-top:var(--space-2)" (click)="numpadPress('exact')">Exact Amount</button>
+        </div>
+        <div>
+          <h4 style="margin-bottom:var(--space-3)">Tenders</h4>
+          @for (t of tenders; track $index) {
+            <div class="split-row" [style.background]="$index === activeTenderIndex ? 'var(--slate-50)' : 'transparent'" (click)="activeTenderIndex = $index">
+              <span class="badge badge-neutral">{{ t.mode }}</span>
+              <strong class="mono">₹{{ t.amount.toFixed(2) }}</strong>
+            </div>
+          }
+          <button class="btn btn-ghost btn-sm" style="margin-top:var(--space-2)" (click)="addSplitTender()">+ Split payment mode</button>
+          <hr class="divider">
+          <div class="summary-row"><span>Remaining</span><span class="mono">₹{{ remainingDue().toFixed(2) }}</span></div>
+          @if (changeDue() > 0) {
+            <div class="summary-row" style="color:var(--success-700);font-weight:700"><span>Change Due</span><span class="mono">₹{{ changeDue().toFixed(2) }}</span></div>
+          }
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" [disabled]="isCompletingSale" (click)="showPaymentModal = false">Cancel</button>
+      <button class="btn btn-success btn-lg" [disabled]="tenderedSum() < calcGrandTotal() || isCompletingSale" (click)="completeSale()">
+        {{ isCompletingSale ? 'Completing Sale...' : 'Complete Sale' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal-overlay" [class.open]="showReceiptModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Sale Complete</h3><button class="icon-btn" (click)="showReceiptModal = false">✕</button></div>
+    <div class="modal-body mono printable-receipt" style="font-size:var(--text-sm)">
+      <div style="text-align:center;margin-bottom:var(--space-3)">
+        <strong>Okuto Mart</strong>
+        <div class="text-xs text-muted">12, MG Road, Bengaluru &middot; GSTIN 29ABCDE1234F1Z5</div>
+      </div>
+      <hr class="divider">
+      <div class="row-between text-sm"><span>Invoice</span><span class="mono">{{ lastSale?.invoiceNo || 'INV-FY26-01025' }}</span></div>
+      <div class="row-between text-sm"><span>Date</span><span class="mono">{{ lastSale?.timeLabel }}</span></div>
+      <div class="row-between text-sm"><span>Pricing Mode</span><span class="mono">{{ lastSale?.pricingMode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span></div>
+      <hr class="divider">
+
+      @for (line of lastSale?.lines; track line.sku) {
+        <div class="row-between text-sm">
+          <span>{{ line.name }}{{ line.priceType === 'wholesale' ? ' (Wholesale)' : '' }} &times; {{ line.unit === 'kg' ? line.qty.toFixed(3) + ' kg' : line.qty + ' pcs' }}</span>
+          <span class="mono">₹{{ (line.price * line.qty).toFixed(2) }}</span>
+        </div>
+      }
+      <hr class="divider">
+
+      @if (lastSale?.pricingMode === 'inclusive') {
+        @if (lastSale?.discountTotal > 0) {
+          <div class="row-between text-sm"><span>Discount</span><span class="mono">−₹{{ lastSale?.discountTotal?.toFixed(2) }}</span></div>
+        }
+        <div class="row-between" style="font-weight:700;font-size:var(--text-md)"><span>Grand Total</span><span class="mono">₹{{ lastSale?.grandTotal?.toFixed(2) || '0.00' }}</span></div>
+        <div class="text-xs text-muted" style="text-align:center;margin-top:var(--space-1);font-style:italic">(Prices inclusive of GST)</div>
+      } @else {
+        <div class="row-between text-sm"><span>Taxable Amount</span><span class="mono">₹{{ lastSale?.taxable?.toFixed(2) || '0.00' }}</span></div>
+        <div class="row-between text-sm"><span>GST Amount</span><span class="mono">₹{{ lastSale?.gstTotal?.toFixed(2) || '0.00' }}</span></div>
+        @if (lastSale?.discountTotal > 0) {
+          <div class="row-between text-sm"><span>Discount</span><span class="mono">−₹{{ lastSale?.discountTotal?.toFixed(2) }}</span></div>
+        }
+        <div class="row-between" style="font-weight:700;font-size:var(--text-md)"><span>Grand Total</span><span class="mono">₹{{ lastSale?.grandTotal?.toFixed(2) || '0.00' }}</span></div>
+      }
+
+      <hr class="divider">
+      @for (t of lastSale?.tenders; track $index) {
+        @if (t.amount > 0) {
+          <div class="row-between text-sm"><span>{{ t.mode }} Paid</span><span class="mono">₹{{ t.amount.toFixed(2) }}</span></div>
+        }
+      }
+      @if (lastSale?.changeDue > 0) {
+        <div class="row-between text-sm" style="font-weight:600;color:var(--success-700)"><span>Change Returned</span><span class="mono">₹{{ lastSale?.changeDue?.toFixed(2) }}</span></div>
+      }
+
+      <p class="text-xs text-muted" style="text-align:center;margin-top:var(--space-4)">Thank you for shopping with us!</p>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <label class="checkbox-row text-sm"><input type="checkbox"> Email/SMS digital copy</label>
+      <div class="row" style="gap:var(--space-2)">
+        <button class="btn btn-secondary" (click)="printReceipt()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 012 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print Receipt
+        </button>
+        <button class="btn btn-primary" (click)="showReceiptModal = false">New Sale</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@if (toastMessage) {
+  <div class="toast-stack"><div class="toast"><span class="dot dot-success"></span><span>{{ toastMessage }}</span></div></div>
+}

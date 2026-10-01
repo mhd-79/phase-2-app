@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "greenfield-mart-pos": {
+    "pos-app": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -13,10 +13,12 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/greenfield-mart-pos-angular",
+            "outputPath": "dist/pos-app",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": ["zone.js"],
+            "polyfills": [
+              "zone.js"
+            ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               "src/favicon.ico",
@@ -24,19 +26,16 @@
               "src/manifest.webmanifest"
             ],
             "styles": [
+              "src/assets/css/tokens.css",
+              "src/assets/css/base.css",
+              "src/assets/css/components.css",
+              "src/assets/css/pos.css",
               "src/styles.css"
             ],
-            "scripts": [],
-            "serviceWorker": "src/ngsw-config.json"
+            "scripts": []
           },
           "configurations": {
             "production": {
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.prod.ts"
-                }
-              ],
               "budgets": [
                 {
                   "type": "initial",
@@ -44,7 +43,8 @@
                   "maximumError": "5mb"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "serviceWorker": "src/ngsw-config.json"
             },
             "development": {
               "optimization": false,
@@ -58,15 +58,18 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "greenfield-mart-pos:build:production"
+              "buildTarget": "pos-app:build:production"
             },
             "development": {
-              "buildTarget": "greenfield-mart-pos:build:development"
+              "buildTarget": "pos-app:build:development"
             }
           },
           "defaultConfiguration": "development"
         }
       }
     }
+  },
+  "cli": {
+    "analytics": "bc373a10-00c9-43db-8875-ce5f13c410d2"
   }
 }

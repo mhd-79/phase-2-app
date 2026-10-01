@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Users &amp; Roles — Greenfield Mart POS</title>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<style>
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-4);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .chip-group {
+    display: flex;
+    gap: var(--space-1);
+  }
+  .chip-group .chip.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+</style>
+</head>
+<body data-role="admin">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="logo-mark">GM</div>
+      <div><div class="brand-name">Greenfield Mart</div><div class="brand-tag">Phase 2 &middot; Vendor &amp; Stock</div></div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="sidebar__section-label">Billing</div>
+      <a class="nav-link" href="pos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.4a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+        Billing
+      </a>
+      <a class="nav-link" href="hold-bills.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        Hold &amp; Recall
+      </a>
+      <a class="nav-link" href="returns.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Returns
+      </a>
+      <div class="sidebar__section-label">Inventory</div>
+      <a class="nav-link" href="items-stock.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l2-4h14l2 4M9 12h6"/></svg>
+        Items &amp; Stock
+      </a>
+      <a class="nav-link" href="stock-upload.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        Stock Upload
+      </a>
+      <div class="sidebar__section-label">Procurement</div>
+      <a class="nav-link" href="vendors.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6"/></svg>
+        Vendors
+      </a>
+      <a class="nav-link" href="purchase-orders.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8 11h8M8 15h5"/></svg>
+        Purchase Orders
+      </a>
+      <a class="nav-link" href="purchase-returns.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Purchase Returns
+      </a>
+      <div class="sidebar__section-label">Stock Maintenance</div>
+      <a class="nav-link" href="stock-adjustment.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h6"/><circle cx="18" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+        Stock Adjustment
+      </a>
+      <a class="nav-link" href="batch-expiry.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Batch &amp; Expiry
+      </a>
+      <a class="nav-link" href="reorder-alerts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        Reorder Alerts
+      </a>
+      <a class="nav-link" href="stock-audit.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Physical Audit
+      </a>
+      <div class="sidebar__section-label">Insights</div>
+      <a class="nav-link" href="reports.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Reports
+      </a>
+      <div class="sidebar__section-label">Administration</div>
+      <a class="nav-link" href="discounts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 8-9 9-8-8V3a1 1 0 011-1h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        Discounts
+      </a>
+      <a class="nav-link" href="tax-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Tax Configuration
+      </a>
+      <a class="nav-link active" href="users.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M16 14c2.8.3 5 2.6 5 6"/></svg>
+        Users &amp; Roles
+      </a>
+      <a class="nav-link" href="store-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.6 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+        Store Settings
+      </a>
+    </nav>
+    <div class="sidebar__footer">v2.0 &middot; Phase 2 prototype</div>
+  </aside>
+
+  <header class="topbar">
+    <div class="row">
+      <div class="role-switch">
+        <button data-role="cashier">Cashier</button>
+        <button data-role="admin" class="active">Admin</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="icon-btn" title="Lock screen" onclick="document.getElementById('lockOverlay').classList.add('open')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">AM</div>
+        <div>
+          <div class="text-sm user-chip-name" style="font-weight:600;line-height:1.2">Arjun M.</div>
+          <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">Admin &middot; Store Manager</div>
+        </div>
+      </div>
+      <a class="icon-btn" href="login.html" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">FR-P1-UM-001..004</span>
+        <h1>Users &amp; Roles</h1>
+        <p>Manage access roles, credentials, and review detailed user productivity &amp; sales performance metrics.</p>
+      </div>
+      <div class="page-actions"><button class="btn btn-primary" onclick="openModal('addUserModal')">+ Add User</button></div>
+    </div>
+
+    <!-- Date Range Filter Bar for User Performance -->
+    <div class="filter-bar">
+      <div class="filter-controls">
+        <div class="row" style="gap:var(--space-2);align-items:center">
+          <span class="text-xs text-muted" style="font-weight:600">From Date:</span>
+          <input class="input" type="date" id="userFromDate" style="width:145px">
+        </div>
+        <div class="row" style="gap:var(--space-2);align-items:center">
+          <span class="text-xs text-muted" style="font-weight:600">To Date:</span>
+          <input class="input" type="date" id="userToDate" style="width:145px">
+        </div>
+        <div class="chip-group" id="userQuickChips">
+          <button class="chip" data-range="today" onclick="setQuickUserDateRange('today')">Today</button>
+          <button class="chip" data-range="yesterday" onclick="setQuickUserDateRange('yesterday')">Yesterday</button>
+          <button class="chip" data-range="this_week" onclick="setQuickUserDateRange('this_week')">This Week</button>
+          <button class="chip active" data-range="this_month" onclick="setQuickUserDateRange('this_month')">This Month</button>
+        </div>
+      </div>
+      <div class="row" style="gap:var(--space-2)">
+        <button class="btn btn-primary btn-sm" onclick="applyUserDateRange()">Apply</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearUserDateRange()">Clear</button>
+      </div>
+    </div>
+
+    <div data-tabs>
+      <div class="tabs">
+        <div class="tab active" data-tab-target="panel-performance">User Performance Metrics</div>
+        <div class="tab" data-tab-target="panel-accounts">User Accounts &amp; Roles</div>
+        <div class="tab" data-tab-target="panel-logs">Action Audit Log</div>
+      </div>
+
+      <!-- ================= USER PERFORMANCE OVERVIEW ================= -->
+      <div class="tab-panel active" id="panel-performance">
+        <div class="grid grid-4" style="margin-bottom:var(--space-5)">
+          <div class="card stat-card"><span class="stat-label">Total Staff Shifts</span><span class="stat-value" id="perfStatShifts">38 Shifts</span><span class="stat-delta up" id="perfPeriodText">1 Sep – 10 Sep 2026</span></div>
+          <div class="card stat-card"><span class="stat-label">Total Rung Up</span><span class="stat-value" id="perfStatTotalSales">₹482,600</span><span class="stat-delta up">across all staff</span></div>
+          <div class="card stat-card"><span class="stat-label">Average Bill Value</span><span class="stat-value" id="perfStatAvgBill">₹427.84</span></div>
+          <div class="card stat-card"><span class="stat-label">Total Staff Hours</span><span class="stat-value" id="perfStatTotalHours">286 hrs</span><span class="stat-delta down">4 active accounts</span></div>
+        </div>
+
+        <div class="card card-flush">
+          <div class="card-header row-between">
+            <h3>Staff Performance &amp; Productivity Overview</h3>
+            <span class="text-sm text-muted" id="userPerfRangeSubtitle">Showing data for: 1 Sep 2026 – 10 Sep 2026</span>
+          </div>
+          <div class="table-scroll">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>User &amp; Role</th>
+                  <th>Shift Login / Logout</th>
+                  <th class="num">Working Hours</th>
+                  <th class="num">Bills Completed</th>
+                  <th class="num">Total Sales Amount</th>
+                  <th class="num">Avg Bill Value</th>
+                  <th class="num">Returns</th>
+                  <th class="num">Cancelled Bills</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="userPerformanceTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= ACCOUNTS & ROLES ================= -->
+      <div class="tab-panel" id="panel-accounts">
+        <div class="grid grid-2" style="margin-bottom:var(--space-5)">
+          <div class="card">
+            <div class="row" style="gap:var(--space-3);margin-bottom:var(--space-3)">
+              <span class="badge badge-primary">Admin</span><h4>Full access</h4>
+            </div>
+            <p class="text-sm text-muted">Item/stock upload, vendor management, POs, tax/store configuration, reports, backup, user management, price overrides and discount approval.</p>
+          </div>
+          <div class="card">
+            <div class="row" style="gap:var(--space-3);margin-bottom:var(--space-3)">
+              <span class="badge badge-neutral">Cashier</span><h4>Billing screen access only</h4>
+            </div>
+            <p class="text-sm text-muted">Ring up sales, hold/recall bills, process returns. No access to procurement, stock maintenance, reports, tax or settings.</p>
+          </div>
+        </div>
+
+        <div class="card card-flush">
+          <div class="card-header row-between">
+            <h3>Configured User Accounts &amp; Schedules</h3>
+            <button class="btn btn-primary btn-sm" onclick="openAddUserModal()">+ Add User</button>
+          </div>
+          <div class="table-scroll">
+            <table class="table">
+              <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Working Schedule</th><th>Status</th><th>Auto-Lock</th><th>Actions</th></tr></thead>
+              <tbody id="userAccountsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= ACTION LOGS ================= -->
+      <div class="tab-panel" id="panel-logs">
+        <div class="card card-flush">
+          <div class="card-header"><h3>Audit &amp; Action Log</h3><span class="text-sm text-muted">Who created, edited, approved or cancelled a bill or PO</span></div>
+          <div class="table-scroll">
+            <table class="table">
+              <thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Reference</th></tr></thead>
+              <tbody id="actionLogsTbody">
+                <tr><td class="mono">2026-09-10 09:14:02</td><td>Priya K.</td><td>Bill created</td><td class="mono">INV-FY26-01031</td></tr>
+                <tr><td class="mono">2026-09-10 10:02:47</td><td>Priya K.</td><td>Bill completed</td><td class="mono">INV-FY26-01031</td></tr>
+                <tr><td class="mono">2026-09-10 11:47:11</td><td>Arjun M.</td><td>Discount approved (15%)</td><td class="mono">INV-FY26-00988</td></tr>
+                <tr><td class="mono">2026-09-10 11:47:38</td><td>Arjun M.</td><td>Return processed</td><td class="mono">INV-FY26-00988</td></tr>
+                <tr><td class="mono">2026-09-10 13:20:05</td><td>Ravi S.</td><td>Bill parked (hold)</td><td class="mono">HOLD-3341</td></tr>
+                <tr><td class="mono">2026-09-10 13:26:52</td><td>Ravi S.</td><td>Bill recalled &amp; completed</td><td class="mono">INV-FY26-01032</td></tr>
+                <tr><td class="mono">2026-09-09 16:10:15</td><td>Priya K.</td><td>Bill cancelled</td><td class="mono">INV-FY26-00962</td></tr>
+                <tr><td class="mono">2026-09-08 14:05:30</td><td>Ravi S.</td><td>Return processed</td><td class="mono">INV-FY26-00910</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ================= USER PERFORMANCE DETAIL MODAL ================= -->
+<div class="modal-overlay" id="userDetailModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="row" style="gap:var(--space-3);align-items:center">
+        <div class="avatar" id="dUserAvatar">PK</div>
+        <div>
+          <h3 id="dUserName">Priya K.</h3>
+          <div class="text-xs text-muted" id="dUserSub">Cashier &middot; Counter 1</div>
+        </div>
+      </div>
+      <button class="icon-btn" onclick="closeModal('userDetailModal')">✕</button>
+    </div>
+    <div class="modal-body stack">
+      <div class="grid grid-3" style="gap:var(--space-3)">
+        <div class="card" style="background:var(--slate-50);padding:var(--space-3)">
+          <div class="text-xs text-muted">Total Sales Amount</div>
+          <strong class="mono" style="font-size:var(--text-lg)" id="dTotalSales">₹214,500.00</strong>
+        </div>
+        <div class="card" style="background:var(--slate-50);padding:var(--space-3)">
+          <div class="text-xs text-muted">Completed Bills</div>
+          <strong class="mono" style="font-size:var(--text-lg)" id="dBillsCount">480 bills</strong>
+        </div>
+        <div class="card" style="background:var(--slate-50);padding:var(--space-3)">
+          <div class="text-xs text-muted">Avg Bill Value</div>
+          <strong class="mono" style="font-size:var(--text-lg)" id="dAvgBill">₹446.88</strong>
+        </div>
+        <div class="card" style="background:var(--slate-50);padding:var(--space-3)">
+          <div class="text-xs text-muted">Working Hours</div>
+          <strong class="mono" style="font-size:var(--text-lg)" id="dWorkHours">78 hrs 30 mins</strong>
+        </div>
+        <div class="card" style="background:var(--slate-50);padding:var(--space-3)">
+          <div class="text-xs text-muted">Returns Processed</div>
+          <strong class="mono" style="font-size:var(--text-lg);color:var(--danger-700)" id="dReturns">12 (₹3,420.00)</strong>
+        </div>
+        <div class="card" style="background:var(--slate-50);padding:var(--space-3)">
+          <div class="text-xs text-muted">Cancelled Bills</div>
+          <strong class="mono" style="font-size:var(--text-lg);color:var(--warning-700)" id="dCancels">4 bills</strong>
+        </div>
+      </div>
+
+      <div class="grid grid-2" style="align-items:start">
+        <div class="card card-flush">
+          <div class="card-header"><h3>Shift Log &amp; Work Hours</h3></div>
+          <div class="card-body stack" id="dShiftLogs">
+            <div class="row-between text-sm"><span>Shift Start Time:</span><strong class="mono" id="dLatestLogin">09:00 AM (10 Sep 2026)</strong></div>
+            <div class="row-between text-sm"><span>Shift End Time:</span><strong class="mono" id="dLatestLogout">05:15 PM (10 Sep 2026)</strong></div>
+            <div class="row-between text-sm"><span>Shift Duration:</span><span class="badge badge-success" id="dShiftHrsBadge">8h 15m</span></div>
+            <div class="row-between text-sm" style="border-top:1px solid var(--border);padding-top:var(--space-2);margin-top:var(--space-2)">
+              <span>Configured Schedule:</span>
+              <strong class="mono text-xs" style="text-align:right;max-width:240px;color:var(--primary)" id="dConfiguredSchedule">Monday–Friday 09:00 AM–06:00 PM, Saturday 10:00 AM–04:00 PM, Sunday Off</strong>
+            </div>
+          </div>
+        </div>
+        <div class="card card-flush">
+          <div class="card-header"><h3>Payment Mode Collection</h3></div>
+          <div class="card-body stack">
+            <div class="row-between text-sm"><span>Cash Collected</span><strong class="mono" id="dCashVal">₹118,000.00</strong></div>
+            <div class="row-between text-sm"><span>Card Payments</span><strong class="mono" id="dCardVal">₹64,300.00</strong></div>
+            <div class="row-between text-sm"><span>UPI Payments</span><strong class="mono" id="dUpiVal">₹32,200.00</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-flush">
+        <div class="card-header"><h3>Recent Activity Timeline</h3></div>
+        <div class="table-scroll">
+          <table class="table text-sm">
+            <thead><tr><th>Time</th><th>Action</th><th>Reference</th><th class="num">Amount</th></tr></thead>
+            <tbody id="dActivityTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('userDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3 id="addUserModalTitle">Add User Account</h3><button class="icon-btn" onclick="closeModal('addUserModal')">✕</button></div>
+    <form class="modal-body stack" onsubmit="return saveUserAccount(event)">
+      <input type="hidden" id="uKeyEdit" value="">
+      <div class="form-grid">
+        <div class="field"><label for="uFullName">Full Name</label><input class="input" id="uFullName" placeholder="e.g. Sana R." required></div>
+        <div class="field"><label for="uUsername">Username</label><input class="input" id="uUsername" placeholder="e.g. sana.r" required></div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label for="uRole">Role</label>
+          <select class="select" id="uRole"><option value="Cashier">Cashier</option><option value="Admin">Admin</option></select>
+        </div>
+        <div class="field"><label for="uPin">Set 4-digit PIN</label><input class="input" id="uPin" type="password" maxlength="4" placeholder="••••" required></div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label for="uStatus">Account Status</label>
+          <select class="select" id="uStatus"><option value="Active">Active</option><option value="Disabled">Disabled</option></select>
+        </div>
+        <div class="field"><label for="uAutoLock">Auto-Lock After</label>
+          <select class="select" id="uAutoLock"><option value="2 min">2 min</option><option value="5 min">5 min</option><option value="15 min">15 min</option><option value="30 min">30 min</option></select>
+        </div>
+      </div>
+
+      <!-- Working Schedule Section -->
+      <div class="field" style="border-top:1px solid var(--border);padding-top:var(--space-4);margin-top:var(--space-2)">
+        <label style="font-weight:700;font-size:var(--text-base)">Working Schedule Configuration</label>
+        <span class="hint">Select working days and set shift Start Time and End Time for each active day. Unchecked days are set to Off.</span>
+        
+        <div class="table-scroll" style="margin-top:var(--space-3)">
+          <table class="table text-sm" style="background:var(--slate-50);border:1px solid var(--border);border-radius:var(--radius-md)">
+            <thead>
+              <tr>
+                <th style="width:140px">Working Day</th>
+                <th style="width:100px">Status</th>
+                <th>Shift Start Time</th>
+                <th>Shift End Time</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleFormTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding-left:0;padding-right:0;margin-top:var(--space-3)">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveUserBtn">Save User Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="lock-overlay" id="lockOverlay">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  <h2>Screen Locked</h2>
+  <p class="text-sm" style="color:var(--slate-400)">Idle timeout reached. Re-enter your PIN to continue.</p>
+  <input class="input input-lg" id="lockPinInput" type="password" maxlength="6" placeholder="••••" style="max-width:220px;text-align:center;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);color:#fff">
+  <button class="btn btn-primary btn-lg" onclick="unlockScreen()">Unlock</button>
+</div>
+
+<div class="toast-stack"></div>
+<script src="assets/js/app.js"></script>
+<script>
+  var DEFAULT_SCHEDULES = {
+    arjun: {
+      Monday: { active: true, start: "08:30", end: "18:30" },
+      Tuesday: { active: true, start: "08:30", end: "18:30" },
+      Wednesday: { active: true, start: "08:30", end: "18:30" },
+      Thursday: { active: true, start: "08:30", end: "18:30" },
+      Friday: { active: true, start: "08:30", end: "18:30" },
+      Saturday: { active: true, start: "09:00", end: "17:00" },
+      Sunday: { active: false, start: "", end: "" }
+    },
+    priya: {
+      Monday: { active: true, start: "09:00", end: "18:00" },
+      Tuesday: { active: true, start: "09:00", end: "18:00" },
+      Wednesday: { active: true, start: "09:00", end: "18:00" },
+      Thursday: { active: true, start: "09:00", end: "18:00" },
+      Friday: { active: true, start: "09:00", end: "18:00" },
+      Saturday: { active: true, start: "10:00", end: "16:00" },
+      Sunday: { active: false, start: "", end: "" }
+    },
+    ravi: {
+      Monday: { active: true, start: "10:00", end: "18:00" },
+      Tuesday: { active: true, start: "10:00", end: "18:00" },
+      Wednesday: { active: true, start: "10:00", end: "18:00" },
+      Thursday: { active: true, start: "10:00", end: "18:00" },
+      Friday: { active: true, start: "10:00", end: "18:00" },
+      Saturday: { active: true, start: "10:00", end: "18:00" },
+      Sunday: { active: false, start: "", end: "" }
+    },
+    meena: {
+      Monday: { active: true, start: "09:00", end: "17:00" },
+      Tuesday: { active: true, start: "09:00", end: "17:00" },
+      Wednesday: { active: true, start: "09:00", end: "17:00" },
+      Thursday: { active: true, start: "09:00", end: "17:00" },
+      Friday: { active: true, start: "09:00", end: "17:00" },
+      Saturday: { active: false, start: "", end: "" },
+      Sunday: { active: false, start: "", end: "" }
+    }
+  };
+
+  var USER_MOCK_DATA = {
+    priya: {
+      key: "priya", name: "Priya K.", username: "priya.k", role: "Cashier", avatar: "PK", sub: "Cashier · Counter 1",
+      status: "Active", autoLock: "2 min", pin: "1234", schedule: DEFAULT_SCHEDULES.priya,
+      daily: {
+        "2026-09-10": { login: "09:00 AM", logout: "05:15 PM", hrs: 8.25, bills: 52, sales: 22450, returns: 1, returnAmt: 240, cancels: 0, cash: 12300, card: 6800, upi: 3350 },
+        "2026-09-09": { login: "08:55 AM", logout: "05:00 PM", hrs: 8.08, bills: 48, sales: 20800, returns: 2, returnAmt: 350, cancels: 1, cash: 11400, card: 6200, upi: 3200 },
+        "2026-09-08": { login: "09:05 AM", logout: "05:10 PM", hrs: 8.08, bills: 45, sales: 19500, returns: 0, returnAmt: 0, cancels: 0, cash: 10200, card: 5900, upi: 3400 },
+        "2026-09-07": { login: "09:00 AM", logout: "05:00 PM", hrs: 8.00, bills: 42, sales: 18200, returns: 1, returnAmt: 180, cancels: 0, cash: 9800, card: 5400, upi: 3000 },
+        "2026-09-06": { login: "09:00 AM", logout: "05:30 PM", hrs: 8.50, bills: 60, sales: 26500, returns: 2, returnAmt: 420, cancels: 1, cash: 14500, card: 8200, upi: 3800 },
+        "2026-09-05": { login: "08:50 AM", logout: "05:00 PM", hrs: 8.16, bills: 55, sales: 23900, returns: 1, returnAmt: 210, cancels: 0, cash: 12900, card: 7100, upi: 3900 },
+        "2026-09-04": { login: "09:00 AM", logout: "05:00 PM", hrs: 8.00, bills: 46, sales: 19800, returns: 0, returnAmt: 0, cancels: 0, cash: 10800, card: 5900, upi: 3100 },
+        "2026-09-03": { login: "09:00 AM", logout: "05:00 PM", hrs: 8.00, bills: 41, sales: 17900, returns: 1, returnAmt: 150, cancels: 0, cash: 9400, card: 5600, upi: 2900 },
+        "2026-09-02": { login: "09:10 AM", logout: "05:15 PM", hrs: 8.08, bills: 44, sales: 19100, returns: 2, returnAmt: 280, cancels: 1, cash: 10100, card: 5800, upi: 3200 },
+        "2026-09-01": { login: "09:00 AM", logout: "05:00 PM", hrs: 8.00, bills: 40, sales: 17200, returns: 0, returnAmt: 0, cancels: 0, cash: 9100, card: 5200, upi: 2900 }
+      }
+    },
+    arjun: {
+      key: "arjun", name: "Arjun M.", username: "owner.arjun", role: "Admin", avatar: "AM", sub: "Admin · Store Manager",
+      status: "Active", autoLock: "15 min", pin: "1234", schedule: DEFAULT_SCHEDULES.arjun,
+      daily: {
+        "2026-09-10": { login: "08:30 AM", logout: "06:30 PM", hrs: 10.00, bills: 34, sales: 15800, returns: 0, returnAmt: 0, cancels: 0, cash: 8200, card: 4900, upi: 2700 },
+        "2026-09-09": { login: "08:30 AM", logout: "06:15 PM", hrs: 9.75, bills: 30, sales: 14200, returns: 1, returnAmt: 190, cancels: 0, cash: 7300, card: 4500, upi: 2400 },
+        "2026-09-08": { login: "08:30 AM", logout: "06:00 PM", hrs: 9.50, bills: 28, sales: 13100, returns: 0, returnAmt: 0, cancels: 0, cash: 6800, card: 4100, upi: 2200 },
+        "2026-09-07": { login: "08:45 AM", logout: "06:00 PM", hrs: 9.25, bills: 26, sales: 12400, returns: 1, returnAmt: 150, cancels: 0, cash: 6300, card: 3900, upi: 2200 },
+        "2026-09-06": { login: "08:30 AM", logout: "07:00 PM", hrs: 10.50, bills: 40, sales: 18900, returns: 0, returnAmt: 0, cancels: 0, cash: 9600, card: 6100, upi: 3200 },
+        "2026-09-05": { login: "08:30 AM", logout: "06:30 PM", hrs: 10.00, bills: 36, sales: 16500, returns: 1, returnAmt: 140, cancels: 0, cash: 8400, card: 5200, upi: 2900 },
+        "2026-09-04": { login: "08:30 AM", logout: "06:00 PM", hrs: 9.50, bills: 29, sales: 13500, returns: 0, returnAmt: 0, cancels: 0, cash: 6900, card: 4300, upi: 2300 },
+        "2026-09-03": { login: "08:30 AM", logout: "06:00 PM", hrs: 9.50, bills: 27, sales: 12600, returns: 0, returnAmt: 0, cancels: 0, cash: 6400, card: 4000, upi: 2200 },
+        "2026-09-02": { login: "08:30 AM", logout: "06:15 PM", hrs: 9.75, bills: 28, sales: 13200, returns: 1, returnAmt: 120, cancels: 0, cash: 6700, card: 4200, upi: 2300 },
+        "2026-09-01": { login: "08:30 AM", logout: "06:00 PM", hrs: 9.50, bills: 25, sales: 11900, returns: 0, returnAmt: 0, cancels: 0, cash: 6100, card: 3800, upi: 2000 }
+      }
+    },
+    ravi: {
+      key: "ravi", name: "Ravi S.", username: "ravi.s", role: "Cashier", avatar: "RS", sub: "Cashier · Counter 2",
+      status: "Active", autoLock: "2 min", pin: "1234", schedule: DEFAULT_SCHEDULES.ravi,
+      daily: {
+        "2026-09-10": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 40, sales: 13810, returns: 0, returnAmt: 0, cancels: 0, cash: 6010, card: 4190, upi: 3610 },
+        "2026-09-09": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 36, sales: 13140, returns: 1, returnAmt: 180, cancels: 0, cash: 5700, card: 4200, upi: 3240 },
+        "2026-09-08": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 35, sales: 12930, returns: 1, returnAmt: 150, cancels: 0, cash: 5600, card: 4100, upi: 3230 },
+        "2026-09-07": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 34, sales: 12420, returns: 0, returnAmt: 0, cancels: 0, cash: 5400, card: 3900, upi: 3120 },
+        "2026-09-06": { login: "10:00 AM", logout: "06:30 PM", hrs: 8.50, bills: 38, sales: 15690, returns: 1, returnAmt: 220, cancels: 0, cash: 6900, card: 4900, upi: 3890 },
+        "2026-09-05": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 31, sales: 11210, returns: 0, returnAmt: 0, cancels: 0, cash: 4900, card: 3600, upi: 2710 },
+        "2026-09-04": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 30, sales: 11490, returns: 0, returnAmt: 0, cancels: 0, cash: 5000, card: 3700, upi: 2790 },
+        "2026-09-03": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 30, sales: 11040, returns: 0, returnAmt: 0, cancels: 0, cash: 4800, card: 3500, upi: 2740 },
+        "2026-09-02": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 29, sales: 11030, returns: 1, returnAmt: 140, cancels: 0, cash: 4800, card: 3500, upi: 2730 },
+        "2026-09-01": { login: "10:00 AM", logout: "06:00 PM", hrs: 8.00, bills: 29, sales: 10830, returns: 0, returnAmt: 0, cancels: 0, cash: 4700, card: 3400, upi: 2730 }
+      }
+    },
+    meena: {
+      key: "meena", name: "Meena T.", username: "meena.t", role: "Cashier", avatar: "MT", sub: "Relief Cashier",
+      status: "Disabled", autoLock: "2 min", pin: "1234", schedule: DEFAULT_SCHEDULES.meena,
+      daily: {
+        "2026-09-10": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-09": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-08": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-07": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-06": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-05": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-04": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-03": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-02": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 },
+        "2026-09-01": { login: "—", logout: "—", hrs: 0, bills: 0, sales: 0, returns: 0, returnAmt: 0, cancels: 0, cash: 0, card: 0, upi: 0 }
+      }
+    }
+  };
+
+  var ACCOUNTS_STORAGE_KEY = "pos_p2_user_accounts_v1";
+  var DAYS_LIST = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  function getStoredAccounts() {
+    try {
+      var raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+
+    saveStoredAccounts(USER_MOCK_DATA);
+    return USER_MOCK_DATA;
+  }
+
+  function saveStoredAccounts(accounts) {
+    try { localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts)); } catch (e) {}
+  }
+
+  function formatTime12(tStr) {
+    if (!tStr) return "";
+    var parts = tStr.split(":");
+    var h = parseInt(parts[0], 10);
+    var m = parts[1] || "00";
+    var ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12;
+    if (h === 0) h = 12;
+    return (h < 10 ? "0" + h : h) + ":" + m + " " + ampm;
+  }
+
+  function formatWorkingSchedule(schedule) {
+    if (!schedule) return "Schedule Not Set";
+    var activeGroups = [];
+    var offDays = [];
+
+    var i = 0;
+    while (i < DAYS_LIST.length) {
+      var d = DAYS_LIST[i];
+      var info = schedule[d];
+      if (!info || !info.active) {
+        offDays.push(d);
+        i++;
+        continue;
+      }
+
+      var start = info.start;
+      var end = info.end;
+      var timeKey = formatTime12(start) + "–" + formatTime12(end);
+      var startDay = d;
+      var endDay = d;
+
+      while (i + 1 < DAYS_LIST.length) {
+        var nextDay = DAYS_LIST[i + 1];
+        var nextInfo = schedule[nextDay];
+        if (nextInfo && nextInfo.active && nextInfo.start === start && nextInfo.end === end) {
+          endDay = nextDay;
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      var dayRange = startDay === endDay ? startDay : (startDay + "–" + endDay);
+      activeGroups.push(dayRange + " " + timeKey);
+      i++;
+    }
+
+    if (offDays.length > 0) {
+      var offRanges = [];
+      var j = 0;
+      while (j < offDays.length) {
+        var sOff = offDays[j];
+        var eOff = sOff;
+        var sIdx = DAYS_LIST.indexOf(sOff);
+        while (j + 1 < offDays.length && DAYS_LIST.indexOf(offDays[j + 1]) === DAYS_LIST.indexOf(eOff) + 1) {
+          eOff = offDays[j + 1];
+          j++;
+        }
+        offRanges.push(sOff === eOff ? sOff : (sOff + "–" + eOff));
+        j++;
+      }
+      if (activeGroups.length === 0) return "All days Off";
+      activeGroups.push(offRanges.join(", ") + " Off");
+    }
+
+    return activeGroups.join(", ");
+  }
+
+  function renderUserAccountsTable() {
+    var accounts = getStoredAccounts();
+    var tbody = document.getElementById("userAccountsTbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    Object.keys(accounts).forEach(function (k) {
+      var u = accounts[k];
+      var schedStr = formatWorkingSchedule(u.schedule);
+      var roleBadge = u.role === "Admin" ? '<span class="badge badge-primary">Admin</span>' : '<span class="badge badge-neutral">Cashier</span>';
+      var statusBadge = u.status === "Disabled" ? '<span class="badge badge-danger">Disabled</span>' : '<span class="badge badge-success">Active</span>';
+
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td><strong>' + u.name + '</strong></td>' +
+        '<td class="mono text-xs">' + u.username + '</td>' +
+        '<td>' + roleBadge + '</td>' +
+        '<td><span class="mono text-xs" style="max-width:260px;display:inline-block;white-space:normal;line-height:1.3" title="' + schedStr + '">' + schedStr + '</span></td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td class="text-xs">' + (u.autoLock || "2 min") + '</td>' +
+        '<td><button class="btn btn-ghost btn-sm" onclick="editUserAccount(\'' + k + '\')">Edit</button></td>';
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderScheduleFormRows(schedule) {
+    var tbody = document.getElementById("scheduleFormTbody");
+    tbody.innerHTML = "";
+    schedule = schedule || {};
+
+    DAYS_LIST.forEach(function (day) {
+      var dayLower = day.toLowerCase();
+      var defaultInfo = {
+        active: (day !== "Sunday"),
+        start: (day === "Saturday" ? "10:00" : "09:00"),
+        end: (day === "Saturday" ? "16:00" : "18:00")
+      };
+      var info = schedule[day] || defaultInfo;
+
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td>' +
+          '<label class="checkbox-row" style="font-weight:600">' +
+            '<input type="checkbox" id="ws_active_' + dayLower + '" ' + (info.active ? 'checked' : '') + ' onchange="onScheduleDayToggle(\'' + dayLower + '\')"> ' + day +
+          '</label>' +
+        '</td>' +
+        '<td>' +
+          '<span id="ws_badge_' + dayLower + '" class="badge ' + (info.active ? 'badge-success' : 'badge-neutral') + '">' + (info.active ? 'Working' : 'Off') + '</span>' +
+        '</td>' +
+        '<td>' +
+          '<input class="input input-sm" type="time" id="ws_start_' + dayLower + '" value="' + (info.start || "09:00") + '" ' + (info.active ? '' : 'disabled') + ' style="width:130px">' +
+        '</td>' +
+        '<td>' +
+          '<input class="input input-sm" type="time" id="ws_end_' + dayLower + '" value="' + (info.end || "18:00") + '" ' + (info.active ? '' : 'disabled') + ' style="width:130px">' +
+        '</td>';
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  window.onScheduleDayToggle = function (dayLower) {
+    var checked = document.getElementById("ws_active_" + dayLower).checked;
+    var badge = document.getElementById("ws_badge_" + dayLower);
+    var startInput = document.getElementById("ws_start_" + dayLower);
+    var endInput = document.getElementById("ws_end_" + dayLower);
+
+    badge.className = "badge " + (checked ? "badge-success" : "badge-neutral");
+    badge.textContent = checked ? "Working" : "Off";
+    startInput.disabled = !checked;
+    endInput.disabled = !checked;
+  };
+
+  window.openAddUserModal = function () {
+    document.getElementById("addUserModalTitle").textContent = "Add User Account";
+    document.getElementById("uKeyEdit").value = "";
+    document.getElementById("uFullName").value = "";
+    document.getElementById("uUsername").value = "";
+    document.getElementById("uRole").value = "Cashier";
+    document.getElementById("uPin").value = "";
+    document.getElementById("uStatus").value = "Active";
+    document.getElementById("uAutoLock").value = "2 min";
+    renderScheduleFormRows(null);
+    openModal("addUserModal");
+  };
+
+  window.editUserAccount = function (key) {
+    var accounts = getStoredAccounts();
+    var u = accounts[key];
+    if (!u) return;
+
+    document.getElementById("addUserModalTitle").textContent = "Edit User Account — " + u.name;
+    document.getElementById("uKeyEdit").value = key;
+    document.getElementById("uFullName").value = u.name;
+    document.getElementById("uUsername").value = u.username;
+    document.getElementById("uRole").value = u.role.indexOf("Admin") > -1 ? "Admin" : "Cashier";
+    document.getElementById("uPin").value = u.pin || "1234";
+    document.getElementById("uStatus").value = u.status || "Active";
+    document.getElementById("uAutoLock").value = u.autoLock || "2 min";
+    renderScheduleFormRows(u.schedule);
+    openModal("addUserModal");
+  };
+
+  window.saveUserAccount = function (e) {
+    e.preventDefault();
+    var key = document.getElementById("uKeyEdit").value.trim();
+    var name = document.getElementById("uFullName").value.trim();
+    var username = document.getElementById("uUsername").value.trim();
+    var role = document.getElementById("uRole").value;
+    var pin = document.getElementById("uPin").value.trim();
+    var status = document.getElementById("uStatus").value;
+    var autoLock = document.getElementById("uAutoLock").value;
+
+    var schedule = {};
+    DAYS_LIST.forEach(function (day) {
+      var dayLower = day.toLowerCase();
+      var active = document.getElementById("ws_active_" + dayLower).checked;
+      schedule[day] = {
+        active: active,
+        start: active ? document.getElementById("ws_start_" + dayLower).value : "",
+        end: active ? document.getElementById("ws_end_" + dayLower).value : ""
+      };
+    });
+
+    if (!key) { key = username.toLowerCase().replace(/[^a-z0-9]/g, "") || ("usr_" + Date.now().toString().slice(-4)); }
+
+    var accounts = getStoredAccounts();
+    var existing = accounts[key] || {
+      key: key, avatar: name.split(" ").map(function (p) { return p[0]; }).join("").toUpperCase().slice(0, 2),
+      sub: role + " · Counter 1", daily: {}
+    };
+
+    existing.name = name;
+    existing.username = username;
+    existing.role = role;
+    existing.pin = pin;
+    existing.status = status;
+    existing.autoLock = autoLock;
+    existing.schedule = schedule;
+
+    accounts[key] = existing;
+    saveStoredAccounts(accounts);
+
+    showToast("User account saved");
+    closeModal("addUserModal");
+    renderUserAccountsTable();
+    updateUserPerformance(currentFromDate, currentToDate);
+    return false;
+  };
+
+  var currentFromDate = "2026-09-01";
+  var currentToDate = "2026-09-10";
+
+  function setQuickUserDateRange(key) {
+    document.querySelectorAll("#userQuickChips .chip").forEach(function (c) {
+      c.classList.toggle("active", c.getAttribute("data-range") === key);
+    });
+
+    var todayStr = "2026-09-10";
+    var fromStr = todayStr, toStr = todayStr;
+
+    if (key === "today") { fromStr = "2026-09-10"; toStr = "2026-09-10"; }
+    else if (key === "yesterday") { fromStr = "2026-09-09"; toStr = "2026-09-09"; }
+    else if (key === "this_week") { fromStr = "2026-09-07"; toStr = "2026-09-10"; }
+    else if (key === "this_month") { fromStr = "2026-09-01"; toStr = "2026-09-10"; }
+
+    document.getElementById("userFromDate").value = fromStr;
+    document.getElementById("userToDate").value = toStr;
+    updateUserPerformance(fromStr, toStr);
+  }
+
+  function applyUserDateRange() {
+    document.querySelectorAll("#userQuickChips .chip").forEach(function (c) { c.classList.remove("active"); });
+    var fromStr = document.getElementById("userFromDate").value;
+    var toStr = document.getElementById("userToDate").value;
+    if (!fromStr || !toStr) { showToast("Select both From and To dates", "warning"); return; }
+    if (fromStr > toStr) { showToast("From date cannot be after To date", "danger"); return; }
+    updateUserPerformance(fromStr, toStr);
+  }
+
+  function clearUserDateRange() {
+    setQuickUserDateRange("this_month");
+  }
+
+  function formatDateLabel(dStr) {
+    if (!dStr) return "";
+    var parts = dStr.split("-");
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    var mIdx = parseInt(parts[1], 10) - 1;
+    return parseInt(parts[2], 10) + " " + months[mIdx] + " " + parts[0];
+  }
+
+  function updateUserPerformance(fromDate, toDate) {
+    currentFromDate = fromDate;
+    currentToDate = toDate;
+
+    var periodLabel = formatDateLabel(fromDate) + (fromDate === toDate ? "" : " – " + formatDateLabel(toDate));
+    document.getElementById("userPerfRangeSubtitle").textContent = "Showing data for: " + periodLabel;
+    document.getElementById("perfPeriodText").textContent = periodLabel;
+
+    var tbody = document.getElementById("userPerformanceTbody");
+    tbody.innerHTML = "";
+
+    var grandTotalSales = 0, grandTotalBills = 0, grandTotalHrs = 0, activeShiftsCount = 0;
+    var accounts = getStoredAccounts();
+
+    Object.keys(accounts).forEach(function (uKey) {
+      var u = accounts[uKey];
+      var totalHrs = 0, totalBills = 0, totalSales = 0, totalReturns = 0, totalReturnAmt = 0, totalCancels = 0;
+      var latestLogin = "—", latestLogout = "—";
+
+      if (u.daily) {
+        Object.keys(u.daily).forEach(function (day) {
+          if (day >= fromDate && day <= toDate) {
+            var d = u.daily[day];
+            totalHrs += d.hrs;
+            totalBills += d.bills;
+            totalSales += d.sales;
+            totalReturns += d.returns;
+            totalReturnAmt += d.returnAmt;
+            totalCancels += d.cancels;
+            if (d.hrs > 0) {
+              latestLogin = d.login;
+              latestLogout = d.logout;
+              activeShiftsCount += 1;
+            }
+          }
+        });
+      }
+
+      grandTotalSales += totalSales;
+      grandTotalBills += totalBills;
+      grandTotalHrs += totalHrs;
+
+      var avgBill = totalBills > 0 ? (totalSales / totalBills) : 0;
+      var roleBadge = u.role === "Admin" ? '<span class="badge badge-primary">Admin</span>' : (u.status === "Disabled" ? '<span class="badge badge-danger">Disabled</span>' : '<span class="badge badge-neutral">Cashier</span>');
+      var shiftText = totalHrs > 0 ? (fromDate === toDate ? latestLogin + " – " + latestLogout : latestLogin + " / " + latestLogout) : "No Shift Logged";
+
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td><div class="row" style="gap:var(--space-2);align-items:center"><div class="avatar" style="width:28px;height:28px;font-size:11px">' + (u.avatar || "US") + '</div><div><strong>' + u.name + '</strong> <span class="text-xs text-muted">(' + u.username + ')</span><div>' + roleBadge + '</div></div></div></td>' +
+        '<td><span class="mono text-xs">' + shiftText + '</span></td>' +
+        '<td class="num mono">' + totalHrs.toFixed(1) + ' hrs</td>' +
+        '<td class="num mono">' + totalBills + ' bills</td>' +
+        '<td class="num mono" style="font-weight:700">₹' + totalSales.toLocaleString("en-IN") + '.00</td>' +
+        '<td class="num mono">₹' + avgBill.toFixed(2) + '</td>' +
+        '<td class="num mono">' + totalReturns + ' (₹' + totalReturnAmt + ')</td>' +
+        '<td class="num mono">' + totalCancels + '</td>' +
+        '<td><button class="btn btn-secondary btn-sm" onclick="openUserDetail(\'' + uKey + '\')">View Details</button></td>';
+
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("perfStatShifts").textContent = activeShiftsCount + " Shifts";
+    document.getElementById("perfStatTotalSales").textContent = "₹" + grandTotalSales.toLocaleString("en-IN");
+    document.getElementById("perfStatAvgBill").textContent = "₹" + (grandTotalBills > 0 ? (grandTotalSales / grandTotalBills).toFixed(2) : "0.00");
+    document.getElementById("perfStatTotalHours").textContent = Math.round(grandTotalHrs) + " hrs";
+  }
+
+  function openUserDetail(uKey) {
+    var accounts = getStoredAccounts();
+    var u = accounts[uKey];
+    if (!u) return;
+
+    document.getElementById("dUserAvatar").textContent = u.avatar || "US";
+    document.getElementById("dUserName").textContent = u.name;
+    document.getElementById("dUserSub").textContent = (u.sub || u.role) + " · " + u.username;
+
+    var totalHrs = 0, totalBills = 0, totalSales = 0, totalReturns = 0, totalReturnAmt = 0, totalCancels = 0;
+    var totalCash = 0, totalCard = 0, totalUpi = 0;
+    var latestLogin = "—", latestLogout = "—";
+
+    if (u.daily) {
+      Object.keys(u.daily).forEach(function (day) {
+        if (day >= currentFromDate && day <= currentToDate) {
+          var d = u.daily[day];
+          totalHrs += d.hrs;
+          totalBills += d.bills;
+          totalSales += d.sales;
+          totalReturns += d.returns;
+          totalReturnAmt += d.returnAmt;
+          totalCancels += d.cancels;
+          totalCash += d.cash;
+          totalCard += d.card;
+          totalUpi += d.upi;
+          if (d.hrs > 0) { latestLogin = d.login; latestLogout = d.logout; }
+        }
+      });
+    }
+
+    var avgBill = totalBills > 0 ? (totalSales / totalBills) : 0;
+    document.getElementById("dTotalSales").textContent = "₹" + totalSales.toLocaleString("en-IN") + ".00";
+    document.getElementById("dBillsCount").textContent = totalBills + " bills";
+    document.getElementById("dAvgBill").textContent = "₹" + avgBill.toFixed(2);
+    document.getElementById("dWorkHours").textContent = totalHrs.toFixed(1) + " hrs";
+    document.getElementById("dReturns").textContent = totalReturns + " (₹" + totalReturnAmt.toLocaleString("en-IN") + ".00)";
+    document.getElementById("dCancels").textContent = totalCancels + " bills";
+
+    document.getElementById("dCashVal").textContent = "₹" + totalCash.toLocaleString("en-IN") + ".00";
+    document.getElementById("dCardVal").textContent = "₹" + totalCard.toLocaleString("en-IN") + ".00";
+    document.getElementById("dUpiVal").textContent = "₹" + totalUpi.toLocaleString("en-IN") + ".00";
+
+    document.getElementById("dLatestLogin").textContent = latestLogin !== "—" ? latestLogin + " (10 Sep 2026)" : "—";
+    document.getElementById("dLatestLogout").textContent = latestLogout !== "—" ? latestLogout + " (10 Sep 2026)" : "—";
+    document.getElementById("dShiftHrsBadge").textContent = totalHrs > 0 ? totalHrs.toFixed(1) + " hrs" : "0 hrs";
+    document.getElementById("dConfiguredSchedule").textContent = formatWorkingSchedule(u.schedule);
+
+    var actTbody = document.getElementById("dActivityTbody");
+    actTbody.innerHTML =
+      '<tr><td class="mono">09:14 AM</td><td>Bill completed</td><td class="mono">INV-FY26-01031</td><td class="num mono">₹540.00</td></tr>' +
+      '<tr><td class="mono">11:47 AM</td><td>Return processed</td><td class="mono">INV-FY26-00988</td><td class="num mono">−₹420.00</td></tr>' +
+      '<tr><td class="mono">01:20 PM</td><td>Parked bill recalled &amp; completed</td><td class="mono">INV-FY26-01032</td><td class="num mono">₹1,265.00</td></tr>' +
+      '<tr><td class="mono">03:45 PM</td><td>Bill completed</td><td class="mono">INV-FY26-01035</td><td class="num mono">₹890.00</td></tr>';
+
+    openModal("userDetailModal");
+  }
+
+  (function init() {
+    renderUserAccountsTable();
+    setQuickUserDateRange("this_month");
+  })();
+</script>
+</body>
+</html>

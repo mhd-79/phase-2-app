@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Receipt Preview — Greenfield Mart POS</title>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<style>
+  .receipt-paper {
+    max-width: 340px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: var(--space-5); font-family: var(--font-mono); font-size: 13px;
+    box-shadow: var(--shadow-sm);
+  }
+  @media print {
+    .app-shell > *:not(.main), .page-header, .lookup-card { display: none !important; }
+    .main { padding: 0 !important; }
+    body { background: #fff !important; }
+  }
+</style>
+</head>
+<body data-role="admin">
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="logo-mark">GM</div>
+      <div><div class="brand-name">Greenfield Mart</div><div class="brand-tag">Phase 2 &middot; Vendor &amp; Stock</div></div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="sidebar__section-label">Billing</div>
+      <a class="nav-link" href="pos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.4a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+        Billing
+      </a>
+      <a class="nav-link" href="hold-bills.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        Hold &amp; Recall
+      </a>
+      <a class="nav-link" href="returns.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Returns
+      </a>
+      <div class="sidebar__section-label">Inventory</div>
+      <a class="nav-link" href="items-stock.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l2-4h14l2 4M9 12h6"/></svg>
+        Items &amp; Stock
+      </a>
+      <a class="nav-link" href="stock-upload.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        Stock Upload
+      </a>
+      <div class="sidebar__section-label">Procurement</div>
+      <a class="nav-link" href="vendors.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6"/></svg>
+        Vendors
+      </a>
+      <a class="nav-link" href="purchase-orders.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8 11h8M8 15h5"/></svg>
+        Purchase Orders
+      </a>
+      <a class="nav-link" href="purchase-returns.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg>
+        Purchase Returns
+      </a>
+      <div class="sidebar__section-label">Stock Maintenance</div>
+      <a class="nav-link" href="stock-adjustment.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h6"/><circle cx="18" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+        Stock Adjustment
+      </a>
+      <a class="nav-link" href="batch-expiry.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Batch &amp; Expiry
+      </a>
+      <a class="nav-link" href="reorder-alerts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        Reorder Alerts
+      </a>
+      <a class="nav-link" href="stock-audit.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Physical Audit
+      </a>
+      <div class="sidebar__section-label">Insights</div>
+      <a class="nav-link" href="reports.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Reports
+      </a>
+      <div class="sidebar__section-label">Administration</div>
+      <a class="nav-link" href="discounts.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 8-9 9-8-8V3a1 1 0 011-1h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        Discounts
+      </a>
+      <a class="nav-link" href="tax-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Tax Configuration
+      </a>
+      <a class="nav-link" href="users.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M16 14c2.8.3 5 2.6 5 6"/></svg>
+        Users &amp; Roles
+      </a>
+      <a class="nav-link" href="store-settings.html" data-admin-only>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 01-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 010-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 014 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.6 1H21a2 2 0 010 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+        Store Settings
+      </a>
+    </nav>
+    <div class="sidebar__footer">v2.0 &middot; Phase 2 prototype</div>
+  </aside>
+
+  <header class="topbar">
+    <div class="row">
+      <div class="role-switch">
+        <button data-role="cashier">Cashier</button>
+        <button data-role="admin" class="active">Admin</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="icon-btn" title="Lock screen" onclick="document.getElementById('lockOverlay').classList.add('open')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">AM</div>
+        <div>
+          <div class="text-sm user-chip-name" style="font-weight:600;line-height:1.2">Arjun M.</div>
+          <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">Admin &middot; Store Manager</div>
+        </div>
+      </div>
+      <a class="icon-btn" href="login.html" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">FR-P1-POS-007 &middot; FR-P1-TAX-002</span>
+        <h1>Receipt Preview / Reprint</h1>
+        <p>Look up any past invoice to reprint or resend a digital copy.</p>
+      </div>
+      <div class="page-actions" style="gap:var(--space-2)">
+        <span class="badge badge-neutral" id="receiptModeBadge">Pricing Mode: Tax Exclusive</span>
+        <a class="btn btn-secondary btn-sm" href="tax-settings.html">Change in Tax Settings</a>
+      </div>
+    </div>
+
+    <div class="card lookup-card" style="margin-bottom:var(--space-5);max-width:520px">
+      <div class="row" style="gap:var(--space-3)">
+        <div class="field" style="flex:1"><label for="lookupInvoice">Invoice Number</label><input class="input input-lg mono" id="lookupInvoice" placeholder="e.g. INV-FY26-01025"></div>
+        <button class="btn btn-primary btn-lg" style="align-self:flex-end" onclick="loadReceipt()">Find</button>
+      </div>
+    </div>
+
+    <div class="receipt-paper mono" id="receiptContent"></div>
+    <div class="row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-5)" id="receiptActions" style="display:none">
+      <button class="btn btn-secondary" onclick="window.print()">Print</button>
+      <label class="checkbox-row text-sm"><input type="checkbox"> Resend Email/SMS copy</label>
+    </div>
+  </main>
+</div>
+
+<div class="lock-overlay" id="lockOverlay">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  <h2>Screen Locked</h2>
+  <p class="text-sm" style="color:var(--slate-400)">Idle timeout reached. Re-enter your PIN to continue.</p>
+  <input class="input input-lg" id="lockPinInput" type="password" maxlength="6" placeholder="••••" style="max-width:220px;text-align:center;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2);color:#fff">
+  <button class="btn btn-primary btn-lg" onclick="unlockScreen()">Unlock</button>
+</div>
+
+<div class="toast-stack"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/pricing.js"></script>
+<script>
+  function demoFallbackBill(invoiceNo) {
+    var cart = [
+      { sku: "BEV-001", name: "Cola 500ml", price: 45, tax: 12, pricingMethod: "qty", unit: "pcs", qty: 3 },
+      { sku: "SNK-001", name: "Potato Chips 90g", price: 35, tax: 12, pricingMethod: "qty", unit: "pcs", qty: 2 },
+      { sku: "DAI-003", name: "Paneer 200g", price: 90, tax: 5, pricingMethod: "weight", unit: "kg", qty: 0.2 }
+    ];
+    var totals = window.computeCartTotals(cart, window.getTaxSettings().pricingMode, { type: "percent", value: 0 });
+    return Object.assign({ invoiceNo: invoiceNo, time: new Date(Date.now() - 3600000).toISOString(), tenders: [{ mode: "UPI", amount: totals.grandTotal }] }, totals);
+  }
+
+  function loadReceipt() {
+    var q = document.getElementById("lookupInvoice").value.trim();
+    if (!q) { showToast("Enter an invoice number", "warning"); return; }
+    var log = [];
+    try { log = JSON.parse(localStorage.getItem("pos_demo_sales_log") || "[]"); } catch (e) {}
+    var record = log.find(function (b) { return b.invoiceNo.toLowerCase() === q.toLowerCase(); }) || demoFallbackBill(q.toUpperCase());
+    render(record);
+  }
+
+  function render(record) {
+    var box = document.getElementById("receiptContent");
+    if (box) box.innerHTML = window.renderReceiptHTML(record);
+    document.getElementById("receiptActions").style.display = "flex";
+  }
+
+  (function initFromQuery() {
+    var mode = window.getTaxSettings().pricingMode;
+    var badge = document.getElementById("receiptModeBadge");
+    if (badge) badge.textContent = "Pricing Mode: " + (mode === "inclusive" ? "Tax Inclusive" : "Tax Exclusive");
+
+    var params = new URLSearchParams(window.location.search);
+    var inv = params.get("invoice") || "INV-FY26-01025";
+    document.getElementById("lookupInvoice").value = inv;
+    loadReceipt();
+  })();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Cloude Code ToolBox — MCP & Skills awareness
 
-_Generated: 2026-09-14T08:48:46.842Z_
+_Generated: 2026-09-14T05:11:42.704Z_
 
 ## How to use this report
 
@@ -13,9 +13,9 @@ _Generated: 2026-09-14T08:48:46.842Z_
 
 ## MCP — workspace
 
-Workspace `mcp.json` _(folder: phase 1 app)_
+Workspace `mcp.json` _(folder: Phase 2 app)_
 
-- **c:\Yunus\Internship\Billing Software\phase 1 app\.mcp.json** — _File missing_
+- **c:\Yunus\Internship\Billing Software\Phase 2 app\.mcp.json** — _File missing_
 
 _No active workspace servers in mcp.json._
 

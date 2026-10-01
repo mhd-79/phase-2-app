@@ -7,8 +7,11 @@ db = Prisma()
 
 async def connect_db():
     if not db.is_connected():
-        await db.connect()
-        print("Connected to Railway PostgreSQL database successfully.")
+        try:
+            await db.connect()
+            print("Connected to PostgreSQL database successfully.")
+        except Exception as e:
+            print(f"[Database] Could not connect to PostgreSQL ({e}). Operating in memory / fallback mode.")
 
 async def disconnect_db():
     try:

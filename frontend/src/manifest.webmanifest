@@ -1,10 +1,10 @@
 {
-  "name": "Okuto Mart POS",
-  "short_name": "GM-POS",
-  "theme_color": "#1e293b",
+  "name": "Okuto Mart POS & Billing",
+  "short_name": "OkutoPOS",
+  "theme_color": "#4a4fd6",
   "background_color": "#0f172a",
   "display": "standalone",
-  "scope": "/",
+  "orientation": "any",
   "start_url": "/",
   "icons": [
     {
