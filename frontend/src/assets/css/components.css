@@ -244,7 +244,7 @@ table.table tbody tr:last-child td { border-bottom: none; }
 
 @media (max-width: 980px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: var(--topbar-height) 1fr auto;
     grid-template-areas:
       "topbar"
@@ -268,6 +268,13 @@ table.table tbody tr:last-child td { border-bottom: none; }
   .nav-link { flex-direction: column; gap: 2px; font-size: 11px; padding: var(--space-2); white-space: nowrap; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .main { padding: var(--space-4); }
+  /* Keep the shell, nav strip and page from growing wider than the viewport: the nav scrolls sideways instead. */
+  .app-shell { max-width: 100vw; overflow-x: clip; }
+  .app-shell > * { min-width: 0; max-width: 100%; }
+  .sidebar { max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar__nav { width: max-content; }
+  .nav-link { flex: 0 0 auto; }
 }
 
 @media (max-width: 560px) {
