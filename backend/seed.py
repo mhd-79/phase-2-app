@@ -59,6 +59,32 @@ DEMO_USERS = [
         "full_name": "Meena T.",
         "sub_text": "Relief Cashier",
         "is_active": False
+    },
+    {
+        "username": "cashier.demo",
+        "pin": "1111",
+        "role": "cashier",
+        "full_name": "Demo Cashier",
+        "sub_text": "Cashier · Counter 1",
+        "is_active": True
+    },
+    {
+        "username": "admin.phase1",
+        "pin": "2222",
+        "role": "admin",
+        "full_name": "Phase 1 Admin",
+        "sub_text": "Admin · Phase 1",
+        "is_active": True,
+        "phase_access": 1
+    },
+    {
+        "username": "admin.phase2",
+        "pin": "3333",
+        "role": "admin",
+        "full_name": "Phase 2 Admin",
+        "sub_text": "Admin · Phase 2",
+        "is_active": True,
+        "phase_access": 2
     }
 ]
 
@@ -266,14 +292,17 @@ async def seed_all():
     for u in DEMO_USERS:
         existing = await db.user.find_unique(where={"username": u["username"]})
         if not existing:
-            await db.user.create(data={
+            user_data = {
                 "username": u["username"],
                 "pin_hash": get_pin_hash(u["pin"]),
                 "role": u["role"],
                 "full_name": u["full_name"],
                 "sub_text": u["sub_text"],
                 "is_active": u.get("is_active", True)
-            })
+            }
+            if "phase_access" in u:
+                user_data["phase_access"] = u["phase_access"]
+            await db.user.create(data=user_data)
         # Existing users are left exactly as they are (names, roles, active status, PINs, phase access are managed in
         # Users & Roles). Seeding only creates users that are missing.
 
