@@ -1,9 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { OfflineDbService } from './offline-db.service';
 import { AuthService } from './auth.service';
 import { environment } from '../../environments/environment';
+
+/** Max time to wait for POST /auth/login before giving up (Railway cold starts can take a few seconds). */
+const LOGIN_TIMEOUT_MS = 20000;
 
 export interface CatalogItem {
   sku: string;
@@ -75,7 +78,7 @@ export class ApiService {
   // --- Auth & Access ---
   async login(username: string, pin: string): Promise<any> {
     try {
-      const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/login`, { username, pin }));
+      const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/login`, { username, pin }).pipe(timeout(LOGIN_TIMEOUT_MS)));
       if (res && res.access_token) {
         this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2);
       }
@@ -95,6 +98,9 @@ export class ApiService {
         const fallbackToken = 'offline-token-' + Date.now();
         this.auth.setSession(fallbackToken, username, role, fullName, subText, autoLock);
         return { access_token: fallbackToken, username, role, full_name: fullName, sub_text: subText, auto_lock: autoLock };
+      }
+      if (err?.name === 'TimeoutError') {
+        throw new Error('The server is taking too long to respond. Please try again.');
       }
       throw new Error(err?.error?.detail || 'Unable to reach the server. Please check your connection and try again.');
     }

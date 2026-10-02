@@ -201,7 +201,9 @@ export class LoginComponent {
         this.pin = '';
       }
     } catch (err: any) {
-      this.errorMessage = err?.error?.detail || err?.message || 'Invalid username or PIN. Please try again.';
+      this.errorMessage = err?.status === 401
+        ? (err?.error?.detail || 'Invalid username or PIN')
+        : (err?.error?.detail || err?.message || 'Login failed. Please try again.');
       this.pin = '';
     } finally {
       this.isSubmitting = false;
