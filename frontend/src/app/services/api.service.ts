@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { OfflineDbService } from './offline-db.service';
 import { AuthService } from './auth.service';
+import { environment } from '../../environments/environment';
 
 export interface CatalogItem {
   sku: string;
@@ -57,7 +58,7 @@ export class ApiService {
   private http = inject(HttpClient);
   private offlineDb = inject(OfflineDbService);
   private auth = inject(AuthService);
-  private baseUrl = 'http://localhost:8000/api/v1';
+  private baseUrl = environment.apiUrl;
 
   private getHeaders(idempotencyKey?: string): HttpHeaders {
     let headers = new HttpHeaders();
@@ -95,7 +96,7 @@ export class ApiService {
         this.auth.setSession(fallbackToken, username, role, fullName, subText, autoLock);
         return { access_token: fallbackToken, username, role, full_name: fullName, sub_text: subText, auto_lock: autoLock };
       }
-      throw new Error(err?.error?.detail || 'Invalid username or PIN');
+      throw new Error(err?.error?.detail || 'Unable to reach the server. Please check your connection and try again.');
     }
   }
 
