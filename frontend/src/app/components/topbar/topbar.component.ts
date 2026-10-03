@@ -1,11 +1,10 @@
 import { Component, EventEmitter, Output, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-topbar',
   standalone: true,
-  imports: [RouterLink],
+  imports: [],
   template: `
     <header class="topbar">
       <div class="row">
@@ -24,9 +23,6 @@ import { AuthService } from '../../services/auth.service';
             <div class="text-xs text-muted user-chip-sub" style="line-height:1.2">{{ auth.currentUser().subText }}</div>
           </div>
         </div>
-        <a class="icon-btn" routerLink="/login" title="Sign out" (click)="auth.logout()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-        </a>
       </div>
     </header>
   `
