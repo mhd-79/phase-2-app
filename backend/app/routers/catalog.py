@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from typing import List, Optional
 import csv
 import io
+from datetime import date, datetime, timezone
 from app.schemas import ItemSchema, ItemCreate, ItemUpdate, CategorySchema, CategoryCreate, UploadPreviewResult
 from app.security import get_current_user, require_admin
 from app.database import db
@@ -9,6 +10,13 @@ from app.database import db
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
 DEFAULT_CATEGORIES = ["Beverages", "Snacks", "Dairy", "Bakery", "Grocery", "Personal Care"]
+
+def _to_dt(d: Optional[date]) -> Optional[datetime]:
+    """Calendar date -> midnight UTC datetime (how Mfg / Exp dates are stored)."""
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc) if d else None
+
+def _to_date(v: Optional[datetime]) -> Optional[date]:
+    return v.date() if v else None
 
 @router.get("/items", response_model=List[ItemSchema])
 async def get_items(category: Optional[str] = None, search: Optional[str] = None):
@@ -34,7 +42,7 @@ async def get_items(category: Optional[str] = None, search: Optional[str] = None
             min_stock=i.min_stock,
             pricing_method=i.pricing_method,
             unit=i.unit,
-            is_active=i.is_active
+            is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
         ))
     return result
 
@@ -47,7 +55,7 @@ async def get_item_by_sku(sku: str):
         sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
         price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
         tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
-        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active
+        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
     )
 
 @router.post("/items", response_model=ItemSchema)
@@ -68,13 +76,15 @@ async def create_item(item: ItemCreate, user = Depends(require_admin)):
         "min_stock": item.min_stock,
         "pricing_method": item.pricing_method,
         "unit": item.unit,
+        "mfg_date": _to_dt(item.mfg_date),
+        "exp_date": _to_dt(item.exp_date),
         "is_active": True
     })
     return ItemSchema(
         sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
         price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
         tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
-        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active
+        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
     )
 
 @router.put("/items/{sku}", response_model=ItemSchema)
@@ -83,13 +93,29 @@ async def update_item(sku: str, item: ItemUpdate, user = Depends(require_admin))
     if not existing:
         raise HTTPException(status_code=404, detail="Item not found")
     data = item.dict(exclude_unset=True)
+    if "mfg_date" in data or "exp_date" in data:
+        mfg = data["mfg_date"] if "mfg_date" in data else _to_date(getattr(existing, "mfg_date", None))
+        exp = data["exp_date"] if "exp_date" in data else _to_date(getattr(existing, "exp_date", None))
+        if mfg and exp and exp < mfg:
+            raise HTTPException(status_code=400, detail="Expiry Date cannot be earlier than Manufacturing Date")
+        for key in ("mfg_date", "exp_date"):
+            if key in data:
+                data[key] = _to_dt(data[key])
     i = await db.item.update(where={"sku": sku}, data=data)
     return ItemSchema(
         sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
         price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
         tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
-        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active
+        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
     )
+
+@router.delete("/items/{sku}")
+async def delete_item(sku: str, user = Depends(require_admin)):
+    existing = await db.item.find_unique(where={"sku": sku})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Item not found")
+    await db.item.delete(where={"sku": sku})
+    return {"message": f"Item {sku} deleted", "sku": sku}
 
 @router.get("/categories", response_model=List[str])
 async def get_categories():
@@ -105,6 +131,13 @@ async def create_category(req: CategoryCreate, user = Depends(require_admin)):
         return CategorySchema(id=existing.id, name=existing.name)
     c = await db.category.create(data={"name": req.name})
     return CategorySchema(id=c.id, name=c.name)
+
+def _num(v) -> Optional[float]:
+    """Optional numeric upload cell: blank / non-numeric -> None (meaning 'leave unchanged' for an existing item)."""
+    try:
+        return float(str(v).strip()) if str(v).strip() != "" else None
+    except ValueError:
+        return None
 
 @router.post("/upload/preview", response_model=UploadPreviewResult)
 async def upload_preview(file: UploadFile = File(...), user = Depends(require_admin)):
@@ -125,6 +158,8 @@ async def upload_preview(file: UploadFile = File(...), user = Depends(require_ad
         name = norm.get("name", "")
         sp = norm.get("selling_price", norm.get("price", ""))
         qty = norm.get("opening_qty", norm.get("stock", ""))
+        cp = norm.get("cost_price", norm.get("cost", ""))
+        wp = norm.get("wholesale_price", norm.get("wholesale", ""))
         
         missing = []
         if not sku: missing.append("sku")
@@ -138,6 +173,8 @@ async def upload_preview(file: UploadFile = File(...), user = Depends(require_ad
             "name": name,
             "category": norm.get("category", "Grocery"),
             "selling_price": float(sp) if sp and sp.replace(".","",1).isdigit() else 0.0,
+            "cost_price": _num(cp),
+            "wholesale_price": _num(wp),
             "tax_rate": float(norm.get("tax_rate", norm.get("tax", 0))) if norm.get("tax_rate", norm.get("tax")) else 0.0,
             "opening_qty": float(qty) if qty and qty.replace(".","",1).isdigit() else 0.0
         }
@@ -177,9 +214,21 @@ async def upload_commit(payload: List[dict], user = Depends(require_admin)):
         category = row.get("category", "Grocery")
         barcode = row.get("barcode", "")
         
+        cost = _num(row.get("cost_price"))
+        wholesale = _num(row.get("wholesale_price"))
+
+        if category and not await db.category.find_unique(where={"name": category}) and category not in DEFAULT_CATEGORIES:
+            await db.category.create(data={"name": category})   # a category first seen in an upload is added to the database
+
         existing = await db.item.find_unique(where={"sku": sku})
         if existing:
-            await db.item.update(where={"sku": sku}, data={"stock": stock, "price": price if price > 0 else existing.price})
+            # Existing item: refresh quantity, selling price, cost price and wholesale price (blank cells leave a value as is)
+            update = {"stock": stock, "price": price if price > 0 else existing.price}
+            if cost is not None:
+                update["cost_price"] = cost
+            if wholesale is not None:
+                update["wholesale_price"] = wholesale
+            await db.item.update(where={"sku": sku}, data=update)
         else:
             await db.item.create(data={
                 "sku": sku,
@@ -187,6 +236,8 @@ async def upload_commit(payload: List[dict], user = Depends(require_admin)):
                 "name": name,
                 "category_name": category,
                 "price": price,
+                "cost_price": cost if cost is not None else 0.0,
+                "wholesale_price": wholesale,
                 "tax_rate": tax,
                 "stock": stock,
                 "min_stock": max(10.0, stock * 0.2),

@@ -117,6 +117,14 @@ const PALETTE = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#0ea5e9', '#8b5cf6
           }
         </div>
       }
+      @if (tab() === 'customers') {
+        <div class="chip-row" style="margin-bottom:var(--space-4)">
+          <span class="text-xs text-muted" style="font-weight:600">Period:</span>
+          @for (d of [30, 90, 180, 0]; track d) {
+            <button type="button" class="chip" [class.active]="custDays === d" (click)="setCustDays(d)">{{ d === 0 ? 'All time' : 'Last ' + d + ' days' }}</button>
+          }
+        </div>
+      }
       @if (tab() === 'newproduct') {
         <div class="chip-row" style="margin-bottom:var(--space-4)">
           <span class="text-xs text-muted" style="font-weight:600">Products added in the last:</span>
@@ -158,6 +166,216 @@ const PALETTE = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#0ea5e9', '#8b5cf6
               </div>
             </div>
           } @else {
+
+            <!-- ============================ CUSTOMER BEHAVIOUR ============================ -->
+            @if (tab() === 'customers') {
+              <div class="grid grid-4" style="margin-bottom:var(--space-5)">
+                <div class="card stat-card"><span class="stat-label">Customers who purchased</span><span class="stat-value">{{ d.kpis.customers_purchased }}</span>
+                  <span class="stat-delta text-muted">of {{ d.kpis.customers_registered }} registered</span></div>
+                <div class="card stat-card"><span class="stat-label">Customer sales</span><span class="stat-value">{{ inr(d.kpis.total_revenue) }}</span>
+                  <span class="stat-delta text-muted">{{ d.kpis.invoices }} invoices · avg bill {{ inr(d.kpis.avg_bill_value) }}</span></div>
+                <div class="card stat-card"><span class="stat-label">Average spend per customer</span><span class="stat-value">{{ inr(d.kpis.avg_spend_per_customer) }}</span>
+                  <span class="stat-delta text-muted">median {{ inr(d.spending.median_per_customer) }}</span></div>
+                <div class="card stat-card"><span class="stat-label">Repeat customers</span><span class="stat-value">{{ pctOrDash(d.kpis.repeat_rate) }}</span>
+                  <span class="stat-delta text-muted">{{ d.repeat.repeat_customers }} bought more than once</span></div>
+              </div>
+
+              @if (d.highlights.length) {
+                <div class="card" style="margin-bottom:var(--space-5)">
+                  <div class="row-between" style="margin-bottom:var(--space-2)"><h3>What the data says</h3><span class="badge badge-primary">{{ d.highlights.length }}</span></div>
+                  <div class="stack" style="gap:var(--space-2)">
+                    @for (h of d.highlights; track h.text) {
+                      <div class="insight-card" [ngClass]="h.status" style="padding:var(--space-2) var(--space-3);background:var(--slate-50);border-radius:var(--radius-md)"><span class="text-sm">{{ h.text }}</span></div>
+                    }
+                  </div>
+                </div>
+              }
+
+              <div class="grid grid-2" style="margin-bottom:var(--space-5);align-items:start">
+                <div class="card">
+                  <h3>Frequently purchased products</h3>
+                  <p class="text-xs text-muted" style="margin-bottom:var(--space-3)">Most units bought by customers, with how many customers bought them and how many came back for more.</p>
+                  @for (p of d.products; track p.sku) {
+                    <div class="bar-row" [title]="p.customers + ' customer(s), ' + p.repeat_buyers + ' repeat buyer(s)'">
+                      <span class="text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</span>
+                      <div class="bar-track"><div class="bar-fill" [style.width.%]="barPct(p.qty, d.products[0].qty)"></div></div>
+                      <span class="text-xs mono">{{ num(p.qty, 1) }} · {{ p.customers }} cust</span>
+                    </div>
+                  }
+                </div>
+                <div class="stack">
+                  <div class="card">
+                    <h3>Most purchased categories</h3>
+                    @for (c of d.categories.most; track c.category) {
+                      <div class="bar-row">
+                        <span class="text-sm">{{ c.category }}</span>
+                        <div class="bar-track"><div class="bar-fill" style="background:var(--success-500)" [style.width.%]="barPct(c.revenue, d.categories.most[0].revenue)"></div></div>
+                        <span class="text-xs mono">{{ inr(c.revenue) }} · {{ c.share }}%</span>
+                      </div>
+                    }
+                  </div>
+                  <div class="card">
+                    <h3>Least purchased categories</h3>
+                    @for (c of d.categories.least; track c.category) {
+                      <div class="bar-row">
+                        <span class="text-sm">{{ c.category }}</span>
+                        <div class="bar-track"><div class="bar-fill" style="background:var(--warning-500)" [style.width.%]="barPct(c.revenue, d.categories.most[0].revenue || 1)"></div></div>
+                        <span class="text-xs mono">{{ inr(c.revenue) }} · {{ c.customers }} cust</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-2" style="margin-bottom:var(--space-5);align-items:start">
+                <div class="card">
+                  <h3>Purchase frequency</h3>
+                  <p class="text-xs text-muted" style="margin-bottom:var(--space-3)">{{ num(d.frequency.avg_purchases_per_customer, 2) }} purchases per customer
+                    ({{ num(d.frequency.purchases_per_customer_per_month, 2) }} a month)@if (d.frequency.avg_days_between_purchases !== null) { · repeat customers return every {{ d.frequency.avg_days_between_purchases }} days (median {{ d.frequency.median_days_between_purchases }}) }</p>
+                  @for (b of d.frequency.distribution; track b.label) {
+                    <div class="bar-row">
+                      <span class="text-sm">{{ b.label }}</span>
+                      <div class="bar-track"><div class="bar-fill" [style.width.%]="b.customers ? barPct(b.customers, d.kpis.customers_purchased) : 0"></div></div>
+                      <span class="text-xs mono">{{ b.customers }} · {{ pctOrDash(b.share) }}</span>
+                    </div>
+                  }
+                </div>
+                <div class="card">
+                  <h3>Average spending per customer</h3>
+                  <p class="text-xs text-muted" style="margin-bottom:var(--space-3)">Average {{ inr(d.spending.avg_per_customer) }} · median {{ inr(d.spending.median_per_customer) }} · average bill {{ inr(d.spending.avg_bill_value) }}</p>
+                  @for (b of d.spending.bands; track b.label) {
+                    <div class="bar-row">
+                      <span class="text-sm">{{ b.label }}</span>
+                      <div class="bar-track"><div class="bar-fill" style="background:var(--indigo-400)" [style.width.%]="b.customers ? barPct(b.customers, d.kpis.customers_purchased) : 0"></div></div>
+                      <span class="text-xs mono">{{ b.customers }} cust</span>
+                    </div>
+                  }
+                  <div class="table-scroll" style="margin-top:var(--space-3)">
+                    <table class="table">
+                      <thead><tr><th>Top spenders</th><th class="num">Invoices</th><th class="num">Spent</th><th class="num">Share</th></tr></thead>
+                      <tbody>
+                        @for (c of d.spending.top_spenders; track c.id) {
+                          <tr><td>{{ c.name }}</td><td class="num">{{ c.invoices }}</td><td class="num mono">{{ inr(c.total) }}</td><td class="num">{{ pctOrDash(c.share) }}</td></tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-2" style="margin-bottom:var(--space-5);align-items:start">
+                <div class="card card-flush">
+                  <div class="card-header"><h3>Repeat customer patterns</h3>
+                    <span class="badge badge-neutral">{{ d.repeat.repeat_customers }} repeat · {{ d.repeat.one_time_customers }} one-time</span></div>
+                  <p class="text-xs text-muted" style="padding:0 var(--space-4)">Repeat customers bring {{ pctOrDash(d.repeat.repeat_revenue_share) }} of customer sales.</p>
+                  <div class="table-scroll">
+                    <table class="table">
+                      <thead><tr><th>Customer</th><th class="num">Invoices</th><th class="num">Every</th><th>Favourite</th><th>Last bought</th></tr></thead>
+                      <tbody>
+                        @for (c of d.repeat.customers; track c.id) {
+                          <tr><td>{{ c.name }}</td><td class="num">{{ c.invoices }}</td><td class="num">{{ c.avg_days_between !== null ? c.avg_days_between + ' d' : '—' }}</td><td>{{ c.favourite_product || '—' }}</td><td>{{ c.last_purchase }}</td></tr>
+                        }
+                        @if (!d.repeat.customers.length) { <tr><td colspan="5" class="text-center text-muted" style="padding:var(--space-3)">No repeat customers in this period yet.</td></tr> }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="card">
+                  <h3>When customers buy</h3>
+                  <p class="text-xs text-muted" style="margin-bottom:var(--space-3)">Customer invoices by day of the week.</p>
+                  @for (w of d.repeat.by_weekday; track w.day) {
+                    <div class="bar-row">
+                      <span class="text-sm">{{ w.day }}</span>
+                      <div class="bar-track"><div class="bar-fill" style="background:var(--violet-500, #8b5cf6)" [style.width.%]="w.invoices ? barPct(w.invoices, weekdayMax(d.repeat.by_weekday)) : 0"></div></div>
+                      <span class="text-xs mono">{{ w.invoices }} · {{ inr(w.revenue) }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="grid grid-2" style="margin-bottom:var(--space-5);align-items:start">
+                <div class="card">
+                  <h3>Frequently bought together</h3>
+                  <p class="text-xs text-muted" style="margin-bottom:var(--space-3)">Product pairs that appear on the same customer invoice (at least twice).</p>
+                  @for (c of d.combinations; track c.a + c.b) {
+                    <div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--border)">
+                      <span class="text-sm">{{ c.a }} <span class="text-muted">+</span> {{ c.b }}</span>
+                      <span class="badge badge-neutral">{{ c.bills }} bills · {{ pctOrDash(c.share) }}</span>
+                    </div>
+                  }
+                  @if (!d.combinations.length) { <p class="text-sm text-muted">No product pair has been bought together more than once yet.</p> }
+                </div>
+                <div class="card">
+                  <h3>Payment preference</h3>
+                  <p class="text-xs text-muted" style="margin-bottom:var(--space-3)">How customers pay.</p>
+                  @for (m of d.payment_mix; track m.mode) {
+                    <div class="bar-row">
+                      <span class="text-sm">{{ m.mode }}</span>
+                      <div class="bar-track"><div class="bar-fill" style="background:var(--success-500)" [style.width.%]="m.share"></div></div>
+                      <span class="text-xs mono">{{ inr(m.amount) }} · {{ m.share }}%</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="card" style="margin-bottom:var(--space-5)">
+                <div class="row-between">
+                  <div><h3>Recent purchasing trend</h3><p class="text-xs text-muted">Customer sales per week, last 8 weeks.</p></div>
+                  <div class="text-sm">
+                    <span class="badge" [ngClass]="d.trend.revenue_change_pct === null ? 'badge-neutral' : d.trend.revenue_change_pct >= 0 ? 'badge-success' : 'badge-warning'">Sales {{ d.trend.revenue_change_pct === null ? '—' : (d.trend.revenue_change_pct >= 0 ? '▲ ' : '▼ ') + Math.abs(d.trend.revenue_change_pct) + '%' }}</span>
+                    <span class="badge badge-neutral">Active customers {{ d.trend.customers_change_pct === null ? '—' : (d.trend.customers_change_pct >= 0 ? '▲ ' : '▼ ') + Math.abs(d.trend.customers_change_pct) + '%' }}</span>
+                    <span class="badge badge-info">{{ d.trend.new_customers_last4 }} new customers (4 wks)</span>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:var(--space-2);height:150px;margin-top:var(--space-3)">
+                  @for (w of d.trend.weeks; track w.week_start) {
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%" [title]="w.invoices + ' invoices · ' + w.customers + ' customers · ' + w.new_customers + ' new'">
+                      <span class="text-xs mono" style="margin-bottom:2px">{{ w.revenue ? inr(w.revenue) : '' }}</span>
+                      <div [style.height.%]="w.revenue ? barPct(w.revenue, weekMax(d.trend.weeks)) * 0.8 : 1" style="width:100%;background:var(--primary);border-radius:4px 4px 0 0;min-height:2px"></div>
+                      <span class="text-xs text-muted" style="margin-top:4px">{{ w.week_start.slice(5) }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="card card-flush" style="margin-bottom:var(--space-5)">
+                <div class="card-header"><h3>Customer buying preferences</h3><span class="text-xs text-muted">Top 10 customers by spend</span></div>
+                <div class="table-scroll">
+                  <table class="table">
+                    <thead><tr><th>Customer</th><th class="num">Invoices</th><th class="num">Spent</th><th class="num">Avg bill</th><th>Favourite category</th><th>Favourite product</th><th>Pays by</th></tr></thead>
+                    <tbody>
+                      @for (c of d.preferences; track c.id) {
+                        <tr><td><strong>{{ c.name }}</strong></td><td class="num">{{ c.invoices }}</td><td class="num mono">{{ inr(c.total) }}</td><td class="num mono">{{ inr(c.avg_bill) }}</td>
+                          <td>{{ c.favourite_category || '—' }}</td><td>{{ c.favourite_product || '—' }}</td><td>{{ c.preferred_payment || '—' }}</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card card-flush">
+                <div class="card-header"><h3>Inactive &amp; less-active customers</h3>
+                  <span class="text-xs text-muted">Active: bought within {{ d.activity.active_days }} days · Less active: up to {{ d.activity.inactive_days }} days · Inactive: longer</span></div>
+                <div class="grid grid-4" style="padding:0 var(--space-4) var(--space-3)">
+                  <div class="card stat-card"><span class="stat-label">Active</span><span class="stat-value" style="color:var(--success-700)">{{ d.activity.active }}</span></div>
+                  <div class="card stat-card"><span class="stat-label">Less active</span><span class="stat-value" style="color:var(--warning-700)">{{ d.activity.less_active }}</span></div>
+                  <div class="card stat-card"><span class="stat-label">Inactive</span><span class="stat-value" style="color:var(--danger-700)">{{ d.activity.inactive }}</span></div>
+                  <div class="card stat-card"><span class="stat-label">Never purchased</span><span class="stat-value">{{ d.activity.never_purchased }}</span></div>
+                </div>
+                <div class="table-scroll">
+                  <table class="table">
+                    <thead><tr><th>Customer</th><th>Status</th><th>Last purchase</th><th class="num">Days ago</th><th class="num">Invoices</th><th class="num">Lifetime spend</th></tr></thead>
+                    <tbody>
+                      @for (c of d.activity.customers; track c.id) {
+                        <tr><td>{{ c.name }}</td><td><span class="badge" [ngClass]="c.status === 'Inactive' ? 'badge-danger' : 'badge-warning'">{{ c.status }}</span></td>
+                          <td>{{ c.last_purchase }}</td><td class="num">{{ c.days_since }}</td><td class="num">{{ c.invoices }}</td><td class="num mono">{{ inr(c.lifetime_spend) }}</td></tr>
+                      }
+                      @if (!d.activity.customers.length) { <tr><td colspan="6" class="text-center text-muted" style="padding:var(--space-3)">Every purchasing customer is active.</td></tr> }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
 
             <!-- ============================ BUSINESS SUMMARY ============================ -->
             @if (tab() === 'summary') {
@@ -694,6 +912,7 @@ export class AiInsightsComponent implements OnInit {
     { key: 'prices', label: 'Price Comparison', endpoint: 'vendor-price-comparison' },
     { key: 'discounts', label: 'Discount Recommendations', endpoint: 'discount-recommendations' },
     { key: 'newproduct', label: 'New Product Prediction', endpoint: 'new-product-prediction' },
+    { key: 'customers', label: 'Customer Behaviour', endpoint: 'customer-behavior' },
   ];
   windowKeys = ['Order now', 'Within 3 days', 'This week', 'Next 2 weeks'];
 
@@ -706,6 +925,7 @@ export class AiInsightsComponent implements OnInit {
   horizon = 14;
   trendDays = 14;
   newDays = 60;
+  custDays = 90;
 
   current = () => this.cache()[this.cacheKey()] ?? null;
 
@@ -721,6 +941,7 @@ export class AiInsightsComponent implements OnInit {
       case 'forecast': p = { horizon: this.horizon }; break;
       case 'trending': p = { days: this.trendDays }; break;
       case 'newproduct': p = { new_days: this.newDays }; break;
+      case 'customers': p = { days: this.custDays }; break;
       default: p = {};
     }
     return this.demo() ? { ...p, demo: 'true' } : p;
@@ -752,6 +973,9 @@ export class AiInsightsComponent implements OnInit {
   async setHorizon(d: number) { this.horizon = d; await this.load(); }
   async setTrendDays(d: number) { this.trendDays = d; await this.load(); }
   async setNewDays(d: number) { this.newDays = d; await this.load(); }
+  async setCustDays(d: number) { this.custDays = d; await this.load(); }
+  weekdayMax(rows: any[]): number { return Math.max(...rows.map(r => r.invoices), 1); }
+  weekMax(rows: any[]): number { return Math.max(...rows.map(r => r.revenue), 1); }
 
   linkTab(link: string): string {
     return ({ 'low-stock': 'lowstock', discounts: 'discounts', vendors: 'vendors', trending: 'trending' } as Record<string, string>)[link] || 'summary';

@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List
-from app.schemas import UserSchema, UserCreate, UserUpdate
+from app.schemas import UserSchema, UserCreate, UserUpdate, LeaveRequest
 from app.security import get_pin_hash, require_admin, get_phase_access, PHASE_1, PHASE_2
 from app.database import db
 from app.idempotency import enforce_idempotency
@@ -57,7 +57,10 @@ async def get_users(user = Depends(require_admin)):
                     is_active=u.is_active,
                     auto_lock=u.auto_lock or "2 min",
                     schedule_json=u.schedule_json,
-                    phase_access=get_phase_access(u)
+                    phase_access=get_phase_access(u),
+                    on_leave=bool(getattr(u, "on_leave", False)),
+                    leave_reason=getattr(u, "leave_reason", None),
+                    leave_started_at=getattr(u, "leave_started_at", None)
                 ))
             return result
         except Exception:
@@ -74,7 +77,9 @@ async def get_users(user = Depends(require_admin)):
             is_active=u["is_active"],
             auto_lock=u.get("auto_lock", "2 min"),
             schedule_json=u.get("schedule_json"),
-            phase_access=get_phase_access(u)
+            phase_access=get_phase_access(u),
+            on_leave=bool(u.get("on_leave", False)),
+            leave_reason=u.get("leave_reason")
         ) for u in _FALLBACK_USERS.values()
     ]
 
@@ -214,7 +219,8 @@ async def update_user(username: str, req: UserUpdate, request: Request, user = D
             return UserSchema(
                 id=u.id, username=u.username, role=u.role,
                 full_name=u.full_name, sub_text=u.sub_text, is_active=u.is_active,
-                auto_lock=u.auto_lock, schedule_json=u.schedule_json, phase_access=get_phase_access(u)
+                auto_lock=u.auto_lock, schedule_json=u.schedule_json, phase_access=get_phase_access(u),
+                on_leave=bool(getattr(u, "on_leave", False)), leave_reason=getattr(u, "leave_reason", None)
             )
         except HTTPException:
             raise
@@ -240,6 +246,64 @@ async def update_user(username: str, req: UserUpdate, request: Request, user = D
         id=u["id"], username=u["username"], role=u["role"],
         full_name=u["full_name"], sub_text=u["sub_text"], is_active=u["is_active"],
         auto_lock=u.get("auto_lock", "2 min"), schedule_json=u.get("schedule_json"), phase_access=get_phase_access(u)
+    )
+
+@router.put("/{username}/leave", response_model=UserSchema)
+async def set_user_leave(username: str, req: LeaveRequest, request: Request, user = Depends(require_admin)):
+    """Marks a user as on leave (with a reason) or back at work. Only the leave fields change: role, PIN, schedule and permissions are untouched."""
+    await enforce_idempotency(request, f"user_leave_{username}")
+    admin_user = getattr(user, 'username', 'admin') if not isinstance(user, dict) else user.get("username", "admin")
+    now = datetime.now(timezone.utc)
+    reason = (req.reason or "").strip()
+
+    if req.on_leave and not reason:
+        raise HTTPException(status_code=400, detail="Please give a reason for the leave")
+    if req.on_leave and username == admin_user:
+        raise HTTPException(status_code=400, detail="You cannot put your own account on leave")
+
+    target = await _snapshot(username)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if get_phase_access(user) < PHASE_2 and target["role"] == "admin" and target["phase"] >= PHASE_2:
+        raise HTTPException(status_code=403, detail="A Phase 1 admin cannot modify a Phase 2 admin account")
+    if (req.on_leave and target["role"] == "admin" and target["phase"] >= PHASE_2 and target["active"]
+            and await _other_active_phase2_admins(username) == 0):
+        raise HTTPException(status_code=400, detail="At least one active Phase 2 admin must remain")
+
+    data = {
+        "on_leave": req.on_leave,
+        "leave_reason": reason if req.on_leave else None,
+        "leave_started_at": now if req.on_leave else None,
+    }
+    details = {"by": admin_user, "reason": reason if req.on_leave else None, "timestamp": now.isoformat()}
+    action = "USER_ON_LEAVE" if req.on_leave else "USER_RETURNED_FROM_LEAVE"
+
+    if db.is_connected():
+        try:
+            if not await db.user.find_unique(where={"username": username}):
+                raise HTTPException(status_code=404, detail="User not found")
+            u = await db.user.update(where={"username": username}, data=data)
+            await db.auditlog.create(data={"username": username, "action": action, "details_json": json.dumps(details)})
+            return UserSchema(
+                id=u.id, username=u.username, role=u.role, full_name=u.full_name, sub_text=u.sub_text, is_active=u.is_active,
+                auto_lock=u.auto_lock or "2 min", schedule_json=u.schedule_json, phase_access=get_phase_access(u),
+                on_leave=bool(u.on_leave), leave_reason=u.leave_reason, leave_started_at=u.leave_started_at
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Could not save the leave status ({type(exc).__name__}). Run `prisma generate` and `prisma db push`.")
+
+    if username not in _FALLBACK_USERS:
+        raise HTTPException(status_code=404, detail="User not found")
+    f = _FALLBACK_USERS[username]
+    f.update(data)
+    _FALLBACK_AUDIT_LOGS.append({"id": f"audit-{len(_FALLBACK_AUDIT_LOGS)+1}", "username": username, "action": action,
+                                 "details_json": json.dumps(details), "timestamp": now.isoformat()})
+    return UserSchema(
+        id=f["id"], username=f["username"], role=f["role"], full_name=f["full_name"], sub_text=f["sub_text"], is_active=f["is_active"],
+        auto_lock=f.get("auto_lock", "2 min"), schedule_json=f.get("schedule_json"), phase_access=get_phase_access(f),
+        on_leave=f["on_leave"], leave_reason=f["leave_reason"], leave_started_at=f["leave_started_at"]
     )
 
 @router.get("/audit-logs")

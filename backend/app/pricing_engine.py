@@ -214,6 +214,8 @@ def render_receipt_html(sale_record: Dict[str, Any], store_info: Optional[Dict[s
         '''
 
     sale_time = sale_record.get("time", datetime.now().isoformat())
+    customer_row = (f'<div class="row-between text-sm"><span>Customer</span><span class="mono">{sale_record["customer_name"]}</span></div>'
+                    if sale_record.get("customer_name") else "")
 
     return f'''
     <div style="text-align:center;margin-bottom:var(--space-3)">
@@ -223,6 +225,7 @@ def render_receipt_html(sale_record: Dict[str, Any], store_info: Optional[Dict[s
     <hr class="divider">
     <div class="row-between text-sm"><span>Invoice</span><span class="mono">{sale_record["invoice_no"]}</span></div>
     <div class="row-between text-sm"><span>Date</span><span class="mono">{sale_time}</span></div>
+    {customer_row}
     <div class="row-between text-sm"><span>Pricing Mode</span><span class="mono">{mode_label}</span></div>
     <hr class="divider">
     {lines_html}

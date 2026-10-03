@@ -1,9 +1,10 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, CatalogItem } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { CustomersComponent } from '../customers/customers.component';
 
 interface DailySummary {
   gross: number;
@@ -55,7 +56,7 @@ interface StockReportItem {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, CustomersComponent],
   template: `
     <main class="main">
       <div class="page-header">
@@ -101,8 +102,12 @@ interface StockReportItem {
 
       <div class="tabs">
         <div class="tab" [class.active]="activeTab === 'zreport'" (click)="activeTab = 'zreport'">Daily Sales (Z-Report)</div>
+        <div class="tab" [class.active]="activeTab === 'transactions'" (click)="activeTab = 'transactions'">Transactions</div>
+        @if (auth.hasPhase2()) {
+          <div class="tab" [class.active]="activeTab === 'customers'" (click)="openCustomerReport()">Customers</div>
+        }
         <div class="tab" [class.active]="activeTab === 'itemSales'" (click)="activeTab = 'itemSales'">Sales by Item</div>
-        <div class="tab" [class.active]="activeTab === 'cashDrawer'" (click)="activeTab = 'cashDrawer'">Cash Drawer</div>
+        <div class="tab" [class.active]="activeTab === 'cashDrawer'" (click)="openCashDrawer()">Cash Drawer</div>
         <div class="tab" [class.active]="activeTab === 'stockValuation'" (click)="activeTab = 'stockValuation'">Stock on Hand</div>
         @if (auth.hasPhase2()) {
           <div class="tab" [class.active]="activeTab === 'aiInsights'" (click)="activeTab = 'aiInsights'">AI Insights &amp; Recommendations</div>
@@ -116,6 +121,9 @@ interface StockReportItem {
         }
         @if (auth.hasPhase2()) {
           <div class="tab" [class.active]="activeTab === 'batchExpiry'" (click)="activeTab = 'batchExpiry'">Batch &amp; Expiry</div>
+        }
+        @if (auth.hasPhase2()) {
+          <div class="tab" [class.active]="activeTab === 'customerMgmt'" (click)="activeTab = 'customerMgmt'">Customer Management</div>
         }
       </div>
 
@@ -163,7 +171,7 @@ interface StockReportItem {
           <div class="card card-flush">
             <div class="card-header row-between">
               <h3>Completed Transactions</h3>
-              <span class="badge badge-neutral">{{ transactions.length }} session sales</span>
+              <span class="badge badge-neutral">{{ transactions.length }} of {{ totalBills }} sales</span>
             </div>
             <div class="table-scroll" style="max-height:320px;overflow-y:auto">
               <table class="table">
@@ -183,6 +191,120 @@ interface StockReportItem {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      }
+
+      <!-- Transactions Tab: every sale in the selected range, read from the database -->
+      @if (activeTab === 'transactions') {
+        <div class="card card-flush">
+          <div class="card-header row-between" style="flex-wrap:wrap;gap:var(--space-3)">
+            <div>
+              <h3>Transactions</h3>
+              <span class="text-sm text-muted">{{ formattedPeriodLabel }} &middot; {{ txTotal.toLocaleString('en-IN') }} sale(s)@if (txTotal > txRows.length) { , showing latest {{ txRows.length }} }</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+              <input class="input" type="text" placeholder="Search invoice..." [(ngModel)]="txSearch" (ngModelChange)="loadTransactions()" style="width:170px">
+              <select class="input" [(ngModel)]="txCounter" (ngModelChange)="loadTransactions()" style="width:150px">
+                <option value="All">All Counters</option>
+                @for (c of cashCounters; track c.id) {
+                  <option [value]="c.counter_name">{{ c.counter_name }}</option>
+                }
+              </select>
+              <select class="input" [(ngModel)]="txStatus" (ngModelChange)="loadTransactions()" style="width:170px">
+                <option value="All">All Statuses</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="PARTIALLY_RETURNED">Partially Returned</option>
+                <option value="RETURNED">Returned</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="table">
+              <thead>
+                <tr><th>Invoice</th><th>Date / Time</th><th>Counter</th><th>Cashier</th><th>Customer</th><th class="num">Items</th><th class="num">Amount</th><th>Payment Method</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (tx of txRows; track tx.invoice_no) {
+                  <tr>
+                    <td class="mono">{{ tx.invoice_no }}</td>
+                    <td>{{ formatDateTime(tx.time) }}</td>
+                    <td>{{ tx.counter_name }}</td>
+                    <td>{{ tx.cashier_name }}</td>
+                    <td>{{ tx.customer_name || 'Walk-in' }}</td>
+                    <td class="num">{{ tx.item_count }}</td>
+                    <td class="num mono">₹{{ tx.grand_total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                    <td>{{ tx.payment_method }}</td>
+                    <td>
+                      <span class="badge" [class.badge-success]="tx.status === 'COMPLETED'" [class.badge-warning]="tx.status === 'PARTIALLY_RETURNED'" [class.badge-danger]="tx.status === 'RETURNED'">{{ statusLabel(tx.status) }}</span>
+                    </td>
+                  </tr>
+                }
+                @if (txRows.length === 0) {
+                  <tr><td colspan="9" class="text-center text-muted" style="padding:var(--space-4)">{{ txError || 'No transactions in this date range.' }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- Customer Management tab (Phase 2 admin): the customer master inside Reports -->
+      @if (activeTab === 'customerMgmt') {
+        <app-customers [embedded]="true"></app-customers>
+      }
+
+      <!-- Customers Tab (Phase 2): customer-wise sales and purchase history for the selected range -->
+      @if (activeTab === 'customers') {
+        <div class="grid grid-4" style="margin-bottom:var(--space-5)">
+          <div class="card stat-card">
+            <span class="stat-label">Total Customers</span>
+            <span class="stat-value">{{ (custReport?.totalCustomers ?? 0).toLocaleString('en-IN') }}</span>
+            <span class="stat-delta up">{{ custReport?.customersWhoPurchased ?? 0 }} purchased in this range</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Total Purchase Amount</span>
+            <span class="stat-value">₹{{ Math.round(custReport?.totalAmount ?? 0).toLocaleString('en-IN') }}</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Customer Invoices</span>
+            <span class="stat-value">{{ (custReport?.totalInvoices ?? 0).toLocaleString('en-IN') }}</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Purchase Frequency</span>
+            <span class="stat-value">{{ custReport?.avgPurchasesPerCustomer ?? 0 }}</span>
+            <span class="stat-delta up">purchases per customer</span>
+          </div>
+        </div>
+
+        <div class="card card-flush">
+          <div class="card-header">
+            <h3>Customer-wise Sales &amp; Purchase History</h3>
+            <span class="text-sm text-muted">{{ formattedPeriodLabel }}</span>
+          </div>
+          <div class="table-scroll">
+            <table class="table">
+              <thead>
+                <tr><th>Customer</th><th>Mobile</th><th>Type</th><th class="num">Invoices</th><th class="num">Total Purchase</th><th class="num">Avg Bill</th><th>Purchase Frequency</th><th>Last Purchase</th></tr>
+              </thead>
+              <tbody>
+                @for (c of custReport?.rows ?? []; track c.id) {
+                  <tr>
+                    <td><strong>{{ c.name }}</strong><div class="text-xs text-muted mono">{{ c.id }}</div></td>
+                    <td class="mono">{{ c.mobile }}</td>
+                    <td><span class="badge" [class.badge-info]="c.customerType === 'Retail'" [class.badge-warning]="c.customerType === 'Wholesale'">{{ c.customerType }}</span></td>
+                    <td class="num">{{ c.invoices }}</td>
+                    <td class="num mono font-bold">₹{{ c.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                    <td class="num mono">₹{{ c.avgBill.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                    <td>{{ c.purchasesPerMonth }} / month@if (c.avgDaysBetween !== null) { &middot; every {{ c.avgDaysBetween }} days }</td>
+                    <td>{{ formatDateTime(c.lastPurchase) }}</td>
+                  </tr>
+                }
+                @if ((custReport?.rows ?? []).length === 0) {
+                  <tr><td colspan="8" class="text-center text-muted" style="padding:var(--space-4)">{{ custError || 'No customer purchases in this date range.' }}</td></tr>
+                }
+              </tbody>
+            </table>
           </div>
         </div>
       }
@@ -254,7 +376,7 @@ interface StockReportItem {
             <div class="row-between" style="margin-bottom:var(--space-4)">
               <div>
                 <span class="eyebrow">Shift Close &amp; Cash Balancing</span>
-                <h3>{{ selectedCounter?.counter_name || 'Counter 1' }}</h3>
+                <h3>{{ selectedCounter?.counter_name || '—' }}</h3>
               </div>
               <div style="display:flex;gap:var(--space-2);align-items:center">
                 <select class="input" [ngModel]="selectedCounter?.id" (ngModelChange)="onSelectCounter($event)" style="width:140px">
@@ -289,10 +411,10 @@ interface StockReportItem {
                 }
               </div>
 
-              <div class="row-between"><span class="text-muted">+ Cash Sales</span><strong class="mono">₹{{ Math.round(totalCash).toLocaleString('en-IN') }}.00</strong></div>
-              <div class="row-between"><span class="text-muted">− Cash Refunds</span><strong class="mono">−₹{{ Math.round(totalRefunds).toLocaleString('en-IN') }}.00</strong></div>
+              <div class="row-between"><span class="text-muted">+ Cash Sales</span><strong class="mono">₹{{ drawerCashSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></div>
+              <div class="row-between"><span class="text-muted">− Cash Refunds</span><strong class="mono">−₹{{ drawerCashRefunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></div>
               <hr class="divider">
-              <div class="row-between"><span style="font-weight:700">Expected Cash</span><strong class="mono" style="font-size:var(--text-lg)">₹{{ Math.round(expectedCash).toLocaleString('en-IN') }}.00</strong></div>
+              <div class="row-between"><span style="font-weight:700">Expected Cash</span><strong class="mono" style="font-size:var(--text-lg)">₹{{ expectedCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></div>
               <div class="field"><label>Counted Cash (physical drawer count)</label><input class="input input-lg mono" type="number" [(ngModel)]="countedCash" placeholder="Enter counted amount"></div>
               @if (countedCash !== null && countedCash !== undefined) {
                 <div class="row-between" style="padding:var(--space-2) var(--space-3);background:var(--slate-50);border-radius:var(--radius-md)">
@@ -312,10 +434,10 @@ interface StockReportItem {
               <table class="table">
                 <thead><tr><th>Date / Time</th><th>Type</th><th>Ref</th><th class="num">Amount</th></tr></thead>
                 <tbody>
-                  <tr><td>{{ formattedFromDate }} 09:00</td><td><span class="badge badge-neutral">Float</span></td><td>Opening Float ({{ selectedCounter?.counter_name || 'Counter 1' }})</td><td class="num mono">₹{{ openingFloat.toFixed(2) }}</td></tr>
-                  <tr><td>{{ formattedPeriodLabel }}</td><td><span class="badge badge-success">Cash Sales</span></td><td>{{ totalBills }} Transactions</td><td class="num mono">₹{{ Math.round(totalCash).toLocaleString('en-IN') }}.00</td></tr>
-                  @if (totalRefunds > 0) {
-                    <tr><td>{{ formattedPeriodLabel }}</td><td><span class="badge badge-danger">Refunds</span></td><td>Cash Returns</td><td class="num mono">−₹{{ Math.round(totalRefunds).toLocaleString('en-IN') }}.00</td></tr>
+                  <tr><td>{{ formattedFromDate }}</td><td><span class="badge badge-neutral">Float</span></td><td>Opening Float ({{ selectedCounter?.counter_name || '—' }})</td><td class="num mono">₹{{ openingFloat.toFixed(2) }}</td></tr>
+                  <tr><td>{{ formattedPeriodLabel }}</td><td><span class="badge badge-success">Cash Sales</span></td><td>{{ drawerBills }} Transactions</td><td class="num mono">₹{{ drawerCashSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td></tr>
+                  @if (drawerCashRefunds > 0) {
+                    <tr><td>{{ formattedPeriodLabel }}</td><td><span class="badge badge-danger">Refunds</span></td><td>Cash Returns</td><td class="num mono">−₹{{ drawerCashRefunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td></tr>
                   }
                 </tbody>
               </table>
@@ -732,14 +854,14 @@ interface StockReportItem {
     }
   `
 })
-export class ReportsComponent implements OnInit {
+export class ReportsComponent implements OnInit, OnDestroy {
   api = inject(ApiService);
   auth = inject(AuthService);
   Math = Math;
 
   activeTab = 'zreport';
-  fromDate = '2026-09-01';
-  toDate = '2026-09-10';
+  fromDate = '';
+  toDate = '';
   quickRange = 'this_month';
 
   // Cash Counter & Float
@@ -801,21 +923,24 @@ export class ReportsComponent implements OnInit {
 
   toastMessage: string | null = null;
 
-  DAILY_MOCK_REPORTS: Record<string, DailySummary> = {
-    '2026-09-10': { gross: 48260, disc: 1140, tax: 4972, net: 52092, cash: 26510, card: 15890, upi: 9692, bills: 126, refunds: 420 },
-    '2026-09-09': { gross: 44600, disc: 980, tax: 4520, net: 48140, cash: 23100, card: 16200, upi: 8840, bills: 114, refunds: 300 },
-    '2026-09-08': { gross: 42100, disc: 850, tax: 4280, net: 45530, cash: 21000, card: 15400, upi: 9130, bills: 108, refunds: 150 },
-    '2026-09-07': { gross: 39800, disc: 790, tax: 4010, net: 43020, cash: 20500, card: 14200, upi: 8320, bills: 102, refunds: 200 },
-    '2026-09-06': { gross: 51200, disc: 1420, tax: 5310, net: 55090, cash: 28400, card: 17800, upi: 8890, bills: 138, refunds: 600 },
-    '2026-09-05': { gross: 47900, disc: 1200, tax: 4910, net: 51610, cash: 25200, card: 16900, upi: 9510, bills: 122, refunds: 250 },
-    '2026-09-04': { gross: 41500, disc: 920, tax: 4210, net: 44790, cash: 22100, card: 14100, upi: 8590, bills: 105, refunds: 0 },
-    '2026-09-03': { gross: 38400, disc: 750, tax: 3890, net: 41540, cash: 19800, card: 13500, upi: 8240, bills: 98, refunds: 180 },
-    '2026-09-02': { gross: 40100, disc: 820, tax: 4050, net: 43330, cash: 20900, card: 14000, upi: 8430, bills: 101, refunds: 350 },
-    '2026-09-01': { gross: 36900, disc: 680, tax: 3710, net: 39930, cash: 18900, card: 12800, upi: 8230, bills: 94, refunds: 100 }
-  };
+  // Transactions tab
+  txRows: any[] = [];
+  txTotal = 0;
+  txSearch = '';
+  txCounter = 'All';
+  txStatus = 'All';
+  txError = '';
+
+  // Cash drawer figures of the selected counter (from the database)
+  drawerCashSales = 0;
+  drawerCashRefunds = 0;
+  drawerBills = 0;
+
+  private refreshTimer: any = null;
 
   async ngOnInit() {
     await this.loadCashCounters();
+    this.setQuickDateRange('this_month');   // start the sales figures now: they must not wait for the slower Phase 2 data below
     await this.loadStockReport();
     // Phase 2 report data (AI insights, purchase register, vendor payables, batch & expiry) is only loaded for Phase 2 admins
     if (this.auth.hasPhase2()) {
@@ -828,7 +953,54 @@ export class ReportsComponent implements OnInit {
       this.expiringBatches = allBatches.filter((b: any) => b.daysToExpiry <= 14);
     }
 
-    this.setQuickDateRange('this_month');
+    // Keep the page live: roll "Today" over at midnight and pick up new sales / counters without a manual refresh.
+    this.refreshTimer = setInterval(() => this.autoRefresh(), 30000);
+  }
+
+  ngOnDestroy() {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
+  }
+
+  private async autoRefresh() {
+    if (document.hidden) return;
+    if (this.quickRange) {
+      const [from, to] = this.quickRangeDates(this.quickRange);
+      if (from !== this.fromDate || to !== this.toDate) {   // a new day has started
+        this.setQuickDateRange(this.quickRange);
+        return;
+      }
+    }
+    await this.recalculate();
+    if (this.activeTab === 'cashDrawer') await this.refreshCounters();
+  }
+
+  async openCashDrawer() {
+    this.activeTab = 'cashDrawer';
+    await this.refreshCounters();   // counters created since the page loaded appear here
+  }
+
+  /** Re-reads the counter list from the database, keeping the current selection when it still exists. */
+  async refreshCounters() {
+    const list = await this.api.getCashCounters();
+    this.cashCounters = list;
+    const keep = list.find(c => c.id === this.selectedCounter?.id) || list[0] || null;
+    this.selectedCounter = keep;
+    if (keep && !this.isEditingFloat) this.openingFloat = keep.opening_float ?? 2000.0;
+    await this.loadCashDrawer();
+  }
+
+  async loadCashDrawer() {
+    if (!this.selectedCounter || !this.fromDate || !this.toDate) return;
+    try {
+      const d = await this.api.getCashDrawer(this.selectedCounter.id, this.fromDate, this.toDate);
+      this.drawerCashSales = d.cash_sales || 0;
+      this.drawerCashRefunds = d.cash_refunds || 0;
+      this.drawerBills = d.bills || 0;
+    } catch {
+      this.drawerCashSales = 0;
+      this.drawerCashRefunds = 0;
+      this.drawerBills = 0;
+    }
   }
 
   async loadCashCounters() {
@@ -839,12 +1011,13 @@ export class ReportsComponent implements OnInit {
     }
   }
 
-  onSelectCounter(counterId: string) {
+  async onSelectCounter(counterId: string) {
     const found = this.cashCounters.find(c => c.id === counterId);
     if (found) {
       this.selectedCounter = found;
       this.openingFloat = found.opening_float ?? 2000.0;
       this.isEditingFloat = false;
+      await this.loadCashDrawer();
     }
   }
 
@@ -868,9 +1041,10 @@ export class ReportsComponent implements OnInit {
       return;
     }
     const created = await this.api.createCashCounter(this.newCounterName.trim(), this.newCounterFloat || 2000.0);
-    this.cashCounters.push(created);
-    this.selectedCounter = created;
+    this.cashCounters = await this.api.getCashCounters();
+    this.selectedCounter = this.cashCounters.find(c => c.id === created.id) || created;
     this.openingFloat = created.opening_float;
+    await this.loadCashDrawer();
     this.showAddCounterModal = false;
     this.newCounterName = '';
     this.newCounterFloat = 2000.0;
@@ -926,29 +1100,26 @@ export class ReportsComponent implements OnInit {
     this.aiInsights = await this.api.getAIInsights(this.fromDate, this.toDate);
   }
 
+  /** YYYY-MM-DD of a Date in the viewer's local time zone. */
+  private localDateStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /** [from, to] for a quick range, always computed from the system clock (never a fixed date). */
+  private quickRangeDates(key: string): [string, string] {
+    const now = new Date();
+    const day = (offset: number) => this.localDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset));
+    const today = day(0);
+    if (key === 'yesterday') return [day(-1), day(-1)];
+    if (key === 'this_week') return [day(-((now.getDay() + 6) % 7)), today];   // Monday .. today
+    if (key === 'this_month') return [this.localDateStr(new Date(now.getFullYear(), now.getMonth(), 1)), today];
+    return [today, today];
+  }
+
   setQuickDateRange(key: string) {
     this.quickRange = key;
-    const todayStr = '2026-09-10';
-    let fromStr = todayStr;
-    let toStr = todayStr;
-
-    if (key === 'today') {
-      fromStr = '2026-09-10';
-      toStr = '2026-09-10';
-    } else if (key === 'yesterday') {
-      fromStr = '2026-09-09';
-      toStr = '2026-09-09';
-    } else if (key === 'this_week') {
-      fromStr = '2026-09-07';
-      toStr = '2026-09-10';
-    } else if (key === 'this_month') {
-      fromStr = '2026-09-01';
-      toStr = '2026-09-10';
-    }
-
-    this.fromDate = fromStr;
-    this.toDate = toStr;
-    this.recalculate();
+    [this.fromDate, this.toDate] = this.quickRangeDates(key);
+    void this.recalculate();
   }
 
   async applyDateRange() {
@@ -961,7 +1132,7 @@ export class ReportsComponent implements OnInit {
       alert('From date cannot be after To date');
       return;
     }
-    this.recalculate();
+    await this.recalculate();
     await this.loadAiInsights();
   }
 
@@ -977,35 +1148,26 @@ export class ReportsComponent implements OnInit {
     return parseInt(parts[2], 10) + ' ' + months[mIdx] + ' ' + parts[0];
   }
 
-  recalculate() {
+  async recalculate() {
     this.formattedFromDate = this.formatDateLabel(this.fromDate);
     this.formattedPeriodLabel =
       this.formattedFromDate + (this.fromDate === this.toDate ? '' : ' – ' + this.formatDateLabel(this.toDate));
 
-    this.totalGross = 0;
-    this.totalDisc = 0;
-    this.totalTax = 0;
-    this.totalNet = 0;
-    this.totalBills = 0;
-    this.totalCash = 0;
-    this.totalCard = 0;
-    this.totalUpi = 0;
-    this.totalRefunds = 0;
-
-    Object.keys(this.DAILY_MOCK_REPORTS).forEach(day => {
-      if (day >= this.fromDate && day <= this.toDate) {
-        const d = this.DAILY_MOCK_REPORTS[day];
-        this.totalGross += d.gross;
-        this.totalDisc += d.disc;
-        this.totalTax += d.tax;
-        this.totalNet += d.net;
-        this.totalBills += d.bills;
-        this.totalCash += d.cash;
-        this.totalCard += d.card;
-        this.totalUpi += d.upi;
-        this.totalRefunds += d.refunds || 0;
-      }
-    });
+    try {
+      const t = await this.api.getSalesSummary(this.fromDate, this.toDate);
+      this.totalGross = t.gross;
+      this.totalDisc = t.disc;
+      this.totalTax = t.tax;
+      this.totalNet = t.net;
+      this.totalBills = t.bills;
+      this.totalCash = t.cash;
+      this.totalCard = t.card;
+      this.totalUpi = t.upi;
+      this.totalRefunds = t.refunds || 0;
+    } catch {
+      this.totalGross = this.totalDisc = this.totalTax = this.totalNet = this.totalBills = 0;
+      this.totalCash = this.totalCard = this.totalUpi = this.totalRefunds = 0;
+    }
 
     // Payment percentage calculation
     const totalPaySum = this.totalCash + this.totalCard + this.totalUpi || 1;
@@ -1014,14 +1176,18 @@ export class ReportsComponent implements OnInit {
     this.upiPct = Math.round((this.totalUpi / totalPaySum) * 100);
     this.discountPct = this.totalGross > 0 ? ((this.totalDisc / this.totalGross) * 100).toFixed(1) : '0.0';
 
-    // Transactions list
-    this.transactions = [
-      { invoiceNo: 'INV-2026-0984', time: '14:25', itemCount: 4, grandTotal: 685.0 },
-      { invoiceNo: 'INV-2026-0983', time: '14:12', itemCount: 2, grandTotal: 210.0 },
-      { invoiceNo: 'INV-2026-0982', time: '13:50', itemCount: 6, grandTotal: 1450.0 },
-      { invoiceNo: 'INV-2026-0981', time: '13:34', itemCount: 1, grandTotal: 135.0 },
-      { invoiceNo: 'INV-2026-0980', time: '13:05', itemCount: 3, grandTotal: 520.0 }
-    ];
+    // Completed Transactions card (latest sales in the range) and the Transactions tab
+    await Promise.all([this.loadTransactions(), this.loadCashDrawer()]);
+    if (this.activeTab === 'customers') await this.loadCustomerReport();
+    try {
+      const filtered = this.txCounter !== 'All' || this.txStatus !== 'All' || this.txSearch.trim() !== '';
+      const latest = filtered ? (await this.api.getTransactions({ fromDate: this.fromDate, toDate: this.toDate, limit: 200 })).rows : this.txRows;
+      this.transactions = latest.slice(0, 200).map((r: any) => ({
+        invoiceNo: r.invoice_no, time: this.formatDateTime(r.time), itemCount: r.item_count, grandTotal: r.grand_total
+      }));
+    } catch {
+      this.transactions = [];
+    }
 
     // Item Sales calculation
     const rawItems = [
@@ -1058,6 +1224,51 @@ export class ReportsComponent implements OnInit {
       const share = this.totalTax > 0 ? ((gst / this.totalTax) * 100).toFixed(1) : '0.0';
       return { slab: s.slab, taxable, gst, share };
     });
+  }
+
+  // Customers tab
+  custReport: any = null;
+  custError = '';
+
+  async openCustomerReport() {
+    this.activeTab = 'customers';
+    await this.loadCustomerReport();
+  }
+
+  async loadCustomerReport() {
+    if (!this.auth.hasPhase2() || !this.auth.isAdmin()) return;
+    try {
+      this.custReport = await this.api.getCustomerReport(this.fromDate, this.toDate);
+      this.custError = '';
+    } catch (err: any) {
+      this.custReport = null;
+      this.custError = err?.status === 403 ? 'Only a Phase 2 admin can view customer reports.' : 'Could not load the customer report. Please try again.';
+    }
+  }
+
+  async loadTransactions() {
+    try {
+      const res = await this.api.getTransactions({
+        fromDate: this.fromDate, toDate: this.toDate, counter: this.txCounter, status: this.txStatus, search: this.txSearch, limit: 500
+      });
+      this.txRows = res.rows;
+      this.txTotal = res.total;
+      this.txError = '';
+    } catch (err: any) {
+      this.txRows = [];
+      this.txTotal = 0;
+      this.txError = err?.status === 403 ? 'Only an admin can view transactions.' : 'Could not load transactions. Please try again.';
+    }
+  }
+
+  formatDateTime(iso: string): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  statusLabel(s: string): string {
+    return ({ COMPLETED: 'Completed', PARTIALLY_RETURNED: 'Partially Returned', RETURNED: 'Returned' } as Record<string, string>)[s] || s;
   }
 
   // Sorting & Filtering for Item Sales
@@ -1127,7 +1338,7 @@ export class ReportsComponent implements OnInit {
   }
 
   get expectedCash(): number {
-    return this.openingFloat + this.totalCash - this.totalRefunds;
+    return this.openingFloat + this.drawerCashSales - this.drawerCashRefunds;
   }
 
   cashVariance(): number {
@@ -1160,6 +1371,16 @@ export class ReportsComponent implements OnInit {
       csvContent += `Cash Tendered,${this.totalCash}\n`;
       csvContent += `Card Tendered,${this.totalCard}\n`;
       csvContent += `UPI Tendered,${this.totalUpi}\n`;
+    } else if (this.activeTab === 'transactions') {
+      csvContent = dateHeader + `Invoice,Date / Time,Counter,Cashier,Customer,Items,Amount,Payment Method,Status\n`;
+      this.txRows.forEach(t => {
+        csvContent += `"${t.invoice_no}","${this.formatDateTime(t.time)}","${t.counter_name}","${t.cashier_name}","${t.customer_name || 'Walk-in'}",${t.item_count},${t.grand_total},"${t.payment_method}","${this.statusLabel(t.status)}"\n`;
+      });
+    } else if (this.activeTab === 'customers') {
+      csvContent = dateHeader + `Customer ID,Name,Mobile,Type,Invoices,Total Purchase,Avg Bill,Purchases per Month,Avg Days Between Purchases,Last Purchase\n`;
+      (this.custReport?.rows || []).forEach((c: any) => {
+        csvContent += `"${c.id}","${c.name}","${c.mobile}","${c.customerType}",${c.invoices},${c.totalAmount},${c.avgBill},${c.purchasesPerMonth},${c.avgDaysBetween ?? ''},"${this.formatDateTime(c.lastPurchase)}"\n`;
+      });
     } else if (this.activeTab === 'itemSales') {
       csvContent = dateHeader + `Item Name,Category,Qty Sold,Revenue,Share %\n`;
       this.filteredItemSales().forEach(row => {
@@ -1167,7 +1388,7 @@ export class ReportsComponent implements OnInit {
       });
     } else if (this.activeTab === 'cashDrawer') {
       csvContent = dateHeader + `Counter,Opening Float,Cash Sales,Cash Refunds,Expected Cash,Counted Cash,Variance\n`;
-      csvContent += `"${this.selectedCounter?.counter_name || 'Counter 1'}",${this.openingFloat},${this.totalCash},${this.totalRefunds},${this.expectedCash},${this.countedCash ?? 'N/A'},${this.cashVariance()}\n`;
+      csvContent += `"${this.selectedCounter?.counter_name || ''}",${this.openingFloat},${this.drawerCashSales},${this.drawerCashRefunds},${this.expectedCash},${this.countedCash ?? 'N/A'},${this.cashVariance()}\n`;
     } else if (this.activeTab === 'stockValuation') {
       csvContent = `Stock-on-Hand Report\n\nSKU,Item Name,Category,Qty,Unit Cost,Total Value,Expiry Date,Status\n`;
       this.filteredStockItems().forEach(item => {

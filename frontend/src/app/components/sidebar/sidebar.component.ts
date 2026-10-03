@@ -105,6 +105,10 @@ import { AuthService } from '../../services/auth.service';
             Store Settings
           </a>
         }
+        <a class="nav-link nav-link--logout" routerLink="/login" (click)="auth.logout()" style="margin-top:auto">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          Logout
+        </a>
       </nav>
       <div class="sidebar__footer">v2.0 &middot; Phase 2 Production</div>
     </aside>

@@ -22,6 +22,9 @@ export interface CatalogItem {
   pricingMethod: 'qty' | 'weight';
   unit: string;
   isActive?: boolean;
+  /** Manufacturing / expiry date as YYYY-MM-DD (empty or missing when not set). */
+  mfgDate?: string | null;
+  expDate?: string | null;
 }
 
 const DEFAULT_DEMO_ITEMS: CatalogItem[] = [
@@ -80,7 +83,7 @@ export class ApiService {
     try {
       const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/login`, { username, pin }).pipe(timeout(LOGIN_TIMEOUT_MS)));
       if (res && res.access_token) {
-        this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2);
+        this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2, res.active_counter ?? null);
       }
       return res;
     } catch (err: any) {
@@ -153,6 +156,12 @@ export class ApiService {
     return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/users/${username}`, data, { headers }));
   }
 
+  /** Marks a user as on leave (reason required) or back at work. */
+  async setUserLeave(username: string, onLeave: boolean, reason?: string): Promise<any> {
+    const headers = this.getHeaders();
+    return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/users/${encodeURIComponent(username)}/leave`, { on_leave: onLeave, reason: reason ?? null }, { headers }));
+  }
+
   async getAuditLogs(): Promise<any[]> {
     try {
       return await firstValueFrom(this.http.get<any[]>(`${this.baseUrl}/users/audit-logs`, { headers: this.getHeaders() }));
@@ -169,6 +178,41 @@ export class ApiService {
       return [
         { id: 'cnt-1', counter_name: 'Counter 1', opening_float: 2000.0, is_active: true }
       ];
+    }
+  }
+
+  // --- Reports (all figures come from the database) ---
+  private tzOffset(): number { return new Date().getTimezoneOffset(); }
+
+  async getSalesSummary(fromDate: string, toDate: string): Promise<any> {
+    return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/reports/summary`, {
+      headers: this.getHeaders(), params: { from_date: fromDate, to_date: toDate, tz_offset: this.tzOffset() }
+    }));
+  }
+
+  async getTransactions(opts: { fromDate: string; toDate: string; counter?: string; status?: string; search?: string; limit?: number }): Promise<{ total: number; rows: any[] }> {
+    const params: any = { from_date: opts.fromDate, to_date: opts.toDate, tz_offset: this.tzOffset(), limit: opts.limit ?? 500 };
+    if (opts.counter && opts.counter !== 'All') params.counter = opts.counter;
+    if (opts.status && opts.status !== 'All') params.status = opts.status;
+    if (opts.search && opts.search.trim()) params.search = opts.search.trim();
+    return await firstValueFrom(this.http.get<{ total: number; rows: any[] }>(`${this.baseUrl}/reports/transactions`, { headers: this.getHeaders(), params }));
+  }
+
+  async getCashDrawer(counterId: string, fromDate: string, toDate: string): Promise<any> {
+    return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/reports/cash-drawer`, {
+      headers: this.getHeaders(), params: { counter_id: counterId, from_date: fromDate, to_date: toDate, tz_offset: this.tzOffset() }
+    }));
+  }
+
+  /** Switches the signed-in user to another billing counter; the server saves it on the user. Returns the counter name. */
+  async switchCounter(counterId: string, counterName: string): Promise<string> {
+    try {
+      const res = await firstValueFrom(this.http.put<any>(`${this.baseUrl}/auth/active-counter`, { counter_id: counterId }, { headers: this.getHeaders() }));
+      return res?.active_counter || counterName;
+    } catch (err: any) {
+      // Offline (server unreachable): keep working on the chosen counter locally. A server answer (e.g. 404) is a real error.
+      if (err?.status) throw err;
+      return counterName;
     }
   }
 
@@ -256,7 +300,9 @@ export class ApiService {
           stock: i.stock,
           min: i.min_stock || i.min || 10,
           pricingMethod: i.pricing_method || i.pricingMethod || 'qty',
-          unit: i.unit || 'pcs'
+          unit: i.unit || 'pcs',
+          mfgDate: i.mfg_date || null,
+          expDate: i.exp_date || null
         }));
         await this.offlineDb.saveCatalog(mapped);
         return mapped;
@@ -274,7 +320,10 @@ export class ApiService {
       const overrides = JSON.parse(localStorage.getItem('pos_demo_item_overrides_v2') || '{}');
       const custom = JSON.parse(localStorage.getItem('pos_demo_custom_items') || '[]');
       const base = DEFAULT_DEMO_ITEMS.concat(custom);
-      return base.map(item => Object.assign({}, item, overrides[item.sku] || {}));
+      // An edited demo item is saved into `custom` under its own SKU: the saved copy must replace the built-in one.
+      const bySku = new Map<string, CatalogItem>();
+      for (const item of base) bySku.set(item.sku, Object.assign({}, bySku.get(item.sku) || {}, item));
+      return Array.from(bySku.values()).map(item => Object.assign({}, item, overrides[item.sku] || {}));
     } catch {
       return DEFAULT_DEMO_ITEMS;
     }
@@ -325,7 +374,7 @@ export class ApiService {
     return true;
   }
 
-  async saveItem(item: CatalogItem): Promise<void> {
+  async saveItem(item: CatalogItem, isEdit = false, strict = false): Promise<void> {
     try {
       const body = {
         sku: item.sku,
@@ -334,14 +383,23 @@ export class ApiService {
         category_name: item.category,
         price: item.price,
         wholesale_price: item.wholesalePrice,
+        cost_price: item.costPrice ?? 0,
         tax_rate: item.tax,
         stock: item.stock,
         min_stock: item.min,
         pricing_method: item.pricingMethod,
-        unit: item.unit
+        unit: item.unit,
+        mfg_date: item.mfgDate || null,
+        exp_date: item.expDate || null
       };
-      await firstValueFrom(this.http.post(`${this.baseUrl}/catalog/items`, body, { headers: this.getHeaders() }));
-    } catch {
+      if (isEdit) {
+        await firstValueFrom(this.http.put(`${this.baseUrl}/catalog/items/${encodeURIComponent(item.sku)}`, body, { headers: this.getHeaders() }));
+      } else {
+        await firstValueFrom(this.http.post(`${this.baseUrl}/catalog/items`, body, { headers: this.getHeaders() }));
+      }
+    } catch (err: any) {
+      // Edits are real updates: if the server answered with an error (e.g. validation), tell the user instead of hiding it.
+      if ((isEdit || strict) && err?.status && !(isEdit && err.status === 404)) throw err;
       const custom = JSON.parse(localStorage.getItem('pos_demo_custom_items') || '[]');
       const idx = custom.findIndex((i: any) => i.sku === item.sku);
       if (idx > -1) custom[idx] = item; else custom.push(item);
@@ -349,11 +407,62 @@ export class ApiService {
     }
   }
 
+  /** Permanently removes an item from the database (Item Edit -> Discard). A 404 means it is already gone. */
+  async deleteItem(sku: string): Promise<void> {
+    try {
+      await firstValueFrom(this.http.delete(`${this.baseUrl}/catalog/items/${encodeURIComponent(sku)}`, { headers: this.getHeaders() }));
+    } catch (err: any) {
+      if (err?.status !== 404) throw err;
+    }
+    const custom = JSON.parse(localStorage.getItem('pos_demo_custom_items') || '[]');
+    localStorage.setItem('pos_demo_custom_items', JSON.stringify(custom.filter((i: any) => i.sku !== sku)));
+  }
+
+  // --- Customers (Phase 2 admin) ---
+  async getCustomers(search = '', customerType = 'All', limit = 200): Promise<any[]> {
+    const params: any = { limit };
+    if (search.trim()) params.search = search.trim();
+    if (customerType && customerType !== 'All') params.customer_type = customerType;
+    return await firstValueFrom(this.http.get<any[]>(`${this.baseUrl}/customers`, { headers: this.getHeaders(), params }));
+  }
+
+  async createCustomer(data: { name: string; mobile: string; email?: string; address?: string; customerType: string }): Promise<any> {
+    return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/customers`, data, { headers: this.getHeaders() }));
+  }
+
+  async updateCustomer(id: string, data: { name?: string; mobile?: string; email?: string; address?: string; customerType?: string }): Promise<any> {
+    return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/customers/${encodeURIComponent(id)}`, data, { headers: this.getHeaders() }));
+  }
+
+  async deleteCustomer(id: string): Promise<any> {
+    return await firstValueFrom(this.http.delete<any>(`${this.baseUrl}/customers/${encodeURIComponent(id)}`, { headers: this.getHeaders() }));
+  }
+
+  async getCustomerPurchases(id: string): Promise<any> {
+    return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/customers/${encodeURIComponent(id)}/purchases`, { headers: this.getHeaders(), params: { tz_offset: this.tzOffset() } }));
+  }
+
+  async getCustomerReport(fromDate: string, toDate: string): Promise<any> {
+    return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/customers/reports/summary`, {
+      headers: this.getHeaders(), params: { from_date: fromDate, to_date: toDate, tz_offset: this.tzOffset() }
+    }));
+  }
+
+  /** Billing-screen customer search (customer number / mobile) and quick add: open to Phase 2 admins and cashiers. */
+  async searchBillingCustomers(q: string, limit = 8): Promise<any[]> {
+    return await firstValueFrom(this.http.get<any[]>(`${this.baseUrl}/billing/customers/search`, { headers: this.getHeaders(), params: { q, limit } }));
+  }
+
+  async createBillingCustomer(data: { name: string; mobile: string; email?: string; address?: string; customerType: string }): Promise<any> {
+    return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/billing/customers`, data, { headers: this.getHeaders() }));
+  }
+
   // --- Sales & Billing ---
   async createSale(saleData: any): Promise<any> {
     try {
       return await firstValueFrom(this.http.post(`${this.baseUrl}/billing/sales`, saleData, { headers: this.getHeaders() }));
-    } catch {
+    } catch (err: any) {
+      if (saleData.customerId && err?.status) throw err;   // a bill for a customer is checked by the server: show its answer, never fake it offline
       const seq = parseInt(localStorage.getItem('pos_demo_invoice_seq') || '1024', 10) + 1;
       localStorage.setItem('pos_demo_invoice_seq', String(seq));
       const invoiceNo = `INV-FY26-${String(seq).padStart(5, '0')}`;
@@ -665,10 +774,25 @@ export class ApiService {
   }
 
   // --- Purchase Returns ---
-  async createPurchaseReturn(vendorId: string, lines: any[], reason: string): Promise<any> {
+  /** Recent purchase invoices (goods receipts) of a vendor, from the database. */
+  async getPurchaseInvoices(vendorId: string): Promise<any[]> {
     try {
-      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-returns`, { vendorId, lines, reason }, { headers: this.getHeaders() }));
+      return await firstValueFrom(this.http.get<any[]>(`${this.baseUrl}/purchase-returns/invoices`, { headers: this.getHeaders(), params: { vendor_id: vendorId } }));
     } catch {
+      return [];
+    }
+  }
+
+  /** The items bought on one purchase invoice (GRN id or PO id). Rejects with the server's 404 when it does not exist for the vendor. */
+  async getPurchaseInvoice(vendorId: string, invoiceRef: string): Promise<any> {
+    return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/purchase-returns/invoices/${encodeURIComponent(invoiceRef)}`, { headers: this.getHeaders(), params: { vendor_id: vendorId } }));
+  }
+
+  async createPurchaseReturn(vendorId: string, lines: any[], reason: string, invoiceId?: string | null): Promise<any> {
+    try {
+      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-returns`, { vendorId, lines, reason, invoiceId: invoiceId || null }, { headers: this.getHeaders() }));
+    } catch (err: any) {
+      if (invoiceId && err?.status) throw err;   // a return against an invoice is validated by the server: show its answer, do not fake it offline
       let total = 0;
       lines.forEach((l: any) => { this.updateLocalStock(l.sku, -l.qty); total += l.qty * l.cost; });
       const dnId = "DN-" + String(1000 + Math.floor(Math.random() * 8999)).slice(-4);

@@ -1,4 +1,5 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -80,13 +81,23 @@ import { ApiService } from '../../services/api.service';
     </main>
   `
 })
-export class ReturnsComponent {
+export class ReturnsComponent implements OnInit {
   api = inject(ApiService);
+  private route = inject(ActivatedRoute);
   searchInvoiceNo = 'INV-FY26-01025';
   sale: any = null;
   returnReason = 'Customer return';
   resultMsg: string | null = null;
   isProcessing = false;
+
+  ngOnInit() {
+    // Opened from a customer's purchase history: go straight to that invoice
+    const invoice = this.route.snapshot.queryParamMap.get('invoice');
+    if (invoice) {
+      this.searchInvoiceNo = invoice;
+      void this.lookupInvoice();
+    }
+  }
 
   async lookupInvoice() {
     this.resultMsg = null;
@@ -95,6 +106,7 @@ export class ReturnsComponent {
     if (res) {
       this.sale = {
         ...res,
+        invoiceNo: res.invoiceNo || res.invoice_no,   // the API sends invoice_no
         lines: (res.lines || []).map((l: any) => ({
           ...l,
           selected: false,

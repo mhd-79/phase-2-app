@@ -6,6 +6,14 @@
       <p>Scan, search or tap to build the bill. Barcode-to-line-item in under a second.</p>
     </div>
     <div class="page-actions">
+      @if (counters().length > 0) {
+        <select class="select" style="width:auto;min-width:130px" title="Switch counter" aria-label="Active counter"
+                [ngModel]="activeCounterId()" (ngModelChange)="onCounterChange($event)">
+          @for (c of counters(); track c.id) {
+            <option [value]="c.id">{{ c.counter_name }}</option>
+          }
+        </select>
+      }
       <button class="btn btn-secondary" [disabled]="isHoldingBill || cart().length === 0" (click)="holdBill()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
         {{ isHoldingBill ? 'Parking...' : 'Hold Bill' }}
@@ -58,6 +66,37 @@
           <span class="badge badge-primary">{{ cart().length }} items</span>
         </div>
       </div>
+
+      @if (canPickCustomer()) {
+        <div style="padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--border);position:relative">
+          @if (selectedCustomer(); as sc) {
+            <div class="row-between" style="gap:var(--space-2)">
+              <span class="text-sm"><strong>{{ sc.name }}</strong> &middot; <span class="mono">{{ sc.mobile }}</span> <span class="badge badge-neutral">{{ sc.customerType }}</span></span>
+              <button type="button" class="btn btn-ghost btn-xs" style="padding:0 6px;min-height:auto;font-weight:600" (click)="useWalkIn()">Walk-in</button>
+            </div>
+          } @else {
+            <div class="row" style="gap:var(--space-2)">
+              <input class="input" style="flex:1;min-width:0" placeholder="Walk-in Customer — search by customer no. / mobile" [(ngModel)]="customerSearch"
+                     (ngModelChange)="onCustomerSearch()" (focus)="openCustomerList()">
+              <button type="button" class="btn btn-secondary btn-sm" (click)="openNewCustomer()">+ New</button>
+            </div>
+            @if (showCustomerList) {
+              <div class="card" style="position:absolute;left:var(--space-4);right:var(--space-4);top:100%;z-index:20;max-height:220px;overflow-y:auto;padding:0;box-shadow:var(--shadow-lg)">
+                <button type="button" class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;border-radius:0" (click)="useWalkIn()">Walk-in Customer (no customer)</button>
+                @for (c of customerResults(); track c.id) {
+                  <button type="button" class="btn btn-ghost btn-sm" style="width:100%;justify-content:space-between;border-radius:0" (click)="selectCustomer(c)">
+                    <span>{{ c.name }}</span><span class="mono text-muted">{{ c.mobile }}</span>
+                  </button>
+                }
+                @if (customerResults().length === 0 && customerSearch.trim()) {
+                  <div class="text-xs text-muted" style="padding:var(--space-2) var(--space-3)">No customer found for "{{ customerSearch.trim() }}".</div>
+                  <button type="button" class="btn btn-primary btn-sm" style="margin:var(--space-2) var(--space-3)" (click)="openNewCustomer()">+ Add New Customer</button>
+                }
+              </div>
+            }
+          }
+        </div>
+      }
 
       <div class="cart-lines">
         @if (cart().length === 0) {
@@ -261,6 +300,9 @@
       <hr class="divider">
       <div class="row-between text-sm"><span>Invoice</span><span class="mono">{{ lastSale?.invoiceNo || 'INV-FY26-01025' }}</span></div>
       <div class="row-between text-sm"><span>Date</span><span class="mono">{{ lastSale?.timeLabel }}</span></div>
+      @if (lastSale?.customer) {
+        <div class="row-between text-sm"><span>Customer</span><span class="mono">{{ lastSale.customer.name }} &middot; {{ lastSale.customer.mobile }}</span></div>
+      }
       <div class="row-between text-sm"><span>Pricing Mode</span><span class="mono">{{ lastSale?.pricingMode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span></div>
       <hr class="divider">
 
@@ -308,6 +350,27 @@
         </button>
         <button class="btn btn-primary" (click)="showReceiptModal = false">New Sale</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Customer (from Billing) -->
+<div class="modal-overlay" [class.open]="showNewCustomerModal">
+  <div class="modal">
+    <div class="modal-header"><h3>Add New Customer</h3><button class="icon-btn" (click)="showNewCustomerModal = false">✕</button></div>
+    <div class="modal-body stack">
+      <div class="field"><label for="ncName">Name</label><input class="input" id="ncName" [(ngModel)]="newCustomer.name" maxlength="120"></div>
+      <div class="field"><label for="ncMobile">Mobile Number</label><input class="input mono" id="ncMobile" [(ngModel)]="newCustomer.mobile" inputmode="numeric" placeholder="10-digit mobile number"></div>
+      <div class="field"><label for="ncType">Customer Type</label>
+        <select class="select" id="ncType" [(ngModel)]="newCustomer.customerType"><option value="Retail">Retail</option><option value="Wholesale">Wholesale</option></select>
+      </div>
+      <div class="field"><label for="ncEmail">Email <span class="text-muted">(optional)</span></label><input class="input" id="ncEmail" type="email" [(ngModel)]="newCustomer.email"></div>
+      <div class="field"><label for="ncAddress">Address <span class="text-muted">(optional)</span></label><textarea class="input" id="ncAddress" rows="2" [(ngModel)]="newCustomer.address"></textarea></div>
+      @if (newCustomerError) { <span class="hint" style="color:var(--danger-700)">{{ newCustomerError }}</span> }
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showNewCustomerModal = false">Cancel</button>
+      <button class="btn btn-primary" [disabled]="isSavingCustomer" (click)="saveNewCustomer()">{{ isSavingCustomer ? 'Saving...' : 'Add & Select' }}</button>
     </div>
   </div>
 </div>

@@ -84,6 +84,7 @@ export class PosComponent implements OnInit {
 
   async ngOnInit() {
     await this.loadData();
+    await this.loadCounters();
 
     // Check query params for recalled bill
     this.route.queryParams.subscribe(async (params) => {
@@ -99,6 +100,112 @@ export class PosComponent implements OnInit {
         }
       }
     });
+  }
+
+  // Customer on the bill (Phase 2 admins only; optional, walk-in by default)
+  customerSearch = '';
+  customerResults = signal<any[]>([]);
+  selectedCustomer = signal<any | null>(null);
+  showCustomerList = false;
+  showNewCustomerModal = false;
+  newCustomer = { name: '', mobile: '', email: '', address: '', customerType: 'Retail' };
+  newCustomerError = '';
+  isSavingCustomer = false;
+  private customerTimer: any = null;
+
+  canPickCustomer(): boolean {
+    return this.auth.hasPhase2();   // Phase 2 admins and cashiers; a Phase 1 admin never sees it
+  }
+
+  openCustomerList() {
+    this.showCustomerList = true;
+    void this.searchCustomers();
+  }
+
+  onCustomerSearch() {
+    this.showCustomerList = true;
+    clearTimeout(this.customerTimer);
+    this.customerTimer = setTimeout(() => this.searchCustomers(), 250);
+  }
+
+  private async searchCustomers() {
+    try {
+      this.customerResults.set(await this.api.searchBillingCustomers(this.customerSearch, 8));
+    } catch {
+      this.customerResults.set([]);
+    }
+  }
+
+  selectCustomer(c: any) {
+    this.selectedCustomer.set(c);
+    this.showCustomerList = false;
+    this.customerSearch = '';
+  }
+
+  useWalkIn() {
+    this.selectedCustomer.set(null);
+    this.showCustomerList = false;
+    this.customerSearch = '';
+  }
+
+  openNewCustomer() {
+    this.newCustomer = { name: '', mobile: '', email: '', address: '', customerType: 'Retail' };
+    this.newCustomerError = '';
+    // Typed text becomes the starting point: digits -> mobile number, anything else -> name
+    const typed = this.customerSearch.trim();
+    if (/^[+\d][\d\s-]*$/.test(typed) && typed.replace(/\D/g, '').length >= 5) this.newCustomer.mobile = typed;
+    else if (typed && !/^cust-?\d*$/i.test(typed)) this.newCustomer.name = typed;
+    this.showCustomerList = false;
+    this.showNewCustomerModal = true;
+  }
+
+  async saveNewCustomer() {
+    if (this.isSavingCustomer) return;
+    if (!this.newCustomer.name.trim() || !this.newCustomer.mobile.trim()) {
+      this.newCustomerError = 'Name and mobile number are required';
+      return;
+    }
+    this.isSavingCustomer = true;
+    this.newCustomerError = '';
+    try {
+      const created = await this.api.createBillingCustomer(this.newCustomer);
+      this.showNewCustomerModal = false;
+      this.selectCustomer(created);
+      this.triggerToast(`Customer ${created.name} added`);
+    } catch (err: any) {
+      const detail = err?.error?.detail;
+      this.newCustomerError = typeof detail === 'string' ? detail
+        : Array.isArray(detail) && detail.length ? detail.map((d: any) => d.msg).join(', ') : 'Could not add the customer. Please try again.';
+    } finally {
+      this.isSavingCustomer = false;
+    }
+  }
+
+  // Counters
+  counters = signal<any[]>([]);
+  activeCounterId = signal<string>('');
+
+  async loadCounters() {
+    const list = await this.api.getCashCounters();
+    this.counters.set(list);
+    const saved = this.auth.currentUser().activeCounter;
+    const match = list.find((c) => c.counter_name === saved) || list[0];
+    this.activeCounterId.set(match ? match.id : '');
+  }
+
+  async onCounterChange(counterId: string) {
+    const previous = this.activeCounterId();
+    const counter = this.counters().find((c) => c.id === counterId);
+    if (!counter || counterId === previous) return;
+    this.activeCounterId.set(counterId);
+    try {
+      const name = await this.api.switchCounter(counter.id, counter.counter_name);
+      this.auth.setActiveCounter(name);
+      this.triggerToast(`Switched to ${name}`);
+    } catch (err: any) {
+      this.activeCounterId.set(previous);
+      alert(typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not switch counter. Please try again.');
+    }
   }
 
   async loadData() {
@@ -447,6 +554,7 @@ export class PosComponent implements OnInit {
       const grandTotal = this.calcGrandTotal();
       const change = this.changeDue();
       const cartCopy = [...this.cart()];
+      const customerCopy = this.canPickCustomer() ? this.selectedCustomer() : null;
       const tendersCopy = JSON.parse(JSON.stringify(this.tenders));
 
       const payload = {
@@ -454,7 +562,8 @@ export class PosComponent implements OnInit {
         pricing_mode: this.pricingMode,
         manual_discount: this.manualDiscount(),
         tenders: tendersCopy,
-        grand_total: grandTotal
+        grand_total: grandTotal,
+        customerId: this.canPickCustomer() ? (this.selectedCustomer()?.id ?? null) : null
       };
 
       const res = await this.api.createSale(payload);
@@ -462,6 +571,7 @@ export class PosComponent implements OnInit {
       this.lastSale = {
         invoiceNo: res?.invoiceNo || res?.invoice_no || `INV-FY26-${Math.floor(10000 + Math.random() * 90000)}`,
         timeLabel: new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
+        customer: customerCopy,
         pricingMode: this.pricingMode,
         lines: cartCopy,
         subtotal,
@@ -474,6 +584,7 @@ export class PosComponent implements OnInit {
       };
 
       this.cart.set([]);
+      this.useWalkIn();   // the next bill starts as a walk-in customer
       this.manualDiscount.set({ type: 'percent', value: 0, approved: true });
       this.showPaymentModal = false;
       this.showReceiptModal = true;

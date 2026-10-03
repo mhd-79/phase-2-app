@@ -1,11 +1,46 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from app.security import get_current_user, require_admin
 from app.database import db
 from app.schemas import CashCounterCreate, CashCounterUpdateFloat
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+# --- Date-range helpers (reports use the viewer's local calendar days) ---
+def _day_range(from_date: Optional[str], to_date: Optional[str], tz_offset: int = 0):
+    """[start, end) in UTC for the local days from_date..to_date (YYYY-MM-DD, inclusive).
+    tz_offset is JavaScript's Date.getTimezoneOffset() (minutes, UTC minus local; IST = -330)."""
+    try:
+        start = datetime.strptime(from_date, "%Y-%m-%d") if from_date else None
+        end = (datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)) if to_date else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Dates must be YYYY-MM-DD")
+    shift = timedelta(minutes=tz_offset)
+    return (
+        (start + shift).replace(tzinfo=timezone.utc) if start else None,
+        (end + shift).replace(tzinfo=timezone.utc) if end else None,
+    )
+
+def _time_filter(start, end) -> Dict[str, Any]:
+    cond: Dict[str, Any] = {}
+    if start:
+        cond["gte"] = start
+    if end:
+        cond["lt"] = end
+    return {"time": cond} if cond else {}
+
+async def _default_counter_name() -> str:
+    """Sales made before counters were tracked (counter_name empty) belong to the first counter."""
+    c = await db.cashcounter.find_first(where={"is_active": True}, order={"created_at": "asc"})
+    return c.counter_name if c else "Counter 1"
+
+def _payment_label(tenders) -> str:
+    modes = []
+    for t in tenders or []:
+        if t.mode not in modes:
+            modes.append(t.mode)
+    return " + ".join(modes) if modes else "—"
 
 @router.get("/z-report")
 async def get_z_report(date: Optional[str] = None):
@@ -40,6 +75,60 @@ async def get_z_report(date: Optional[str] = None):
         "average_bill_value": round(avg_bill, 2),
         "payment_breakup": payment_breakup
     }
+
+@router.get("/summary")
+async def get_sales_summary(from_date: Optional[str] = None, to_date: Optional[str] = None, tz_offset: int = 0, user = Depends(require_admin)):
+    """Z-report totals for a date range, straight from the sales tables."""
+    start, end = _day_range(from_date, to_date, tz_offset)
+    sales = await db.sale.find_many(where=_time_filter(start, end), include={"tenders": True})
+    returns = await db.salereturn.find_many(where=_time_filter(start, end))
+    out = {"gross": 0.0, "disc": 0.0, "tax": 0.0, "net": 0.0, "bills": len(sales), "cash": 0.0, "card": 0.0, "upi": 0.0,
+           "refunds": round(sum(r.total_refund for r in returns), 2)}
+    for s in sales:
+        out["gross"] += s.subtotal_original
+        out["disc"] += s.discount_total
+        out["tax"] += s.gst_total
+        out["net"] += s.grand_total
+        for t in s.tenders:
+            key = {"Cash": "cash", "Card": "card", "UPI": "upi"}.get(t.mode)
+            if key:
+                out[key] += t.amount
+    return {k: (round(v, 2) if isinstance(v, float) else v) for k, v in out.items()}
+
+@router.get("/transactions")
+async def get_transactions(from_date: Optional[str] = None, to_date: Optional[str] = None, tz_offset: int = 0,
+                           counter: Optional[str] = None, status: Optional[str] = None, search: Optional[str] = None,
+                           limit: int = 500, user = Depends(require_admin)):
+    """Every sale in the range (newest first) with counter, cashier, payment method and status."""
+    limit = max(1, min(limit, 2000))
+    start, end = _day_range(from_date, to_date, tz_offset)
+    where: Dict[str, Any] = _time_filter(start, end)
+    if status and status != "All":
+        where["status"] = status
+    if search and search.strip():
+        where["invoice_no"] = {"contains": search.strip(), "mode": "insensitive"}
+    default_counter = await _default_counter_name()
+    sales = await db.sale.find_many(where=where, order={"time": "desc"}, include={"tenders": True, "items": True, "created_by": True})
+    rows = []
+    for s in sales:
+        counter_name = s.counter_name or default_counter
+        if counter and counter != "All" and counter_name != counter:
+            continue
+        rows.append({
+            "invoice_no": s.invoice_no,
+            "time": s.time.isoformat(),
+            "counter_name": counter_name,
+            "customer_id": getattr(s, "customer_id", None),
+            "customer_name": getattr(s, "customer_name", None),
+            "cashier_username": s.created_by_username,
+            "cashier_name": s.created_by.full_name if s.created_by else s.created_by_username,
+            "item_count": len(s.items),
+            "grand_total": round(s.grand_total, 2),
+            "payment_method": _payment_label(s.tenders),
+            "tenders": [{"mode": t.mode, "amount": round(t.amount, 2)} for t in s.tenders],
+            "status": s.status,
+        })
+    return {"total": len(rows), "rows": rows[:limit]}
 
 @router.get("/item-sales")
 async def get_item_sales_report():
@@ -126,39 +215,41 @@ async def update_counter_float(counter_id: str, req: CashCounterUpdateFloat, use
     }
 
 @router.get("/cash-drawer")
-async def get_cash_drawer_report(counter_id: Optional[str] = None, opening_float: Optional[float] = None, counted_cash: Optional[float] = None):
-    today = datetime.now().strftime("%Y-%m-%d")
+async def get_cash_drawer_report(counter_id: Optional[str] = None, opening_float: Optional[float] = None, counted_cash: Optional[float] = None,
+                                 from_date: Optional[str] = None, to_date: Optional[str] = None, tz_offset: int = 0):
+    """Cash position of one counter for a date range (default: today): opening float + cash sales - cash refunds."""
+    if not from_date and not to_date:
+        today = (datetime.now(timezone.utc) - timedelta(minutes=tz_offset)).strftime("%Y-%m-%d")
+        from_date = to_date = today
+    start, end = _day_range(from_date, to_date, tz_offset)
     float_val = opening_float
-    counter_name = "Counter 1"
-    
+    counter = None
     if counter_id:
-        c = await db.cashcounter.find_unique(where={"id": counter_id})
-        if c:
-            float_val = float_val if float_val is not None else c.opening_float
-            counter_name = c.counter_name
-            
+        counter = await db.cashcounter.find_unique(where={"id": counter_id})
+    if not counter:
+        counter = await db.cashcounter.find_first(where={"is_active": True}, order={"created_at": "asc"})
+    counter_name = counter.counter_name if counter else "Counter 1"
     if float_val is None:
-        c = await db.cashcounter.find_first(where={"is_active": True})
-        float_val = c.opening_float if c else 2000.0
-        counter_name = c.counter_name if c else "Counter 1"
-        
-    sales = await db.sale.find_many(include={"tenders": True})
-    returns = await db.salereturn.find_many()
-    
-    cash_collected = sum(
-        t.amount for s in sales if s.time.strftime("%Y-%m-%d") == today for t in s.tenders if t.mode == "Cash"
-    )
-    cash_refunds = sum(
-        r.total_refund for r in returns if r.time.strftime("%Y-%m-%d") == today
-    )
-    
+        float_val = counter.opening_float if counter else 2000.0
+    default_counter = await _default_counter_name()
+
+    def on_counter(sale) -> bool:
+        return (sale.counter_name or default_counter) == counter_name
+
+    sales = [s for s in await db.sale.find_many(where=_time_filter(start, end), include={"tenders": True}) if on_counter(s)]
+    returns = [r for r in await db.salereturn.find_many(where=_time_filter(start, end), include={"sale": True}) if r.sale and on_counter(r.sale)]
+
+    cash_collected = sum(t.amount for s in sales for t in s.tenders if t.mode == "Cash")
+    cash_refunds = sum(r.total_refund for r in returns)
     expected_cash = float_val + cash_collected - cash_refunds
     variance = (counted_cash - expected_cash) if counted_cash is not None else 0.0
-    
+
     return {
-        "date": today,
+        "date": from_date if from_date == to_date else f"{from_date} to {to_date}",
+        "counter_id": counter.id if counter else None,
         "counter_name": counter_name,
         "opening_float": float_val,
+        "bills": len(sales),
         "cash_sales": round(cash_collected, 2),
         "cash_refunds": round(cash_refunds, 2),
         "expected_cash": round(expected_cash, 2),

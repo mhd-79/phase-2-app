@@ -18,6 +18,7 @@ from fastapi.routing import APIRoute
 from app.database import get_db
 from app import insights_engine as eng
 from app.insights_demo import build_demo_dataset
+from app import customer_insights as cbi
 from app.security import require_admin
 
 logger = logging.getLogger("uvicorn.error")
@@ -207,6 +208,19 @@ async def vendor_price_comparison(demo: bool = DemoFlag):
 @router.get("/business-summary")
 async def business_summary(days: int = Query(30, ge=7, le=90), demo: bool = DemoFlag):
     return eng.business_summary(await get_dataset(demo), days)
+
+
+@router.get("/customer-behavior")
+async def customer_behavior(days: int = Query(90, ge=0, le=730, description="0 = all time"), demo: bool = DemoFlag):
+    """Customer behaviour from completed invoices that carry a customer (Phase 2)."""
+    today = datetime.now(eng.IST).date()
+    if demo:
+        return {"status": "insufficient_data", "meta": cbi._meta(0, 0, 0, None, today, True),
+                "message": "Customer behaviour is built from your real customer invoices, so it is not part of the sample data. Switch Sample data off to see it."}
+    db = get_db()
+    if not db.is_connected():
+        raise HTTPException(status_code=503, detail="Database unavailable — AI Insights needs live PostgreSQL data.")
+    return await cbi.customer_behavior(db, days)
 
 
 @router.get("/reorder-timing")

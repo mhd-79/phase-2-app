@@ -101,8 +101,20 @@ import { ApiService, CatalogItem } from '../../services/api.service';
             </div>
           </div>
 
+          <div class="form-grid">
+            <div class="field">
+              <label for="fMfgDate">Mfg Date</label>
+              <input class="input" id="fMfgDate" type="date" [(ngModel)]="item.mfgDate" name="mfgDate">
+            </div>
+            <div class="field">
+              <label for="fExpDate">Exp Date</label>
+              <input class="input" id="fExpDate" type="date" [min]="item.mfgDate || ''" [(ngModel)]="item.expDate" name="expDate">
+              @if (dateError) { <span class="hint" style="color:var(--danger-700)">{{ dateError }}</span> }
+            </div>
+          </div>
+
           <div class="row" style="justify-content:flex-end;gap:var(--space-3);margin-top:var(--space-2)">
-            <a class="btn btn-secondary" routerLink="/items-stock">Discard</a>
+            <button type="button" class="btn btn-secondary" (click)="discardItem()">Discard</button>
             <button type="submit" class="btn btn-primary">Save Item</button>
           </div>
         </form>
@@ -141,6 +153,7 @@ export class ItemEditComponent implements OnInit {
   categories: string[] = [];
   showNewCatModal = false;
   newCategoryName = '';
+  dateError = '';
 
   item: CatalogItem = {
     sku: 'NEW-001',
@@ -154,7 +167,9 @@ export class ItemEditComponent implements OnInit {
     stock: 50,
     min: 10,
     pricingMethod: 'qty',
-    unit: 'pcs'
+    unit: 'pcs',
+    mfgDate: '',
+    expDate: ''
   };
 
   async ngOnInit() {
@@ -167,7 +182,9 @@ export class ItemEditComponent implements OnInit {
         if (found) {
           this.item = {
             ...found,
-            costPrice: found.costPrice || Math.round(found.price * 0.7)
+            costPrice: found.costPrice || Math.round(found.price * 0.7),
+            mfgDate: found.mfgDate || '',
+            expDate: found.expDate || ''
           };
         }
       }
@@ -195,12 +212,40 @@ export class ItemEditComponent implements OnInit {
     this.item.unit = this.item.pricingMethod === 'weight' ? 'kg' : 'pcs';
   }
 
+  async discardItem() {
+    if (!this.isEdit) {
+      if (!confirm('Discard this new item? Nothing has been saved.')) return;
+      this.router.navigate(['/items-stock']);
+      return;
+    }
+    if (!confirm(`Discard and permanently delete "${this.item.name}" (${this.item.sku}) from the database? This cannot be undone.`)) return;
+    try {
+      await this.api.deleteItem(this.item.sku);
+    } catch (err: any) {
+      const detail = err?.error?.detail;
+      alert(typeof detail === 'string' ? detail : 'Could not delete the item. Please try again.');
+      return;
+    }
+    this.router.navigate(['/items-stock']);
+  }
+
   async saveItem() {
     if (!this.item.sku || !this.item.name) {
       alert('Fill required fields');
       return;
     }
-    await this.api.saveItem(this.item);
+    this.dateError = '';
+    if (this.item.mfgDate && this.item.expDate && this.item.expDate < this.item.mfgDate) {
+      this.dateError = 'Expiry Date cannot be earlier than Manufacturing Date';
+      return;
+    }
+    try {
+      await this.api.saveItem(this.item, this.isEdit);
+    } catch (err: any) {
+      const detail = err?.error?.detail;
+      this.dateError = typeof detail === 'string' ? detail : 'Could not save the item. Please check the values and try again.';
+      return;
+    }
     this.router.navigate(['/items-stock']);
   }
 }

@@ -46,7 +46,7 @@ import { ApiService, CatalogItem } from '../../services/api.service';
         <div class="table-scroll">
           <table class="table">
             <thead>
-              <tr><th>SKU</th><th>Barcode</th><th>Name</th><th>Category</th><th>Pricing</th><th class="num">Price</th><th class="num">Wholesale</th><th class="num">Tax</th><th class="num">Stock</th><th>Status</th><th></th></tr>
+              <tr><th>SKU</th><th>Barcode</th><th>Name</th><th>Category</th><th>Pricing</th><th class="num">Price</th><th class="num">Wholesale</th><th class="num">Tax</th><th class="num">Stock</th><th>Mfg Date</th><th>Exp Date</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               @for (item of filteredItems(); track item.sku) {
@@ -60,6 +60,8 @@ import { ApiService, CatalogItem } from '../../services/api.service';
                   <td class="num mono">{{ item.wholesalePrice ? '₹' + item.wholesalePrice.toFixed(2) : '—' }}</td>
                   <td class="num">{{ item.tax }}%</td>
                   <td class="num mono">{{ item.pricingMethod === 'weight' ? item.stock.toFixed(3) : item.stock }} {{ item.unit }}</td>
+                  <td class="mono">{{ item.mfgDate ? (item.mfgDate | date:'dd-MM-yyyy') : '—' }}</td>
+                  <td class="mono">{{ item.expDate ? (item.expDate | date:'dd-MM-yyyy') : '—' }}</td>
                   <td>
                     <span class="badge" [class.badge-danger]="item.stock === 0" [class.badge-warning]="item.stock > 0 && item.stock <= item.min" [class.badge-success]="item.stock > item.min">
                       {{ item.stock === 0 ? 'Out of Stock' : (item.stock <= item.min ? 'Low Stock' : 'In Stock') }}

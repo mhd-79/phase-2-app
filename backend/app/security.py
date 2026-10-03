@@ -56,6 +56,8 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
                                  "phase_access": payload.get("phase", 2)})()
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive or not found")
+    if getattr(user, "on_leave", False):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="You are on leave. Please contact your store manager.")
     return user
 
 

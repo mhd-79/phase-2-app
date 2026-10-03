@@ -20,12 +20,27 @@ model User {
   auto_lock    String     @default("2 min")
   schedule_json String?
   phase_access Int        @default(2) // 1 = Phase 1 features only, 2 = Phase 1 + Phase 2 (applies to admins)
+  active_counter String?  // billing counter the user is currently working on (CashCounter.counter_name)
+  on_leave     Boolean    @default(false)
+  leave_reason String?
+  leave_started_at DateTime?
   created_at   DateTime   @default(now())
   updated_at   DateTime   @updatedAt
   sales        Sale[]
   returns      SaleReturn[]
   held_bills   HeldBill[]
   audit_logs   AuditLog[]
+}
+
+model Customer {
+  id            String   @id           // CUST-0001
+  name          String
+  mobile        String   @unique
+  email         String?
+  address       String?
+  customer_type String   @default("Retail") // "Retail" | "Wholesale"
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 }
 
 model CashCounter {
@@ -58,6 +73,8 @@ model Item {
   pricing_method      String   @default("qty") // "qty" | "weight"
   unit                String   @default("pcs") // "pcs" | "kg"
   preferred_vendor_id String?
+  mfg_date            DateTime?
+  exp_date            DateTime?
   is_active           Boolean  @default(true)
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
@@ -136,6 +153,7 @@ model PurchaseReturn {
   date       String
   reason     String
   total      Float
+  invoice_id String?              // purchase invoice the goods are returned against: a GRN id (or a PO id)
   created_at DateTime             @default(now())
   lines      PurchaseReturnLine[]
 }
@@ -199,6 +217,9 @@ model Discount {
 model Sale {
   id                    String       @id @default(uuid())
   invoice_no            String       @unique
+  counter_name          String?
+  customer_id           String?
+  customer_name         String?
   created_by_username   String
   created_by            User         @relation(fields: [created_by_username], references: [username])
   time                  DateTime     @default(now())

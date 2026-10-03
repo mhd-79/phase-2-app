@@ -35,6 +35,9 @@ export interface UserAccountData {
   avatar: string;
   sub: string;
   status: 'Active' | 'Disabled';
+  /** Admin marked the user as on leave (they cannot sign in until marked as returned). */
+  onLeave?: boolean;
+  leaveReason?: string | null;
   autoLock: string;
   pin: string;
   schedule: ScheduleMap;
@@ -244,9 +247,14 @@ export interface UserAccountData {
                       </span>
                     </td>
                     <td>
-                      <span class="badge" [class.badge-success]="u.status === 'Active'" [class.badge-danger]="u.status !== 'Active'">
-                        {{ u.status }}
-                      </span>
+                      @if (u.status === 'Active' && u.onLeave) {
+                        <span class="badge badge-warning">On Leave</span>
+                        @if (u.leaveReason) { <div class="text-xs text-muted" style="max-width:220px;white-space:normal;margin-top:2px">Reason: {{ u.leaveReason }}</div> }
+                      } @else {
+                        <span class="badge" [class.badge-success]="u.status === 'Active'" [class.badge-danger]="u.status !== 'Active'">
+                          {{ u.status }}
+                        </span>
+                      }
                     </td>
                     <td class="text-xs">{{ u.autoLock || '2 min' }}</td>
                     <td>
@@ -311,7 +319,19 @@ export interface UserAccountData {
               <div class="text-xs text-muted">{{ selectedUserDetail?.sub }}</div>
             </div>
           </div>
-          <button class="icon-btn" (click)="showDetailModal = false">✕</button>
+          <div class="row" style="gap:var(--space-2);align-items:center">
+            @if (detailUser(); as du) {
+              @if (du.status === 'Active' && du.onLeave) { <span class="badge badge-warning">On Leave</span> }
+              @if (du.status === 'Active' && du.username !== auth.currentUser().username) {
+                @if (du.onLeave) {
+                  <button class="btn btn-secondary btn-sm" style="color:var(--success-700)" (click)="returnFromLeave(du.key)">Return from Leave</button>
+                } @else {
+                  <button class="btn btn-secondary btn-sm" style="color:var(--warning-700)" (click)="openLeaveModal(du.key)">Mark on Leave</button>
+                }
+              }
+            }
+            <button class="icon-btn" (click)="showDetailModal = false">✕</button>
+          </div>
         </div>
         <div class="modal-body stack">
           <div class="grid grid-3" style="gap:var(--space-3)">
@@ -392,6 +412,27 @@ export interface UserAccountData {
     </div>
 
     <!-- ================= ADD / EDIT USER MODAL ================= -->
+    <div class="modal-overlay" [class.open]="showLeaveModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Mark on Leave — {{ leaveUserName }}</h3>
+          <button class="icon-btn" (click)="showLeaveModal = false">✕</button>
+        </div>
+        <div class="modal-body stack">
+          <p class="text-sm text-muted" style="margin:0">While on leave this user cannot sign in. Use "Return from Leave" to restore access.</p>
+          <div class="field">
+            <label for="leaveReason">Reason for leave</label>
+            <textarea class="input" id="leaveReason" rows="3" [(ngModel)]="leaveReason" placeholder="e.g. Medical leave until 8 Oct" maxlength="200"></textarea>
+          </div>
+          @if (leaveError) { <span class="hint" style="color:var(--danger-700)">{{ leaveError }}</span> }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showLeaveModal = false">Cancel</button>
+          <button class="btn btn-primary" [disabled]="isSavingLeave" (click)="confirmLeave()">{{ isSavingLeave ? 'Saving...' : 'Mark on Leave' }}</button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-overlay" [class.open]="showAddEditModal">
       <div class="modal modal-lg">
         <div class="modal-header">
@@ -561,6 +602,14 @@ export class UsersComponent implements OnInit {
   formRole: 'Admin' | 'Cashier' = 'Cashier';
   formPin = '';
   formStatus: 'Active' | 'Disabled' = 'Active';
+
+  // Leave
+  showLeaveModal = false;
+  leaveKey = '';
+  leaveUserName = '';
+  leaveReason = '';
+  leaveError = '';
+  isSavingLeave = false;
   formAutoLock = '2 min';
   formPhase: 1 | 2 = 2;
   formSchedule: ScheduleMap = {};
@@ -714,6 +763,8 @@ export class UsersComponent implements OnInit {
               avatar: u.full_name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2),
               sub: u.sub_text || `${u.role} · Counter Staff`,
               status: u.is_active ? 'Active' : 'Disabled',
+              onLeave: !!u.on_leave,
+              leaveReason: u.leave_reason || null,
               autoLock: u.auto_lock || '2 min',
               pin: '••••',
               schedule: this.DEFAULT_SCHEDULES[key] || this.DEFAULT_SCHEDULES['priya'],
@@ -722,6 +773,8 @@ export class UsersComponent implements OnInit {
           } else {
             this.userAccounts[key].name = u.full_name;
             this.userAccounts[key].status = u.is_active ? 'Active' : 'Disabled';
+            this.userAccounts[key].onLeave = !!u.on_leave;
+            this.userAccounts[key].leaveReason = u.leave_reason || null;
             this.userAccounts[key].role = u.role.toLowerCase() === 'admin' ? 'Admin' : 'Cashier';
             this.userAccounts[key].phase = u.phase_access === 1 ? 1 : 2;
           }
@@ -1079,6 +1132,63 @@ export class UsersComponent implements OnInit {
     } catch {}
     await this.loadAuditLogs();
     this.triggerToast(`${u.name} status set to ${u.status}`);
+  }
+
+  /** The account record behind the open performance-details modal (for its leave status / actions). */
+  detailUser(): any {
+    return this.selectedUserDetail ? this.userAccounts[this.selectedUserDetail.key] : null;
+  }
+
+  openLeaveModal(key: string) {
+    const u = this.userAccounts[key];
+    if (!u) return;
+    this.leaveKey = key;
+    this.leaveUserName = u.name;
+    this.leaveReason = '';
+    this.leaveError = '';
+    this.showLeaveModal = true;
+  }
+
+  async confirmLeave() {
+    if (this.isSavingLeave) return;
+    const u = this.userAccounts[this.leaveKey];
+    if (!u) return;
+    const reason = this.leaveReason.trim();
+    if (!reason) {
+      this.leaveError = 'Please give a reason for the leave';
+      return;
+    }
+    this.isSavingLeave = true;
+    this.leaveError = '';
+    try {
+      const res = await this.api.setUserLeave(u.username, true, reason);
+      u.onLeave = !!res.on_leave;
+      u.leaveReason = res.leave_reason || reason;
+      this.saveAccountsToStorage();
+      this.showLeaveModal = false;
+      await this.loadAuditLogs();
+      this.triggerToast(`${u.name} marked on leave`);
+    } catch (err: any) {
+      this.leaveError = typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not save. Please try again.';
+    } finally {
+      this.isSavingLeave = false;
+    }
+  }
+
+  async returnFromLeave(key: string) {
+    const u = this.userAccounts[key];
+    if (!u) return;
+    if (!confirm(`Mark ${u.name} as returned from leave? They will be able to sign in again.`)) return;
+    try {
+      await this.api.setUserLeave(u.username, false);
+      u.onLeave = false;
+      u.leaveReason = null;
+      this.saveAccountsToStorage();
+      await this.loadAuditLogs();
+      this.triggerToast(`${u.name} is back from leave`);
+    } catch (err: any) {
+      alert(typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not update the leave status. Please try again.');
+    }
   }
 
   openResetPinModal(username: string) {

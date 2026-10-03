@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends, status, Request
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 import json
-from app.schemas import SaleCreate, SaleReturnCreate, HeldBillCreate, PinVerifyRequest
-from app.security import get_current_user, verify_pin
+from app.schemas import SaleCreate, SaleReturnCreate, HeldBillCreate, PinVerifyRequest, CustomerCreate
+from app.security import get_current_user, verify_pin, get_phase_access, PHASE_2, require_phase2
+from app.routers.customers import _normalize_mobile, _clean, _view, _next_id
 from app.pricing_engine import compute_cart_totals, render_receipt_html
 from app.database import db
 from app.idempotency import enforce_idempotency, idempotency_manager
@@ -50,6 +51,30 @@ async def approve_discount(req: PinVerifyRequest):
             
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Admin PIN")
 
+# --- Customer on a bill (Phase 2 users: admin or cashier). Full customer management stays admin-only in /customers. ---
+@router.get("/customers/search")
+async def search_customers_for_bill(q: str = "", limit: int = 8, user = Depends(require_phase2)):
+    """Find customers by customer number (CUST-0001) or mobile number while billing."""
+    term = q.strip()
+    where: Dict[str, Any] = {}
+    if term:
+        where["OR"] = [{"id": {"contains": term, "mode": "insensitive"}}, {"mobile": {"contains": term}},
+                       {"name": {"contains": term, "mode": "insensitive"}}]
+    rows = await db.customer.find_many(where=where, order={"created_at": "desc"}, take=max(1, min(limit, 20)))
+    return [_view(c) for c in rows]
+
+@router.post("/customers")
+async def create_customer_for_bill(data: CustomerCreate, user = Depends(require_phase2)):
+    """Add a new customer from the Billing screen; the screen then attaches them to the current bill."""
+    mobile = _normalize_mobile(data.mobile)
+    if await db.customer.find_unique(where={"mobile": mobile}):
+        raise HTTPException(status_code=400, detail="A customer with this mobile number already exists - search for them by mobile number")
+    c = await db.customer.create(data={
+        "id": await _next_id(), "name": data.name.strip(), "mobile": mobile, "email": _clean(data.email),
+        "address": _clean(data.address), "customer_type": data.customerType,
+    })
+    return _view(c)
+
 @router.post("/sales")
 async def create_sale(req: SaleCreate, request: Request, user = Depends(get_current_user)):
     # Enforce idempotency: first click creates exactly one sale, repeated requests are rejected safely
@@ -84,7 +109,7 @@ async def create_sale(req: SaleCreate, request: Request, user = Depends(get_curr
                 invoice_no = f"INV-FY26-{seq_no:05d}"
                 
                 # 4. Save Sale Header
-                sale = await db.sale.create(data={
+                sale_data = {
                     "invoice_no": invoice_no,
                     "created_by_username": username,
                     "pricing_mode": req.pricing_mode,
@@ -96,7 +121,20 @@ async def create_sale(req: SaleCreate, request: Request, user = Depends(get_curr
                     "gst_total": totals["gst_total"],
                     "grand_total": totals["grand_total"],
                     "status": "COMPLETED"
-                })
+                }
+                active_counter = getattr(user, "active_counter", None) if not isinstance(user, dict) else user.get("active_counter")
+                if active_counter:
+                    sale_data["counter_name"] = active_counter   # counter the sale was rung up on
+                if req.customerId:
+                    # Customer selection is a Phase 2 feature (admin or cashier); walk-in bills simply send no customer.
+                    if get_phase_access(user) < PHASE_2:
+                        raise HTTPException(status_code=403, detail="Customer selection is available on Phase 2 accounts only")
+                    customer = await db.customer.find_unique(where={"id": req.customerId})
+                    if not customer:
+                        raise HTTPException(status_code=404, detail="Customer not found")
+                    sale_data["customer_id"] = customer.id
+                    sale_data["customer_name"] = customer.name
+                sale = await db.sale.create(data=sale_data)
                 
                 # 5. Save Sale Items & Deduct Stock
                 saved_items = []
@@ -247,6 +285,8 @@ async def get_sale_by_invoice(invoice_no: str):
                 record = {
                     "id": sale.id,
                     "invoice_no": sale.invoice_no,
+                    "customer_id": getattr(sale, "customer_id", None),
+                    "customer_name": getattr(sale, "customer_name", None),
                     "time": sale.time.isoformat(),
                     "pricing_mode": sale.pricing_mode,
                     "lines": items_list,

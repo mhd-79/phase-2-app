@@ -14,7 +14,7 @@ A full-stack Indian retail Point-of-Sale, billing, vendor, and inventory managem
 
 3. **TECH STACK — DO NOT CHANGE**
    - **Frontend:** Angular 22, TypeScript, Angular Material, Tailwind CSS, Angular CDK Layout, PWA
-   - **Backend:** Python 3.12+, FastAPI, Pydantic v2, Prisma ORM, Alembic
+   - **Backend:** Python 3.12+, FastAPI, Pydantic v2, Prisma ORM, 
    - **Database:** PostgreSQL 16+, Neon DB
    - **Cloud/Deploy:** Microsoft Azure, Railway, GitHub Actions / Azure DevOps CI/CD
 

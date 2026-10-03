@@ -10,6 +10,8 @@ export interface UserProfile {
   autoLock?: string;
   /** Admin access level: 1 = Phase 1 features only, 2 = Phase 1 + Phase 2. Missing means 2 (existing admins keep full access). */
   phase?: 1 | 2;
+  /** Billing counter the user is currently working on (CashCounter.counter_name). Saved on the server. */
+  activeCounter?: string | null;
 }
 
 const DEFAULT_ADMIN: UserProfile = {
@@ -36,7 +38,7 @@ export class AuthService {
     return DEFAULT_ADMIN;
   }
 
-  setSession(token: string, username: string, role: string, fullName: string, subText: string, autoLock: string = '2 min', phase: number = 2) {
+  setSession(token: string, username: string, role: string, fullName: string, subText: string, autoLock: string = '2 min', phase: number = 2, activeCounter: string | null = null) {
     const userRole = (role.toLowerCase() === 'admin' ? 'admin' : 'cashier') as UserRole;
     const profile: UserProfile = {
       username,
@@ -44,7 +46,8 @@ export class AuthService {
       fullName,
       subText,
       autoLock,
-      phase: phase === 1 ? 1 : 2
+      phase: phase === 1 ? 1 : 2,
+      activeCounter
     };
 
     this.token.set(token);
@@ -52,6 +55,12 @@ export class AuthService {
     this.currentRole.set(userRole);
 
     localStorage.setItem('pos_token', token);
+    localStorage.setItem('pos_user_profile', JSON.stringify(profile));
+  }
+
+  setActiveCounter(counterName: string | null) {
+    const profile: UserProfile = { ...this.currentUser(), activeCounter: counterName };
+    this.currentUser.set(profile);
     localStorage.setItem('pos_user_profile', JSON.stringify(profile));
   }
 

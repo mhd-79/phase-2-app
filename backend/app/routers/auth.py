@@ -1,8 +1,8 @@
 import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, status
-from app.schemas import LoginRequest, TokenResponse, UserSchema, PinVerifyRequest, ForgotPinRequest, ResetPinRequest
-from app.security import verify_pin, get_pin_hash, create_access_token, get_current_user, require_admin, get_phase_access, PHASE_2
+from app.schemas import LoginRequest, TokenResponse, UserSchema, PinVerifyRequest, ForgotPinRequest, ResetPinRequest, SwitchCounterRequest
+from app.security import verify_pin, get_pin_hash, create_access_token, get_current_user, require_admin, get_phase_access, PHASE_2, security_bearer
 from app.database import db
 from seed import DEMO_USERS
 
@@ -59,6 +59,15 @@ async def login(req: LoginRequest):
             detail="Account is disabled or inactive. Please contact your store manager."
         )
     
+    # On leave: no sign-in until an admin marks the user as returned
+    on_leave = user.get("on_leave", False) if isinstance(user, dict) else getattr(user, "on_leave", False)
+    if on_leave:
+        reason = user.get("leave_reason") if isinstance(user, dict) else getattr(user, "leave_reason", None)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="You are on leave" + (f": {reason}" if reason else "") + ". Please contact your store manager."
+        )
+
     # 2. Reject every incorrect PIN/password
     pin_hash = getattr(user, 'pin_hash', None)
     if pin_hash is None and isinstance(user, dict):
@@ -91,7 +100,8 @@ async def login(req: LoginRequest):
         full_name=full_name,
         sub_text=sub_text,
         auto_lock=auto_lock or "2 min",
-        phase_access=phase_access
+        phase_access=phase_access,
+        active_counter=user.get("active_counter") if isinstance(user, dict) else getattr(user, "active_counter", None)
     )
 
 @router.post("/verify-pin")
@@ -275,6 +285,22 @@ async def admin_reset_pin(req: ResetPinRequest, admin = Depends(require_admin)):
         "username": username
     }
 
+@router.put("/active-counter")
+async def switch_active_counter(req: SwitchCounterRequest, credentials = Depends(security_bearer), user = Depends(get_current_user)):
+    """Switches the signed-in user to another billing counter. Only the user's own active counter changes: role and permissions are untouched."""
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    counter = await db.cashcounter.find_unique(where={"id": req.counter_id}) if db.is_connected() else None
+    if not counter or not counter.is_active:
+        raise HTTPException(status_code=404, detail="Counter not found")
+    username = user.get("username") if isinstance(user, dict) else user.username
+    if db.is_connected():
+        try:
+            await db.user.update(where={"username": username}, data={"active_counter": counter.counter_name})
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Could not save the active counter ({type(exc).__name__}). Run `prisma generate` and `prisma db push`.")
+    return {"counter_id": counter.id, "active_counter": counter.counter_name, "username": username}
+
 @router.get("/me", response_model=UserSchema)
 async def get_me(user = Depends(get_current_user)):
     username = getattr(user, 'username', 'priya.k') if not isinstance(user, dict) else user.get("username", "priya.k")
@@ -294,5 +320,6 @@ async def get_me(user = Depends(get_current_user)):
         is_active=is_active,
         auto_lock=auto_lock or "2 min",
         schedule_json=schedule_json,
-        phase_access=get_phase_access(user)
+        phase_access=get_phase_access(user),
+        active_counter=getattr(user, 'active_counter', None) if not isinstance(user, dict) else user.get('active_counter')
     )
