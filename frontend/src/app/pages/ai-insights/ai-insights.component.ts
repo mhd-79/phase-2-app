@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 
 interface InsightTab { key: string; label: string; endpoint: string; }
@@ -741,23 +741,21 @@ const PALETTE = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#0ea5e9', '#8b5cf6
 
             <!-- ============================ VENDOR INTELLIGENCE ============================ -->
             @if (tab() === 'vendors') {
-              <div class="grid grid-4" style="margin-bottom:var(--space-5)">
+              <div class="grid grid-2" style="margin-bottom:var(--space-5)">
                 <div class="card stat-card"><span class="stat-label">Vendors</span><span class="stat-value">{{ d.summary.vendors }}</span><span class="stat-delta">{{ d.summary.scored }} scored</span></div>
                 <div class="card stat-card"><span class="stat-label">Average score</span><span class="stat-value">{{ d.summary.avg_score === null ? '—' : d.summary.avg_score + '/100' }}</span></div>
-                <div class="card stat-card"><span class="stat-label">Total payable</span><span class="stat-value" style="color:var(--warning-700)">{{ inr(d.summary.total_payable) }}</span></div>
-                <div class="card stat-card"><span class="stat-label">Overdue open POs</span><span class="stat-value" [style.color]="d.summary.overdue_open_pos ? 'var(--danger-700)' : ''">{{ d.summary.overdue_open_pos }}</span></div>
               </div>
               <div class="card card-flush">
                 <div class="card-header"><h3>Vendor scorecard</h3>
                   <span class="text-xs text-muted">Score = fill rate {{ d.score_weights.fill_rate }}% · on-time {{ d.score_weights.on_time_delivery }}% · quality {{ d.score_weights.quality_returns }}% · price {{ d.score_weights.price_index }}%</span></div>
-                <div class="table-scroll"><table class="table"><thead><tr><th>Vendor</th><th>Score</th><th class="num">Fill rate</th><th class="num">On time</th><th class="num">Returns</th><th class="num">Lead</th><th class="num">Spend share</th><th class="num">Payable</th></tr></thead>
+                <div class="table-scroll"><table class="table"><thead><tr><th>Vendor</th><th>Score</th><th class="num">Fill rate</th><th class="num">On time</th><th class="num">Returns</th><th class="num">Lead</th><th class="num">Spend share</th></tr></thead>
                   <tbody>@for (v of d.vendors; track v.vendor_id) {
                     <tr><td><strong>{{ v.name }}</strong><div class="text-xs text-muted">{{ v.category }} · {{ v.terms }} · {{ v.po_count }} PO(s)</div>
-                        @for (n of v.notes; track n) { <div class="text-xs text-muted">• {{ n }}</div> }</td>
+                        @for (n of v.notes; track n) { @if (!isPayableNote(n)) { <div class="text-xs text-muted">• {{ n }}</div> } }</td>
                       <td>@if (v.score !== null) { <span class="badge" [ngClass]="gradeBadge(v.grade)">{{ v.grade }} · {{ v.score }}</span> } @else { <span class="badge badge-neutral">Not enough data</span> }</td>
                       <td class="num">{{ pctOrDash(v.fill_rate_pct) }}</td><td class="num">{{ pctOrDash(v.on_time_rate_pct) }}</td><td class="num">{{ pctOrDash(v.return_rate_pct) }}</td>
                       <td class="num">{{ v.avg_lead_days }}d<div class="text-xs text-muted">{{ v.lead_time_source }}</div></td>
-                      <td class="num">{{ pctOrDash(v.spend_share_pct) }}</td><td class="num mono">{{ inr(v.payable) }}</td></tr>
+                      <td class="num">{{ pctOrDash(v.spend_share_pct) }}</td></tr>
                   }</tbody></table></div>
               </div>
             }
@@ -897,6 +895,7 @@ const PALETTE = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#0ea5e9', '#8b5cf6
 })
 export class AiInsightsComponent implements OnInit {
   private api = inject(ApiService);
+  private route = inject(ActivatedRoute);
   Math = Math;
 
   tabs: InsightTab[] = [
@@ -930,6 +929,13 @@ export class AiInsightsComponent implements OnInit {
   current = () => this.cache()[this.cacheKey()] ?? null;
 
   async ngOnInit() {
+    // /ai-insights?tab=<key> opens that tab (used by the OKUTO IQ chatbot's "Based on" links); it also follows later changes
+    this.route.queryParamMap.subscribe(q => {
+      const key = q.get('tab');
+      if (key && this.tabs.some(t => t.key === key) && key !== this.tab()) { this.tab.set(key); void this.load(); }
+    });
+    const initial = this.route.snapshot.queryParamMap.get('tab');
+    if (initial && this.tabs.some(t => t.key === initial)) this.tab.set(initial);
     await this.load();
   }
 
@@ -967,6 +973,8 @@ export class AiInsightsComponent implements OnInit {
     this.cache.update(c => ({ ...c, [key]: res }));
     this.loading.set(false);
   }
+  /** Vendor scorecard notes about money owed / overdue purchase orders are not shown on this tab. */
+  isPayableNote(note: string): boolean { return /payable|past their expected date/i.test(note); }
   async select(key: string) { this.tab.set(key); await this.load(); }
   async reload() { await this.load(true); }
   async setDays(d: number) { this.days = d; await this.load(); }

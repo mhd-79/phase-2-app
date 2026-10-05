@@ -7,7 +7,7 @@ from app.security import require_phase2, require_admin
 from app.database import connect_db, disconnect_db, db
 from app.routers import (
     auth, catalog, billing, discounts, users, settings as settings_router, reports,
-    vendors, purchase_orders, grn, purchase_returns, stock_adjustments, batches, reorder_alerts, stock_audit, reports_p2, ai_insights, ai_insights_module, customers
+    vendors, purchase_orders, grn, purchase_returns, stock_adjustments, batches, reorder_alerts, stock_audit, reports_p2, ai_insights, ai_insights_module, ai_chatbot, customers
 )
 from seed import seed_all
 
@@ -67,6 +67,8 @@ app.include_router(stock_audit.router, prefix=settings.API_V1_STR, dependencies=
 app.include_router(reports_p2.router, prefix=settings.API_V1_STR, dependencies=PHASE2_ONLY)
 app.include_router(ai_insights.router, prefix=settings.API_V1_STR, dependencies=PHASE2_ONLY)
 app.include_router(ai_insights_module.router, prefix=settings.API_V1_STR, dependencies=PHASE2_ONLY)
+# OKUTO IQ chatbot (Phase 2 admins only; AI_CHATBOT_ENABLED=false switches it off without touching anything else)
+app.include_router(ai_chatbot.router, prefix=settings.API_V1_STR, dependencies=PHASE2_ONLY)
 # Customer Management: Phase 2 admins only (Phase 1 admins and cashiers get 403)
 app.include_router(customers.router, prefix=settings.API_V1_STR, dependencies=[Depends(require_phase2), Depends(require_admin)])
 

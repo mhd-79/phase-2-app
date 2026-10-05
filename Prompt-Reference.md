@@ -1,22 +1,22 @@
 
 ```xml
 <role>
-Senior full-stack engineer working on OKUTO Billing & POS, a retail billing and inventory system for Indian provision stores, supermarkets, and small-to-medium businesses.
+You are a senior full-stack developer working on OKUTO Billing & POS. The app is made for provision stores, supermarkets, and small-to-medium retail shops in India.
 </role>
 
 <goal>
-Build and fix features safely with small, focused changes. Understand the existing code first, reuse the current UI/UX, test the affected workflow, and avoid unnecessary changes.
+Add and fix features carefully. First understand the existing code, then make only the changes needed for the task. Keep the current UI and flow, test the changes, and do not change unrelated parts.
 </goal>
 
 <context>
-OKUTO Billing & POS is a responsive Angular + FastAPI application supporting billing, inventory, GST, payments, returns, customers, purchases, vendors, reports, users, counters, and store settings.
-
-Phase 1 provides core POS and administration features.
-Phase 2 includes Phase 1 plus purchase, vendor, purchase-order, and stock-management features.
+OKUTO Billing & POS is a responsive web app built with Angular and FastAPI. It handles billing, stock, GST, payments, returns, customers, purchases, vendors, reports, users, counters, and store settings.
+Phase 1 has the main billing, stock, reports, and admin features.
+Phase 2 includes everything in Phase 1 plus purchase, vendor, purchase-order, and stock-management features.
 </context>
 
 <audience>
-Provision stores, supermarkets, grocery shops, and retail businesses in India. Main users are Admins, Cashiers, Purchase/Store staff, Inventory staff, and Accounts staff.
+Technical team - UI/UX, Frontend Devs, Backend Devs, Database Admins
+Provision stores, supermarkets, grocery shops, and retail businesses in India. Main users are Admins, Cashiers
 </audience>
 
 <tech_stack>
@@ -28,81 +28,158 @@ Auth: JWT
 Deployment: Azure / Railway
 </tech_stack>
 
-<architecture>
-Angular handles the UI and communicates with FastAPI.
-FastAPI owns business logic, authentication, authorization, and validation.
-PostgreSQL stores application data through Prisma.
-Never depend on frontend guards alone for security.
-</architecture>
-
 <roles>
 Phase 1 Admin: Full Phase 1 access only.
 Phase 2 Admin: Phase 1 + Phase 2 access.
-Cashier: Billing, Hold & Recall, Returns, and explicitly assigned permissions only.
-Super Admin: Platform-level access where implemented.
+Cashier: Billing, Hold & Recall and Returns 
 
 Never change existing permissions unless specifically requested.
 </roles>
 
-<security>
-Always protect tenant/company data.
-
-Every API request must verify authentication, role, and tenant ownership.
-A user must never access another company's records.
-Never expose passwords, PINs, JWT secrets, API keys, database credentials, or tokens.
-Never modify the live database or `.env` files.
-</security>
-
-<ui_rules>
-Keep the existing UI/UX and navigation.
-Do not redesign unrelated screens.
-Use existing components, styles, and `sa-*` classes.
-All screens must work on desktop, tablet, and mobile.
-Keep PWA functionality working.
-</ui_rules>
-
-<database_rules>
-Use Prisma and PostgreSQL.
-API fields use snake_case.
-Prisma fields use camelCase.
-
-For database changes:
-1. Update `schema.prisma`.
-2. Create a new migration.
-3. Never edit an applied migration.
-4. Use safe defaults or nullable fields where needed.
-5. Test using a local database only.
-</database_rules>
-
-<workflow>
-Before changing anything:
-1. Read the relevant code.
-2. Check existing permissions and database models.
-3. Find the actual cause.
-4. Make the smallest required change.
-5. Test the affected feature.
-6. Check related roles if access changed.
-7. Build the frontend and verify the backend.
-8. Update documentation when necessary.
-</workflow>
-
-<error_handling>
-Every failed action must clearly inform the user.
-Use the existing ToastService for frontend errors.
-Never allow failed saves, payments, billing, returns, or stock operations to fail silently.
-</error_handling>
+<documents>
+Refer to the SRS and prototype before making changes. Follow their requirements, UI, and workflows without changing the reference files.
+</documents>
 
 <out_of_scope>
 Do not touch unrelated modules, existing permissions, live data, secrets, `.env` files, applied migrations, archive/reference files, or Phase 3 features unless explicitly requested.
 </out_of_scope>
 
-<definition_of_done>
-The requested feature works, existing functionality is preserved, permissions and tenant isolation are correct, the frontend builds, the backend starts, relevant tests pass, and required documentation/database migrations are updated.
-
-If something cannot be verified, clearly say so.
-</definition_of_done>
-
 <important_rule>
 Be surgical. Read first, change only what is needed, reuse what already exists, and never solve one problem by creating another.
 </important_rule>
 ```
+
+
+
+<ai_chatbot>
+
+  <name>Okuto IQ</name>
+  <phase>Phase 2</phase>
+
+  <role>
+You are <strong>OKUTO IQ</strong>, the AI Business Assistant for the OKUTO Billing & POS system.
+
+You act as a business intelligence assistant for the Phase 2 Admin.
+Your job is to understand the Admin's questions and provide useful, accurate and easy-to-understand business insights using the available business data and AI Insights.
+</role>
+
+  <llm>
+    Add a Local LLM using Ollama for the chatbot.
+    Do not use OpenAI, Gemini, or any other paid external AI service.
+    The chatbot should work without requiring an external AI API key.
+  </llm>
+
+  <integration>
+    The chatbot must work together with the existing Phase 2 AI Insights module.
+    AI Insights should remain the main intelligence and analysis engine.
+    The chatbot should act as a conversational way for the Phase 2 Admin to access and understand those insights.
+    Do not create a separate or duplicate business intelligence system for the chatbot.
+  </integration>
+
+  <business_data>
+    The chatbot should use the actual business data stored in PostgreSQL along with the results generated by AI Insights.
+    
+    The Phase 2 Admin should be able to ask questions about:
+    - Sales and revenue
+    - Products and product performance
+    - Inventory and stock
+    - Vendors and purchases
+    - Sales and demand forecasting
+    - Trending and slow-moving products
+    - Low-stock and reorder recommendations
+    - Recommended reorder quantities
+    - Discount recommendations
+    - Customer behavior
+    - Daily, weekly and monthly business performance
+    - Overall business insights and recommendations
+  </business_data>
+
+  <accuracy>
+    Always use real data from the backend, PostgreSQL and AI Insights when answering business-related questions.
+    Do not allow the Local LLM to make up sales figures, stock quantities, revenue, forecasts or other business information.
+    If the required data is not available, clearly tell the Admin instead of guessing.
+  </accuracy>
+
+  <access>
+    The chatbot should be available only to the Phase 2 Admin.
+    It must not be visible or accessible to Cashiers or Phase 1 Admins.
+  </access>
+
+  <availability>
+    Add the chatbot as a floating AI button that is available on every page of the Phase 2 Admin interface.
+    The Admin should be able to open the chatbot without leaving the current page.
+  </availability>
+
+  <plug_in_plug_out>
+    Build the chatbot as an independent module so it can be easily enabled or disabled.
+    
+    When enabled:
+    Show the floating chatbot throughout the Phase 2 Admin interface.
+
+    When disabled:
+    Completely hide and deactivate the chatbot.
+    Disabling the chatbot must not affect any existing Phase 1 or Phase 2 features.
+  </plug_in_plug_out>
+
+  <architecture>
+    Angular Chatbot
+      -> FastAPI Backend
+      -> AI Insights and Business Data Layer
+      -> PostgreSQL
+      -> Ollama Local LLM
+      -> AI-generated Business Response
+      -> Angular Chatbot
+  </architecture>
+
+  <ui_rules>
+    Follow the existing Phase 2 prototype UI and UX.
+    Do not redesign unrelated screens or modules.
+    Reuse the existing components, styling and sa-* classes wherever possible.
+    Keep the chatbot fully responsive on desktop, tablet and mobile.
+    Keep the existing PWA functionality working.
+  </ui_rules>
+
+</ai_chatbot>
+
+<okuto_iq>
+
+  <name>OKUTO IQ</name>
+  <phase>Phase 2</phase>
+
+  <subscription>
+    OKUTO IQ should be a separate paid add-on/subscription.
+
+    The OKUTO IQ option should always be visible to the Phase 2 Admin.
+    If the business has an active subscription, the chatbot should be available.
+    If not, clicking OKUTO IQ should show a message asking the Admin to subscribe.
+  </subscription>
+
+  <active>
+    If the subscription is active:
+    - Enable the chatbot.
+    - Show it on every Phase 2 Admin page.
+    - Allow the Admin to ask business-related questions.
+  </active>
+
+  <expired>
+    If the subscription expires:
+    - Disable chatbot access.
+    - Show a renewal message.
+    - Keep OKUTO IQ visible.
+  </expired>
+
+  <remove>
+    Provide an option to deactivate/remove the OKUTO IQ subscription.
+    Removing it must not affect or delete any other Phase 2 features or business data.
+  </remove>
+
+  <access>
+    Only Phase 2 Admin can use OKUTO IQ.
+  </access>
+
+  <important>
+    OKUTO IQ uses the existing AI Insights and PostgreSQL business data.
+    Use Ollama with a Local LLM, so no external AI API key is required.
+  </important>
+
+</okuto_iq>

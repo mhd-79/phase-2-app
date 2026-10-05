@@ -2,11 +2,12 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { OkutoIqSubscriptionCardComponent } from '../../components/ai-chatbot/okuto-iq-subscription-card.component';
 
 @Component({
   selector: 'app-store-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, OkutoIqSubscriptionCardComponent],
   template: `
     <main class="main">
       <div class="page-header">
@@ -65,6 +66,8 @@ import { ApiService } from '../../services/api.service';
           <p class="text-sm" style="color:var(--success-700);margin-top:var(--space-3)">{{ backupMsg }}</p>
         }
       </div>
+
+      <app-okuto-iq-subscription-card></app-okuto-iq-subscription-card>
     </main>
   `
 })

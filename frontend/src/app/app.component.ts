@@ -4,11 +4,12 @@ import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { TopbarComponent } from './components/topbar/topbar.component';
 import { LockOverlayComponent } from './components/lock-overlay/lock-overlay.component';
 import { AuthService } from './services/auth.service';
+import { AiChatbotComponent } from './components/ai-chatbot/ai-chatbot.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, SidebarComponent, TopbarComponent, LockOverlayComponent],
+  imports: [RouterOutlet, SidebarComponent, TopbarComponent, LockOverlayComponent, AiChatbotComponent],
   template: `
     @if (router.url.includes('/login')) {
       <router-outlet></router-outlet>
@@ -18,6 +19,7 @@ import { AuthService } from './services/auth.service';
         <app-topbar (lockTrigger)="lockScreen()"></app-topbar>
         <router-outlet></router-outlet>
       </div>
+      <app-ai-chatbot></app-ai-chatbot>
       <app-lock-overlay [isOpen]="isLocked" (unlocked)="unlockScreen()"></app-lock-overlay>
     }
   `

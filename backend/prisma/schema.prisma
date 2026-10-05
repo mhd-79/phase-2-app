@@ -313,6 +313,16 @@ model StoreSettings {
   updated_at           DateTime @updatedAt
 }
 
+/// OKUTO IQ chatbot add-on subscription (single row). Removing it only clears this row; no other data is touched.
+model OkutoIqSubscription {
+  id           String    @id @default("okuto_iq")
+  status       String    @default("inactive")
+  started_at   DateTime?
+  expires_at   DateTime?
+  activated_by String?
+  updated_at   DateTime  @updatedAt
+}
+
 model AuditLog {
   id           String   @id @default(uuid())
   username     String
