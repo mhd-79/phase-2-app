@@ -17,11 +17,11 @@ from app import ai_chatbot as bot
 from app.config import settings
 from app.database import get_db
 from app.routers.ai_insights_module import _SCHEMA_HINT, load_dataset
-from app.security import require_admin
+from app.security import require_module
 
 logger = logging.getLogger("uvicorn.error")
 
-router = APIRouter(prefix="/ai-chatbot", tags=["AI Chatbot"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/ai-chatbot", tags=["AI Chatbot"], dependencies=[Depends(require_module("ai_insights"))])
 
 
 # --------------------------------------------------------------------------- subscription (add-on)
@@ -86,7 +86,7 @@ async def get_subscription():
 
 
 @router.post("/subscription")
-async def activate_subscription(user=Depends(require_admin)):
+async def activate_subscription(user=Depends(require_module("ai_insights"))):
     """Activate or renew OKUTO IQ for one period. (No payment step yet: this is where one would plug in.)"""
     if not settings.AI_CHATBOT_ENABLED:
         raise HTTPException(status_code=404, detail="The AI chatbot is disabled.")
@@ -103,7 +103,7 @@ async def activate_subscription(user=Depends(require_admin)):
 
 
 @router.delete("/subscription")
-async def remove_subscription(user=Depends(require_admin)):
+async def remove_subscription(user=Depends(require_module("ai_insights"))):
     """Plug OKUTO IQ out. Only the subscription row is reset; no other feature or business data is touched."""
     if not settings.AI_CHATBOT_ENABLED:
         raise HTTPException(status_code=404, detail="The AI chatbot is disabled.")

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
-from app.security import get_current_user, require_admin
+from app.security import get_current_user, require_module
 from app.database import db
 from app.schemas import CashCounterCreate, CashCounterUpdateFloat
 
@@ -42,7 +42,7 @@ def _payment_label(tenders) -> str:
             modes.append(t.mode)
     return " + ".join(modes) if modes else "—"
 
-@router.get("/z-report")
+@router.get("/z-report", dependencies=[Depends(require_module("reports"))])
 async def get_z_report(date: Optional[str] = None):
     target_date = date or datetime.now().strftime("%Y-%m-%d")
     sales = await db.sale.find_many(include={"tenders": True})
@@ -77,7 +77,7 @@ async def get_z_report(date: Optional[str] = None):
     }
 
 @router.get("/summary")
-async def get_sales_summary(from_date: Optional[str] = None, to_date: Optional[str] = None, tz_offset: int = 0, user = Depends(require_admin)):
+async def get_sales_summary(from_date: Optional[str] = None, to_date: Optional[str] = None, tz_offset: int = 0, user = Depends(require_module("reports"))):
     """Z-report totals for a date range, straight from the sales tables."""
     start, end = _day_range(from_date, to_date, tz_offset)
     sales = await db.sale.find_many(where=_time_filter(start, end), include={"tenders": True})
@@ -98,7 +98,7 @@ async def get_sales_summary(from_date: Optional[str] = None, to_date: Optional[s
 @router.get("/transactions")
 async def get_transactions(from_date: Optional[str] = None, to_date: Optional[str] = None, tz_offset: int = 0,
                            counter: Optional[str] = None, status: Optional[str] = None, search: Optional[str] = None,
-                           limit: int = 500, user = Depends(require_admin)):
+                           limit: int = 500, user = Depends(require_module("reports"))):
     """Every sale in the range (newest first) with counter, cashier, payment method and status."""
     limit = max(1, min(limit, 2000))
     start, end = _day_range(from_date, to_date, tz_offset)
@@ -130,7 +130,7 @@ async def get_transactions(from_date: Optional[str] = None, to_date: Optional[st
         })
     return {"total": len(rows), "rows": rows[:limit]}
 
-@router.get("/item-sales")
+@router.get("/item-sales", dependencies=[Depends(require_module("reports"))])
 async def get_item_sales_report():
     sale_items = await db.saleitem.find_many()
     items = await db.item.find_many()
@@ -182,7 +182,7 @@ async def get_cash_counters():
     ]
 
 @router.post("/cash-drawer/counters")
-async def create_cash_counter(req: CashCounterCreate, user = Depends(require_admin)):
+async def create_cash_counter(req: CashCounterCreate, user = Depends(require_module("reports"))):
     existing = await db.cashcounter.find_unique(where={"counter_name": req.counter_name})
     if existing:
         raise HTTPException(status_code=400, detail="Counter name already exists")
@@ -199,7 +199,7 @@ async def create_cash_counter(req: CashCounterCreate, user = Depends(require_adm
     }
 
 @router.put("/cash-drawer/counters/{counter_id}/float")
-async def update_counter_float(counter_id: str, req: CashCounterUpdateFloat, user = Depends(require_admin)):
+async def update_counter_float(counter_id: str, req: CashCounterUpdateFloat, user = Depends(require_module("reports"))):
     c = await db.cashcounter.find_unique(where={"id": counter_id})
     if not c:
         raise HTTPException(status_code=404, detail="Counter not found")
@@ -214,7 +214,7 @@ async def update_counter_float(counter_id: str, req: CashCounterUpdateFloat, use
         "message": f"Opening float updated for {updated.counter_name}"
     }
 
-@router.get("/cash-drawer")
+@router.get("/cash-drawer", dependencies=[Depends(require_module("reports"))])
 async def get_cash_drawer_report(counter_id: Optional[str] = None, opening_float: Optional[float] = None, counted_cash: Optional[float] = None,
                                  from_date: Optional[str] = None, to_date: Optional[str] = None, tz_offset: int = 0):
     """Cash position of one counter for a date range (default: today): opening float + cash sales - cash refunds."""
@@ -257,7 +257,7 @@ async def get_cash_drawer_report(counter_id: Optional[str] = None, opening_float
         "variance": round(variance, 2)
     }
 
-@router.get("/stock-on-hand")
+@router.get("/stock-on-hand", dependencies=[Depends(require_module("reports"))])
 async def get_stock_on_hand_report():
     items = await db.item.find_many(where={"is_active": True})
     batches = await db.batch.find_many()
@@ -301,7 +301,7 @@ async def get_stock_on_hand_report():
         "items": item_rows
     }
 
-@router.get("/tax-summary")
+@router.get("/tax-summary", dependencies=[Depends(require_module("reports"))])
 async def get_tax_summary():
     sale_items = await db.saleitem.find_many()
     slabs: Dict[float, Dict[str, float]] = {}

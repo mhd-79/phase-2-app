@@ -24,12 +24,15 @@ model User {
   on_leave     Boolean    @default(false)
   leave_reason String?
   leave_started_at DateTime?
+  email        String?    // business accounts (HO Admin): email + password sign-in; PIN users leave these empty
+  password_hash String?
   created_at   DateTime   @default(now())
   updated_at   DateTime   @updatedAt
   sales        Sale[]
   returns      SaleReturn[]
   held_bills   HeldBill[]
   audit_logs   AuditLog[]
+  modules_json         String?    // per-user module access overrides (JSON {module: true|false}); empty = the role's defaults
 }
 
 model Customer {
@@ -287,6 +290,15 @@ model ReturnItem {
   sku           String
   qty           Float
   refund_amount Float
+  action        String     @default("Return")   // Return | Exchange (what the store allows is set in Store Settings)
+  condition     String     @default("Good")     // Good | Damaged | Warranty (set by the cashier)
+  reason        String?                         // optional per-item return reason (Customer Return / Damaged / Not Willing / Warranty / Other: text)
+  review_status String?                         // Damaged / Warranty items: PENDING until an Admin resolves them, then RESOLVED
+  review_outcome String?
+  review_notes  String?
+  reviewed_by   String?
+  reviewed_at   DateTime?
+  stock_delta   Float?                          // stock added back when the Admin resolved the item
 }
 
 model HeldBill {
@@ -310,6 +322,7 @@ model StoreSettings {
   gstin                String   @default("29ABCDE1234F1Z5")
   pricing_mode         String   @default("exclusive")
   idle_timeout_seconds Int      @default(45)
+  return_policy        String   @default("BOTH")   // allowed customer-return action: RETURN | EXCHANGE | BOTH
   updated_at           DateTime @updatedAt
 }
 
@@ -332,3 +345,159 @@ model AuditLog {
   timestamp    DateTime @default(now())
 }
 
+
+// =====================================================================================================
+// Platform / multi-tenant control plane (Super Admin). These tables live in the default schema and are
+// only ever read through `control_db`; tenant data lives in each tenant's own PostgreSQL schema.
+// =====================================================================================================
+
+/// One business using the platform. The original single store is the default tenant (schema_name = "public").
+model Tenant {
+  id                    String   @id @default(uuid())
+  code                  String   @unique          // business code used to sign in with a PIN, e.g. "abc-supermarket"
+  name                  String                    // tenant_name
+  legal_name            String
+  owner_name            String
+  email                 String
+  phone                 String
+  address               String
+  city                  String
+  state                 String
+  country               String   @default("India")
+  postal_code           String
+  gstin                 String
+  business_type         String
+  initial_outlet_name   String?                   // used as the store name of the tenant's StoreSettings
+  status                String   @default("INVITED")  // PENDING_APPROVAL..INVITATION_EXPIRED (see superadmin.md)
+  status_before_suspend String?
+  schema_name           String   @unique          // PostgreSQL schema holding this tenant's data
+  is_default            Boolean  @default(false)
+  provision_status      String   @default("pending")  // pending | ready | failed
+  schema_version        Int      @default(0)          // application tables version of this tenant's schema (see tenancy.SCHEMA_VERSION)
+  provision_error       String?
+  request_id            String?
+  created_by            String?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  subscription          TenantSubscription?
+  invitations           TenantInvitation[]
+}
+
+model TenantSubscription {
+  id                      String    @id @default(uuid())
+  tenant_id               String    @unique
+  tenant                  Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  plan_id                 String?
+  current_plan            String    @default("Trial")
+  trial_start_date        DateTime?
+  trial_end_date          DateTime?
+  trial_duration_days     Int       @default(14)
+  subscription_start_date DateTime?
+  subscription_end_date   DateTime?
+  payment_status          String    @default("NOT_PAID")  // NOT_PAID | PENDING | PAID | FAILED
+  pending_plan_id         String?                         // plan chosen at checkout, activated once payment is verified
+  trial_reminder_sent     Boolean   @default(false)
+  updated_at              DateTime  @updatedAt
+}
+
+model SubscriptionPlan {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  name           String
+  description    String?
+  price          Float    @default(0)
+  currency       String   @default("INR")
+  duration_days  Int      @default(30)
+  max_users      Int?
+  storage_mb     Int?
+  ai_enabled     Boolean  @default(false)
+  reports_enabled Boolean @default(true)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+}
+
+/// A business asking to join (future public website, or created by Super Admin review flow).
+model TenantRequest {
+  id                  String    @id @default(uuid())
+  tenant_name         String
+  legal_name          String
+  owner_name          String
+  email               String
+  phone               String
+  address             String
+  city                String
+  state               String
+  country             String    @default("India")
+  postal_code         String
+  gstin               String
+  business_type       String
+  initial_outlet_name String?
+  notes               String?
+  source              String    @default("website")
+  status              String    @default("PENDING_APPROVAL")  // PENDING_APPROVAL | APPROVED | REJECTED
+  reviewed_by         String?
+  reviewed_at         DateTime?
+  reject_reason       String?
+  tenant_id           String?
+  ip_address          String?
+  created_at          DateTime  @default(now())
+}
+
+/// Single-use invitation / password-reset token. Only the SHA-256 hash of the token is stored.
+model TenantInvitation {
+  id          String    @id @default(uuid())
+  tenant_id   String
+  tenant      Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  email       String
+  token_hash  String    @unique
+  purpose     String    @default("invite")   // invite | password_reset
+  status      String    @default("PENDING")  // PENDING | ACCEPTED | EXPIRED | REVOKED
+  expires_at  DateTime
+  used_at     DateTime?
+  accepted_at DateTime?
+  created_by  String?
+  created_at  DateTime  @default(now())
+}
+
+/// The platform administrator(s). Not bound to any tenant.
+model PlatformUser {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  full_name     String
+  password_hash String
+  is_active     Boolean   @default(true)
+  last_login_at DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+}
+
+model TenantNotification {
+  id         String   @id @default(uuid())
+  audience   String                         // super_admin | tenant
+  tenant_id  String?
+  type       String
+  title      String
+  message    String
+  link       String?
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+}
+
+model PlatformAuditLog {
+  id            String   @id @default(uuid())
+  actor_id      String?
+  actor_role    String
+  actor_email   String?
+  tenant_id     String?
+  action        String
+  ip_address    String?
+  metadata_json String?
+  timestamp     DateTime @default(now())
+}
+
+model PlatformSetting {
+  key        String   @id
+  value      String
+  updated_at DateTime @updatedAt
+}

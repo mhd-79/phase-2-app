@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-receipt-preview',
@@ -30,8 +31,8 @@ import { ApiService } from '../../services/api.service';
 
       <div class="card mono" style="max-width:400px;margin:0 auto;padding:var(--space-6);background:#fff;border:1px solid var(--border)">
         <div style="text-align:center;margin-bottom:var(--space-3)">
-          <strong>Okuto Mart</strong>
-          <div class="text-xs text-muted">12, MG Road, Bengaluru &middot; GSTIN 29ABCDE1234F1Z5</div>
+          <strong>{{ storeName }}</strong>
+          <div class="text-xs text-muted">{{ storeLine }}</div>
         </div>
         <hr class="divider">
         <div class="row-between text-sm"><span>Invoice</span><span class="mono">{{ invoiceNo }}</span></div>
@@ -55,6 +56,10 @@ export class ReceiptPreviewComponent implements OnInit {
   api = inject(ApiService);
   route = inject(ActivatedRoute);
 
+  private auth = inject(AuthService);
+  storeName = 'Okuto Mart';
+  storeLine = '12, MG Road, Bengaluru · GSTIN 29ABCDE1234F1Z5';
+
   invoiceNo = 'INV-FY26-01025';
   saleDate = new Date();
   grandTotal = 435.0;
@@ -65,6 +70,18 @@ export class ReceiptPreviewComponent implements OnInit {
   ];
 
   async ngOnInit() {
+    const owner = localStorage.getItem('pos_cache_owner');
+    if (owner && owner !== 'default') {
+      // sample receipt content is prototype demo data for the original store only
+      this.invoiceNo = '';
+      this.grandTotal = 0;
+      this.lines = [];
+      const u = this.auth.currentUser();
+      let saved: any = {};
+      try { saved = JSON.parse(localStorage.getItem('pos_demo_store_settings') || '{}'); } catch {}
+      this.storeName = saved.name || u.tenantName || '';
+      this.storeLine = [saved.address, saved.gstin ? `GSTIN ${saved.gstin}` : ''].filter(Boolean).join(' · ');
+    }
     this.route.queryParams.subscribe(async (params) => {
       if (params['invoice_no']) {
         this.invoiceNo = params['invoice_no'];

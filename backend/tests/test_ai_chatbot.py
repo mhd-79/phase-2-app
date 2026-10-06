@@ -209,11 +209,8 @@ def test_follow_up_inherits_previous_topic(client, monkeypatch):
     assert body["topics"] == ["sales"]
 
 
-def test_only_phase2_admins_get_in(client):
+def test_only_admins_get_in(client):
     client.state.user = SimpleNamespace(username="c", role="cashier", phase_access=2)
-    assert client.get("/api/v1/ai-chatbot/status").status_code == 403
-    assert client.post("/api/v1/ai-chatbot/chat", json={"message": "sales"}).status_code == 403
-    client.state.user = SimpleNamespace(username="p1", role="admin", phase_access=1)
     assert client.get("/api/v1/ai-chatbot/status").status_code == 403
     assert client.post("/api/v1/ai-chatbot/chat", json={"message": "sales"}).status_code == 403
 
@@ -292,12 +289,11 @@ def test_remove_clears_only_the_subscription(client, monkeypatch):
     assert client.post("/api/v1/ai-chatbot/subscription").json()["state"] == "active"   # and it can be plugged in again
 
 
-def test_subscription_endpoints_are_phase2_admin_only(client):
-    for user in (SimpleNamespace(username="c", role="cashier", phase_access=2), SimpleNamespace(username="p1", role="admin", phase_access=1)):
-        client.state.user = user
-        assert client.get("/api/v1/ai-chatbot/subscription").status_code == 403
-        assert client.post("/api/v1/ai-chatbot/subscription").status_code == 403
-        assert client.delete("/api/v1/ai-chatbot/subscription").status_code == 403
+def test_subscription_endpoints_are_admin_only(client):
+    client.state.user = SimpleNamespace(username="c", role="cashier", phase_access=2)
+    assert client.get("/api/v1/ai-chatbot/subscription").status_code == 403
+    assert client.post("/api/v1/ai-chatbot/subscription").status_code == 403
+    assert client.delete("/api/v1/ai-chatbot/subscription").status_code == 403
 
 
 def test_subscription_endpoints_inert_when_module_disabled(client, monkeypatch):

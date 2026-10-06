@@ -221,7 +221,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.routers import ai_insights_module as mod
-from app.security import require_admin
+from app.security import get_current_user
 
 
 class _Model:
@@ -267,7 +267,7 @@ def api(monkeypatch):
     monkeypatch.setattr(mod, "get_db", lambda: db)
     app = FastAPI()
     app.include_router(mod.router, prefix="/api/v1")
-    app.dependency_overrides[require_admin] = lambda: NS(role="admin", username="owner.arjun")
+    app.dependency_overrides[get_current_user] = lambda: NS(role="admin", username="owner.arjun")
     return TestClient(app), db
 
 
@@ -302,7 +302,7 @@ def test_router_returns_503_when_database_is_down(monkeypatch):
     monkeypatch.setattr(mod, "get_db", lambda: NS(is_connected=lambda: False))
     app = FastAPI()
     app.include_router(mod.router, prefix="/api/v1")
-    app.dependency_overrides[require_admin] = lambda: NS(role="admin")
+    app.dependency_overrides[get_current_user] = lambda: NS(role="admin")
     res = TestClient(app).get("/api/v1/ai-insights/business-summary")
     assert res.status_code == 503
 
@@ -310,8 +310,7 @@ def test_router_returns_503_when_database_is_down(monkeypatch):
 def test_router_is_admin_only():
     app = FastAPI()
     app.include_router(mod.router, prefix="/api/v1")
-    # no override -> real require_admin runs; a cashier must be rejected
-    from app.security import get_current_user
+    # the module check runs on the signed-in user; a cashier must be rejected
     app.dependency_overrides[get_current_user] = lambda: NS(role="cashier")
     assert TestClient(app).get("/api/v1/ai-insights/vendor-intelligence").status_code == 403
 
@@ -383,7 +382,7 @@ def test_demo_endpoints_never_touch_the_database(monkeypatch, ep):
     monkeypatch.setattr(mod, "get_db", lambda: _ExplodingDb())
     app = FastAPI()
     app.include_router(mod.router, prefix="/api/v1")
-    app.dependency_overrides[require_admin] = lambda: NS(role="admin")
+    app.dependency_overrides[get_current_user] = lambda: NS(role="admin")
     res = TestClient(app).get(f"/api/v1/ai-insights/{ep}?demo=true")
     assert res.status_code == 200, res.text
     body = res.json()
@@ -396,7 +395,6 @@ def test_demo_is_off_by_default_and_still_admin_only(api):
     assert client.get("/api/v1/ai-insights/business-summary").json()["meta"]["is_demo"] is False
     app = FastAPI()
     app.include_router(mod.router, prefix="/api/v1")
-    from app.security import get_current_user
     app.dependency_overrides[get_current_user] = lambda: NS(role="cashier")
     assert TestClient(app).get("/api/v1/ai-insights/business-summary?demo=true").status_code == 403
 
@@ -484,7 +482,7 @@ def test_schema_drift_in_the_auth_dependency_is_explained(api):
 
     def _broken_admin():
         raise err
-    client.app.dependency_overrides[require_admin] = _broken_admin
+    client.app.dependency_overrides[get_current_user] = _broken_admin
     res = client.get("/api/v1/ai-insights/business-summary")
     assert res.status_code == 500 and res.headers["content-type"].startswith("application/json")
     assert "prisma generate" in res.json()["detail"] and "auto_lock_minutes" in res.json()["detail"]

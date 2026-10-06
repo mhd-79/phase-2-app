@@ -2,13 +2,14 @@ import random
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Optional
 from app.database import get_db
+from app.tenant_scoped import TenantList, TenantDict
 from app.schemas import GRNCreate, DirectGRNCreate, LandedCostAllocationInput
 from app.security import get_current_user
 from app.idempotency import enforce_idempotency, idempotency_manager
 
 router = APIRouter(prefix="/grn", tags=["goods-receipt-notes"])
 
-_FALLBACK_GRNS = []
+_FALLBACK_GRNS = TenantList()
 
 @router.get("")
 async def list_grn_logs(vendor_id: Optional[str] = None):

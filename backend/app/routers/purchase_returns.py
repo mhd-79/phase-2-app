@@ -2,13 +2,14 @@ import random
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Optional
 from app.database import get_db
+from app.tenant_scoped import TenantList, TenantDict
 from app.schemas import PurchaseReturnCreate
 from app.security import get_current_user
 from app.idempotency import enforce_idempotency, idempotency_manager
 
 router = APIRouter(prefix="/purchase-returns", tags=["purchase-returns"])
 
-_FALLBACK_RETURNS = []
+_FALLBACK_RETURNS = TenantList()
 
 
 async def _resolve_invoice(db, vendor_id: str, ref: str):

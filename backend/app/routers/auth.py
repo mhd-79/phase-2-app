@@ -1,17 +1,23 @@
 import json
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, Request, status
+from pydantic import BaseModel, Field
 from app.schemas import LoginRequest, TokenResponse, UserSchema, PinVerifyRequest, ForgotPinRequest, ResetPinRequest, SwitchCounterRequest
-from app.security import verify_pin, get_pin_hash, create_access_token, get_current_user, require_admin, get_phase_access, PHASE_2, security_bearer
-from app.database import db
+from app.security import verify_pin, get_pin_hash, create_access_token, get_current_user, require_admin, require_module, user_modules, get_phase_access, security_bearer
+from app.database import db, current_tenant_schema
+from app.tenant_scoped import TenantList, TenantDict
 from seed import DEMO_USERS
+from app import platform_audit, platform_service
+from app.throttle import login_limiter, forgot_limiter
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # In-memory fallback user store (seeded with DEMO_USERS) when database is in dummy/disconnected mode
-_FALLBACK_USERS = {}
+_FALLBACK_USERS = TenantDict()
 
 def _init_fallback_users():
+    if current_tenant_schema.get() is not None:      # demo accounts exist only in the original store
+        return
     for u in DEMO_USERS:
         if u["username"] not in _FALLBACK_USERS:
             _FALLBACK_USERS[u["username"]] = {
@@ -28,7 +34,7 @@ def _init_fallback_users():
             }
 
 _init_fallback_users()
-_FALLBACK_AUDIT_LOGS = []
+_FALLBACK_AUDIT_LOGS = TenantList()
 
 async def _get_user_by_username(username: str):
     _init_fallback_users()
@@ -40,8 +46,19 @@ async def _get_user_by_username(username: str):
     return _FALLBACK_USERS.get(username)
 
 @router.post("/login", response_model=TokenResponse)
-async def login(req: LoginRequest):
-    # 1. Enforce login against actual stored user credentials
+async def login(req: LoginRequest, request: Request):
+    # Business owners and Super Admins: email + password (throttled per client and email)
+    if req.email or req.password:
+        if not (req.email and req.password):
+            raise HTTPException(status_code=422, detail="Enter your email and password.")
+        key = f"pw:{platform_audit.client_ip(request)}:{req.email.strip().lower()}"
+        login_limiter.hit(key)
+        data = await platform_service.login_with_password(req.email, req.password)
+        login_limiter.reset(key)
+        return TokenResponse(**data)
+    if not req.username or req.pin is None:
+        raise HTTPException(status_code=422, detail="Enter your username and PIN.")
+    # 1. Enforce login against actual stored user credentials (default store, unchanged)
     user = await _get_user_by_username(req.username.strip())
     if not user:
         raise HTTPException(
@@ -101,7 +118,8 @@ async def login(req: LoginRequest):
         sub_text=sub_text,
         auto_lock=auto_lock or "2 min",
         phase_access=phase_access,
-        active_counter=user.get("active_counter") if isinstance(user, dict) else getattr(user, "active_counter", None)
+        active_counter=user.get("active_counter") if isinstance(user, dict) else getattr(user, "active_counter", None),
+        modules=user_modules(user)
     )
 
 @router.post("/verify-pin")
@@ -120,6 +138,14 @@ async def verify_user_pin(req: PinVerifyRequest, user = Depends(get_current_user
             pin_hash = getattr(u, 'pin_hash', None) if not isinstance(u, dict) else u.get("pin_hash")
             
     if pin_hash and verify_pin(req.pin, pin_hash):
+        return {"valid": True, "username": getattr(user, 'username', 'user')}
+
+    # business owners sign in with a password (their PIN is unset): accept it to unlock the idle screen
+    password_hash = getattr(user, 'password_hash', None)
+    if password_hash is None:
+        fresh = await _get_user_by_username(user.username if hasattr(user, 'username') else None)
+        password_hash = getattr(fresh, 'password_hash', None) if fresh and not isinstance(fresh, dict) else None
+    if password_hash and platform_service.verify_password(req.pin, password_hash):
         return {"valid": True, "username": getattr(user, 'username', 'user')}
     
     return {"valid": False, "username": getattr(user, 'username', 'user')}
@@ -175,7 +201,7 @@ async def request_forgot_pin(req: ForgotPinRequest):
     }
 
 @router.get("/pin-reset-requests")
-async def list_pin_reset_requests(admin = Depends(require_admin)):
+async def list_pin_reset_requests(admin = Depends(require_module("users"))):
     """
     Lists pending and recent PIN reset requests for Admin review.
     """
@@ -222,7 +248,7 @@ async def list_pin_reset_requests(admin = Depends(require_admin)):
     return requests_list
 
 @router.post("/reset-pin")
-async def admin_reset_pin(req: ResetPinRequest, admin = Depends(require_admin)):
+async def admin_reset_pin(req: ResetPinRequest, admin = Depends(require_module("users"))):
     """
     Allows Admin to reset a user's PIN with proper authorization and audit logging.
     """
@@ -233,10 +259,9 @@ async def admin_reset_pin(req: ResetPinRequest, admin = Depends(require_admin)):
     user = await _get_user_by_username(username)
     if not user:
         raise HTTPException(status_code=404, detail=f"User '{username}' not found")
+    if getattr(admin, "role", None) != "admin" and (user.get("role") if isinstance(user, dict) else getattr(user, "role", None)) == "admin":
+        raise HTTPException(status_code=403, detail="Only an Admin can reset an Admin's PIN")
         
-    if get_phase_access(admin) < PHASE_2 and get_phase_access(user) >= PHASE_2 and (user.get("role") if isinstance(user, dict) else user.role) == "admin":
-        raise HTTPException(status_code=403, detail="A Phase 1 admin cannot reset the PIN of a Phase 2 admin")
-
     new_pin_hash = get_pin_hash(req.new_pin)
     admin_username = getattr(admin, 'username', 'admin') if not isinstance(admin, dict) else admin.get("username", "admin")
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -320,6 +345,47 @@ async def get_me(user = Depends(get_current_user)):
         is_active=is_active,
         auto_lock=auto_lock or "2 min",
         schedule_json=schedule_json,
+        modules=user_modules(user),
         phase_access=get_phase_access(user),
         active_counter=getattr(user, 'active_counter', None) if not isinstance(user, dict) else user.get('active_counter')
     )
+
+
+# --- Password setup / recovery for business owners (multi-tenant) -------------------------------------------------
+class SetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=1, max_length=128)
+    confirm_password: str = Field(min_length=1, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+
+
+async def _set_password(req: SetPasswordRequest, request: Request):
+    from app.routers.platform_public import AcceptIn, accept_with_password
+    return await accept_with_password(req.token, AcceptIn(password=req.password, confirm_password=req.confirm_password), request)
+
+
+@router.post("/set-password")
+async def set_password(req: SetPasswordRequest, request: Request):
+    """Create the password after the invitation was verified (same single-use token as /invitations/{token}/accept)."""
+    return await _set_password(req, request)
+
+
+@router.post("/reset-password")
+async def reset_password(req: SetPasswordRequest, request: Request):
+    """Choose a new password with a reset link sent by /auth/forgot-password."""
+    return await _set_password(req, request)
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, request: Request):
+    """Always answers the same way, so it cannot be used to find out which emails have accounts."""
+    ip = platform_audit.client_ip(request)
+    forgot_limiter.hit(f"forgot:{ip}")
+    try:
+        await platform_service.request_password_reset(req.email, ip=ip)
+    except Exception:                                           # noqa: BLE001
+        pass
+    return {"message": "If an account exists for that email, a password reset link has been sent."}

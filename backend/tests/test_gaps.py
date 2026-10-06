@@ -71,7 +71,8 @@ def test_cash_counters_and_float_management(client):
     assert update_res.json()["opening_float"] == 3500.0
 
 def test_stock_on_hand_report_with_expiry(client):
-    res = client.get("/api/v1/reports/stock-on-hand")
+    token = client.post("/api/v1/auth/login", json={"username": "owner.arjun", "pin": "9999"}).json()["access_token"]
+    res = client.get("/api/v1/reports/stock-on-hand", headers={"Authorization": f"Bearer {token}"})   # Reports module: admins have it, anonymous callers do not
     assert res.status_code == 200
     data = res.json()
     assert "items" in data

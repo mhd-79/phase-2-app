@@ -19,7 +19,7 @@ from app.database import get_db
 from app import insights_engine as eng
 from app.insights_demo import build_demo_dataset
 from app import customer_insights as cbi
-from app.security import require_admin
+from app.security import require_module
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -54,7 +54,7 @@ class _JsonErrorRoute(APIRoute):
         return handler
 
 
-router = APIRouter(prefix="/ai-insights", tags=["AI Insights"], dependencies=[Depends(require_admin)],
+router = APIRouter(prefix="/ai-insights", tags=["AI Insights"], dependencies=[Depends(require_module("ai_insights"))],
                    route_class=_JsonErrorRoute)
 
 HISTORY_DAYS = 190      # 90-day view + the 90 days before it (for the period-over-period comparison)

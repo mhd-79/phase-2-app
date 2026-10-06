@@ -1,19 +1,20 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ApiService, CatalogItem } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-stock-upload',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <main class="main">
       <div class="page-header">
         <div>
           <span class="eyebrow">FR-P1-STK-001 &middot; FR-P1-STK-006 &middot; FR-P2-STK-002</span>
           <h1>Bulk Item &amp; Stock Upload</h1>
-          <p>Upload a CSV/Excel file to initialize or refresh stock. Nothing is committed until you review the preview below.</p>
+          <p>Upload a CSV/Excel file to add stock to, or remove it from, your items. Tick the items to process; nothing is committed until you review the preview below.</p>
         </div>
       </div>
 
@@ -66,6 +67,7 @@ import { AuthService } from '../../services/auth.service';
             <table class="table">
               <thead>
                 <tr>
+                  <th style="width:36px"><input type="checkbox" [checked]="allSelected()" [disabled]="!selectableCount()" (change)="toggleAll($any($event.target).checked)" aria-label="Select all items"></th>
                   <th>SKU</th>
                   <th>Barcode</th>
                   <th>Batch #</th>
@@ -75,14 +77,15 @@ import { AuthService } from '../../services/auth.service';
                   <th class="num">Price</th>
                   <th class="num">Wholesale</th>
                   <th class="num">Tax %</th>
-                  <th class="num">Opening Qty</th>
+                  <th class="num">Qty</th>
                   <th>Exp Date</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 @for (r of previewRows; track $index) {
-                  <tr>
+                  <tr [style.opacity]="issue(r) ? 0.6 : 1">
+                    <td><input type="checkbox" [(ngModel)]="r.selected" [disabled]="!!issue(r)" [attr.aria-label]="'Select ' + r.row.sku"></td>
                     <td class="mono">{{ r.row.sku }}</td>
                     <td class="mono text-xs">{{ r.row.barcode || '—' }}</td>
                     <td class="mono text-xs">{{ r.row.batch_no || '—' }}</td>
@@ -99,14 +102,24 @@ import { AuthService } from '../../services/auth.service';
                         {{ r.status === 'new' ? 'New Item' : (r.status === 'update' ? 'Update' : 'Error') }}
                       </span>
                       @if (r.status === 'error' && r.reason) { <div class="text-xs text-muted" style="max-width:200px;white-space:normal;margin-top:2px">{{ r.reason }}</div> }
+                      @else { @let why = issue(r); @if (why) { <div class="text-xs text-muted" style="max-width:200px;white-space:normal;margin-top:2px">{{ why }}</div> } }
                     </td>
                   </tr>
                 }
               </tbody>
             </table>
           </div>
-          <div class="card-body row" style="justify-content:flex-end;border-top:1px solid var(--border)">
-            <button class="btn btn-primary btn-lg" (click)="commitUpload()">Commit Stock Upload</button>
+          <div class="card-body row wrap" style="justify-content:flex-end;align-items:flex-end;gap:var(--space-4);border-top:1px solid var(--border)">
+            <div class="field" style="min-width:220px">
+              <label>Stock action for selected items</label>
+              <select class="select" [ngModel]="stockAction" (ngModelChange)="setStockAction($event)">
+                <option value="add">Add to stock</option>
+                <option value="remove">Remove from stock</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-lg" [disabled]="!selectedCount() || isCommitting" (click)="commitUpload()">
+              {{ isCommitting ? 'Committing...' : 'Commit Stock Upload (' + selectedCount() + ' selected)' }}
+            </button>
           </div>
         </div>
       }
@@ -129,6 +142,9 @@ export class StockUploadComponent {
   countUpdate = 0;
   countError = 0;
   successMsg: string | null = null;
+  /** Add the uploaded quantities to stock, or remove them. Applies to the selected rows only. */
+  stockAction: 'add' | 'remove' = 'add';
+  isCommitting = false;
   /** Items already in the database, keyed by SKU: those rows are updates, everything else is created. */
   private existingItems = new Map<string, CatalogItem>();
   /** Categories already in the database (lower-case name -> stored name) and the new ones this file will add. */
@@ -224,6 +240,7 @@ PC-005,8901030880605,BAT-2026-005,Face Wash 100ml,Personal Care,72,149,128,18,25
 
       this.previewRows.push({
         status,
+        selected: status !== 'error',
         reason: missing.length ? `Missing or invalid: ${missing.join(', ')}` : '',
         row: {
           sku,
@@ -241,6 +258,31 @@ PC-005,8901030880605,BAT-2026-005,Face Wash 100ml,Personal Care,72,149,128,18,25
         }
       });
     }
+  }
+
+  /** Why a row cannot be processed with the current stock action (null = it can). Rows with errors never can. */
+  issue(r: any): string | null {
+    if (r.status === 'error') return r.reason || 'Invalid row';
+    if (this.stockAction !== 'remove') return null;
+    const existing = this.existingItems.get(r.row.sku);
+    if (!existing) return 'Not in stock: nothing to remove';
+    const qty = r.row.opening_qty;
+    if (qty == null || qty <= 0) return 'Enter a quantity to remove';
+    if (qty > existing.stock) return `Only ${existing.stock} in stock`;
+    return null;
+  }
+
+  selectableCount(): number { return this.previewRows.filter((r) => !this.issue(r)).length; }
+  selectedCount(): number { return this.previewRows.filter((r) => r.selected && !this.issue(r)).length; }
+  allSelected(): boolean { const n = this.selectableCount(); return n > 0 && this.selectedCount() === n; }
+
+  toggleAll(checked: boolean) {
+    for (const r of this.previewRows) r.selected = checked && !this.issue(r);
+  }
+
+  setStockAction(action: 'add' | 'remove') {
+    this.stockAction = action;
+    for (const r of this.previewRows) r.selected = !this.issue(r);      // rows that cannot take this action are unticked
   }
 
   /** Reads a date cell and returns YYYY-MM-DD, or '' when blank / not a real date. Accepts YYYY-MM-DD, DD-MM-YYYY (day first; falls back
@@ -297,27 +339,57 @@ PC-005,8901030880605,BAT-2026-005,Face Wash 100ml,Personal Care,72,149,128,18,25
   }
 
   async commitUpload() {
+    if (this.isCommitting) return;
+    const chosen = this.previewRows.filter((r) => r.selected && !this.issue(r));
+    if (!chosen.length) return;
+    this.isCommitting = true;
+    try {
+      if (this.stockAction === 'remove') await this.commitRemoval(chosen);
+      else await this.commitAddition(chosen);
+    } finally {
+      this.isCommitting = false;
+    }
+  }
+
+  /** Remove: only the stock quantity of the selected, existing items is reduced (logged as a stock adjustment). Nothing else changes. */
+  private async commitRemoval(chosen: any[]) {
+    let removed = 0;
+    const failed: string[] = [];
+    for (const r of chosen) {
+      try {
+        await this.api.createStockAdjustment({
+          sku: r.row.sku, name: r.row.name, delta: -r.row.opening_qty, reason: 'Bulk upload: stock removed', notes: this.fileName || undefined
+        });
+        removed++;
+      } catch (err: any) {
+        failed.push(`${r.row.sku} (${this.errorReason(err)})`);
+      }
+    }
+    this.finish(`${removed} item(s) removed from stock`, failed);
+  }
+
+  /** Add: new items are created and existing ones receive the uploaded quantity on top of their current stock (provided prices / dates are refreshed). */
+  private async commitAddition(chosen: any[]) {
     let created = 0;
     let updated = 0;
     const failed: string[] = [];
     // New categories first, so the items below can be saved into them
     let categoriesAdded = 0;
     for (const name of this.newCategories) {
-      if (this.previewRows.some((r) => r.status !== 'error' && r.row.category === name)) {
+      if (chosen.some((r) => r.row.category === name)) {
         try { await this.api.addCategory(name); categoriesAdded++; } catch { failed.push(`category ${name} (could not be created)`); }
       }
     }
-    for (const r of this.previewRows) {
-      if (r.status === 'error') continue;
+    for (const r of chosen) {
       const existing = this.existingItems.get(r.row.sku);
       try {
         if (existing) {
-          // Existing item: refresh quantity, selling price / MRP, cost, wholesale, tax % and dates. Provided values only; everything else stays as is.
+          // Existing item: the uploaded quantity is added to its stock; provided prices, tax % and dates are refreshed, everything else stays as is.
           const item: CatalogItem = { ...existing };
           if (r.row.tax_rate != null) item.tax = r.row.tax_rate;
           if (r.row.mfg_date) item.mfgDate = r.row.mfg_date;
           if (r.row.exp_date) item.expDate = r.row.exp_date;
-          if (r.row.opening_qty != null) item.stock = r.row.opening_qty;
+          if (r.row.opening_qty != null) item.stock = existing.stock + r.row.opening_qty;
           if (r.row.selling_price != null) item.price = r.row.selling_price;
           if (r.row.cost_price != null) item.costPrice = r.row.cost_price;
           if (r.row.wholesale_price != null) item.wholesalePrice = r.row.wholesale_price;
@@ -360,9 +432,13 @@ PC-005,8901030880605,BAT-2026-005,Face Wash 100ml,Personal Care,72,149,128,18,25
       }
     }
     const summary = `${created} new item(s) created, ${updated} existing item(s) updated` + (categoriesAdded ? `, ${categoriesAdded} new categor${categoriesAdded === 1 ? 'y' : 'ies'} added` : '');
-    this.successMsg = (this.auth.hasPhase2()
+    this.finish(this.auth.hasPhase2()
       ? `${summary}, and associated batches committed to database successfully`
-      : `${summary} in the database successfully`) + (failed.length ? `. Not saved: ${failed.join('; ')}` : '');
+      : `${summary} in the database successfully`, failed);
+  }
+
+  private finish(summary: string, failed: string[]) {
+    this.successMsg = summary + (failed.length ? `. Not saved: ${failed.join('; ')}` : '');
     this.previewRows = [];
     this.newCategories = [];
     this.fileName = null;

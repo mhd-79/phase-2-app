@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from datetime import datetime
-from app.database import get_db
+from app.database import get_db, is_default_store
 from app.schemas import BatchCreate
 from app.security import get_current_user
+from app.security import require_module
 
 router = APIRouter(prefix="/batches", tags=["batches"])
 
@@ -19,6 +20,8 @@ SEED_BATCHES = [
 ]
 
 async def seed_batches_if_needed():
+    if not is_default_store():          # a new tenant starts with NO batches
+        return
     db = get_db()
     count = await db.batch.count()
     if count == 0:
@@ -65,7 +68,7 @@ async def list_batches(status: Optional[str] = None, sku: Optional[str] = None):
     result.sort(key=lambda x: x["daysToExpiry"])
     return result
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_module("inventory", "stock_upload", "purchase_orders"))])
 async def add_batch(data: BatchCreate, current_user=Depends(get_current_user)):
     db = get_db()
     item = await db.item.find_unique(where={"sku": data.sku})

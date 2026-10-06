@@ -40,6 +40,9 @@ import { ApiService } from '../../services/api.service';
                   <th>SKU</th>
                   <th>Original Qty</th>
                   <th>Return Qty</th>
+                  <th>Condition</th>
+                  <th>Return Reason</th>
+                  <th>Action</th>
                   <th class="num">Unit Price</th>
                   <th class="num">Total</th>
                 </tr>
@@ -54,6 +57,34 @@ import { ApiService } from '../../services/api.service';
                     <td>
                       <input class="input" type="number" min="0.1" [max]="item.qty" [(ngModel)]="item.returnQty" style="width:90px" [disabled]="!item.selected">
                     </td>
+                    <td>
+                      <select class="select" [(ngModel)]="item.condition" [disabled]="!item.selected" style="min-width:120px" aria-label="Item condition">
+                        <option value="Good">Good</option>
+                        <option value="Damaged">Damaged</option>
+                        <option value="Warranty">Warranty</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select class="select" [(ngModel)]="item.reason" (ngModelChange)="onReasonChange(item)" [disabled]="!item.selected" style="min-width:150px" aria-label="Return reason">
+                        <option value="">No reason</option>
+                        <option value="Customer Return">Customer Return</option>
+                        <option value="Damaged">Damaged</option>
+                        <option value="Not Willing">Not Willing</option>
+                        <option value="Warranty">Warranty</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      @if (item.reason === 'Other') {
+                        <input class="input" [(ngModel)]="item.otherReason" [disabled]="!item.selected" placeholder="Enter reason" maxlength="120" style="min-width:150px;margin-top:var(--space-1)" aria-label="Other return reason">
+                      }
+                    </td>
+                    <td>
+                      @if (policy === 'BOTH') {
+                        <select class="select" [(ngModel)]="item.action" [disabled]="!item.selected" style="min-width:110px" aria-label="Return or exchange">
+                          <option value="Return">Return</option>
+                          <option value="Exchange">Exchange</option>
+                        </select>
+                      } @else { <span class="text-sm">{{ policy === 'RETURN' ? 'Return' : 'Exchange' }}</span> }
+                    </td>
                     <td class="num mono">₹{{ item.price.toFixed(2) }}</td>
                     <td class="num mono">₹{{ (item.price * (item.returnQty || item.qty)).toFixed(2) }}</td>
                   </tr>
@@ -62,10 +93,7 @@ import { ApiService } from '../../services/api.service';
             </table>
           </div>
           <div class="card-body row-between" style="border-top:1px solid var(--border)">
-            <div class="field">
-              <label>Return Reason</label>
-              <input class="input" [(ngModel)]="returnReason" placeholder="e.g. Damaged package / Customer exchange" style="width:320px">
-            </div>
+            <span class="hint" style="max-width:520px">@if (hasHeldItems()) { Damaged / Warranty items are not added back to stock until an Admin reviews them (Stock Adjustment). }</span>
             <button class="btn btn-danger btn-lg" [disabled]="isProcessing" (click)="processReturn()">
               {{ isProcessing ? 'Processing Refund...' : 'Process Refund & Restore Stock' }}
             </button>
@@ -86,11 +114,12 @@ export class ReturnsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   searchInvoiceNo = 'INV-FY26-01025';
   sale: any = null;
-  returnReason = 'Customer return';
+  policy: 'RETURN' | 'EXCHANGE' | 'BOTH' = 'BOTH';
   resultMsg: string | null = null;
   isProcessing = false;
 
-  ngOnInit() {
+  async ngOnInit() {
+    this.policy = await this.api.getReturnPolicy();
     // Opened from a customer's purchase history: go straight to that invoice
     const invoice = this.route.snapshot.queryParamMap.get('invoice');
     if (invoice) {
@@ -110,12 +139,25 @@ export class ReturnsComponent implements OnInit {
         lines: (res.lines || []).map((l: any) => ({
           ...l,
           selected: false,
-          returnQty: l.qty
+          returnQty: l.qty,
+          condition: 'Good',
+          reason: '',
+          otherReason: '',
+          action: this.policy === 'EXCHANGE' ? 'Exchange' : 'Return'
         }))
       };
     } else {
       alert('Invoice not found');
     }
+  }
+
+  hasHeldItems(): boolean {
+    return !!this.sale?.lines?.some((l: any) => l.selected && l.condition !== 'Good');
+  }
+
+  /** Picking the reason Damaged / Warranty on an item suggests that condition (the cashier can still change it). */
+  onReasonChange(item: any) {
+    if (item.condition === 'Good' && (item.reason === 'Damaged' || item.reason === 'Warranty')) item.condition = item.reason;
   }
 
   async processReturn() {
@@ -127,10 +169,12 @@ export class ReturnsComponent implements OnInit {
     }
     this.isProcessing = true;
     try {
-      const returnItems = selected.map((l: any) => ({ sku: l.sku, qty: l.returnQty || l.qty }));
+      const returnItems = selected.map((l: any) => ({
+        sku: l.sku, qty: l.returnQty || l.qty, condition: l.condition || 'Good', action: l.action || 'Return',
+        reason: (l.reason === 'Other' ? (l.otherReason || '').trim() || 'Other' : l.reason) || null
+      }));
       const payload = {
         invoice_no: this.sale.invoiceNo,
-        reason: this.returnReason,
         items: returnItems
       };
       const res = await this.api.processReturn(payload);

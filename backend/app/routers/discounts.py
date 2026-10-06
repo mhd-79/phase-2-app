@@ -4,11 +4,12 @@ from typing import List
 from app.schemas import DiscountSchema, DiscountCreate
 from app.security import require_admin
 from app.database import db
+from app.tenant_scoped import TenantList, TenantDict
 from app.idempotency import enforce_idempotency, idempotency_manager
 
 router = APIRouter(prefix="/discounts", tags=["Discounts"])
 
-_FALLBACK_DISCOUNTS = []
+_FALLBACK_DISCOUNTS = TenantList()
 
 @router.get("", response_model=List[DiscountSchema])
 async def get_discounts():
@@ -36,7 +37,7 @@ async def get_discounts():
             return result
         except Exception:
             pass
-    return _FALLBACK_DISCOUNTS
+    return list(_FALLBACK_DISCOUNTS)
 
 @router.post("", response_model=DiscountSchema)
 async def create_discount(req: DiscountCreate, request: Request, user = Depends(require_admin)):
@@ -164,6 +165,5 @@ async def delete_discount(discount_id: str, user = Depends(require_admin)):
         except Exception:
             pass
             
-    global _FALLBACK_DISCOUNTS
-    _FALLBACK_DISCOUNTS = [d for d in _FALLBACK_DISCOUNTS if d.id != discount_id]
+    _FALLBACK_DISCOUNTS[:] = [d for d in _FALLBACK_DISCOUNTS if d.id != discount_id]
     return {"message": "Discount rule deleted"}

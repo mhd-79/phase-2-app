@@ -4,8 +4,8 @@ import csv
 import io
 from datetime import date, datetime, timezone
 from app.schemas import ItemSchema, ItemCreate, ItemUpdate, CategorySchema, CategoryCreate, UploadPreviewResult
-from app.security import get_current_user, require_admin
-from app.database import db
+from app.security import get_current_user, require_module
+from app.database import db, is_default_store
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -59,7 +59,7 @@ async def get_item_by_sku(sku: str):
     )
 
 @router.post("/items", response_model=ItemSchema)
-async def create_item(item: ItemCreate, user = Depends(require_admin)):
+async def create_item(item: ItemCreate, user = Depends(require_module("inventory", "stock_upload"))):
     existing = await db.item.find_unique(where={"sku": item.sku})
     if existing:
         raise HTTPException(status_code=400, detail="Item SKU already exists")
@@ -88,7 +88,7 @@ async def create_item(item: ItemCreate, user = Depends(require_admin)):
     )
 
 @router.put("/items/{sku}", response_model=ItemSchema)
-async def update_item(sku: str, item: ItemUpdate, user = Depends(require_admin)):
+async def update_item(sku: str, item: ItemUpdate, user = Depends(require_module("inventory", "stock_upload"))):
     existing = await db.item.find_unique(where={"sku": sku})
     if not existing:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -110,7 +110,7 @@ async def update_item(sku: str, item: ItemUpdate, user = Depends(require_admin))
     )
 
 @router.delete("/items/{sku}")
-async def delete_item(sku: str, user = Depends(require_admin)):
+async def delete_item(sku: str, user = Depends(require_module("inventory"))):
     existing = await db.item.find_unique(where={"sku": sku})
     if not existing:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -121,11 +121,11 @@ async def delete_item(sku: str, user = Depends(require_admin)):
 async def get_categories():
     db_cats = await db.category.find_many()
     custom = [c.name for c in db_cats]
-    merged = list(dict.fromkeys(DEFAULT_CATEGORIES + custom))
+    merged = list(dict.fromkeys((DEFAULT_CATEGORIES if is_default_store() else []) + custom))
     return merged
 
 @router.post("/categories", response_model=CategorySchema)
-async def create_category(req: CategoryCreate, user = Depends(require_admin)):
+async def create_category(req: CategoryCreate, user = Depends(require_module("inventory", "stock_upload"))):
     existing = await db.category.find_unique(where={"name": req.name})
     if existing:
         return CategorySchema(id=existing.id, name=existing.name)
@@ -140,7 +140,7 @@ def _num(v) -> Optional[float]:
         return None
 
 @router.post("/upload/preview", response_model=UploadPreviewResult)
-async def upload_preview(file: UploadFile = File(...), user = Depends(require_admin)):
+async def upload_preview(file: UploadFile = File(...), user = Depends(require_module("stock_upload"))):
     contents = await file.read()
     text = contents.decode("utf-8-sig", errors="ignore")
     reader = csv.DictReader(io.StringIO(text))
@@ -198,7 +198,7 @@ async def upload_preview(file: UploadFile = File(...), user = Depends(require_ad
     )
 
 @router.post("/upload/commit")
-async def upload_commit(payload: List[dict], user = Depends(require_admin)):
+async def upload_commit(payload: List[dict], user = Depends(require_module("stock_upload"))):
     applied = 0
     for r in payload:
         status = r.get("status")

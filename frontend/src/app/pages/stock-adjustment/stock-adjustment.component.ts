@@ -81,6 +81,54 @@ import { ApiService } from '../../services/api.service';
 
     <div class="card card-flush" style="margin-top:var(--space-5)">
       <div class="card-header">
+        <h3>Returned items pending review</h3>
+        <span class="badge" [class.badge-warning]="reviews().length" [class.badge-neutral]="!reviews().length">{{ reviews().length }} pending</span>
+      </div>
+      @if (reviews().length > 0) {
+        <div class="table-scroll">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Return</th>
+                <th>Item</th>
+                <th class="num">Qty</th>
+                <th>Condition</th>
+                <th>Reason</th>
+                <th>Decision</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of reviews(); track r.id) {
+                <tr>
+                  <td class="mono">{{ r.return_no }}<div class="text-xs text-muted">{{ r.invoice_no }}</div></td>
+                  <td>{{ r.name }}<div class="text-xs text-muted mono">{{ r.sku }}</div></td>
+                  <td class="num mono">{{ r.qty }}</td>
+                  <td><span class="badge" [class.badge-danger]="r.condition === 'Damaged'" [class.badge-info]="r.condition === 'Warranty'">{{ r.condition }}</span></td>
+                  <td>{{ r.reason || '—' }}</td>
+                  <td>
+                    <select class="select" [ngModel]="outcomeFor(r)" (ngModelChange)="outcomes[r.id] = $event" style="min-width:210px" aria-label="Review decision">
+                      <option value="RESTOCK">Restock as sellable (+{{ r.qty }})</option>
+                      <option value="WRITE_OFF">Write off / discard (no stock change)</option>
+                      <option value="VENDOR_CLAIM">Send back to supplier (no stock change)</option>
+                      @if (r.condition === 'Warranty') { <option value="WARRANTY_REPLACE">Replace under warranty (-{{ r.qty }})</option> }
+                    </select>
+                  </td>
+                  <td><button class="btn btn-primary btn-sm" type="button" [disabled]="resolvingId === r.id" (click)="resolveReview(r)">Apply</button></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <p class="text-sm">No damaged or warranty returns are waiting for review.</p>
+        </div>
+      }
+    </div>
+
+    <div class="card card-flush" style="margin-top:var(--space-5)">
+      <div class="card-header">
         <h3>Adjustment Log</h3>
       </div>
       @if (adjustmentsLog().length > 0) {
@@ -125,6 +173,9 @@ export class StockAdjustmentComponent implements OnInit {
 
   catalog = signal<any[]>([]);
   adjustmentsLog = signal<any[]>([]);
+  reviews = signal<any[]>([]);
+  outcomes: Record<string, string> = {};
+  resolvingId = '';
 
   selectedSku = '';
   currentStock = signal<number>(0);
@@ -147,6 +198,24 @@ export class StockAdjustmentComponent implements OnInit {
 
     const log = await this.api.getStockAdjustments();
     this.adjustmentsLog.set(log.slice().reverse());
+    this.reviews.set(await this.api.getReturnReviews('PENDING'));
+  }
+
+  outcomeFor(r: any): string { return this.outcomes[r.id] || 'RESTOCK'; }
+
+  async resolveReview(r: any) {
+    if (this.resolvingId) return;
+    this.resolvingId = r.id;
+    try {
+      await this.api.resolveReturnReview(r.id, this.outcomeFor(r));
+      delete this.outcomes[r.id];
+      await this.loadData();
+    } catch (err: any) {
+      alert(err?.error?.detail || err?.message || 'Could not apply the decision');
+      await this.loadData();
+    } finally {
+      this.resolvingId = '';
+    }
   }
 
   onItemChange() {

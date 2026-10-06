@@ -2,12 +2,19 @@ import { Injectable } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class OfflineDbService {
-  private dbName = 'OkutoMartPOS_DB';
+  /** One IndexedDB per business so offline catalog / held bills / queued sales never cross tenants on a shared browser. */
+  private get dbName(): string {
+    const owner = localStorage.getItem('pos_cache_owner');
+    return !owner || owner === 'default' ? 'OkutoMartPOS_DB' : `OkutoMartPOS_DB_${owner}`;
+  }
+  private openName: string | null = null;
   private version = 1;
   private db: IDBDatabase | null = null;
 
   async init(): Promise<void> {
-    if (this.db) return;
+    if (this.db && this.openName === this.dbName) return;
+    if (this.db) { this.db.close(); this.db = null; }
+    this.openName = this.dbName;
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(this.dbName, this.version);
       req.onupgradeneeded = (e: any) => {

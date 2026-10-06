@@ -1,7 +1,8 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../services/auth.service';
+import { Router } from '@angular/router';
+import { ACCESS_MODULES, AuthService } from '../../services/auth.service';
 import { ApiService } from '../../services/api.service';
 
 export interface DaySchedule {
@@ -31,7 +32,6 @@ export interface UserAccountData {
   name: string;
   username: string;
   role: 'Admin' | 'Cashier';
-  phase?: 1 | 2;
   avatar: string;
   sub: string;
   status: 'Active' | 'Disabled';
@@ -239,7 +239,6 @@ export interface UserAccountData {
                       <span class="badge" [class.badge-primary]="u.role === 'Admin'" [class.badge-neutral]="u.role !== 'Admin'">
                         {{ u.role }}
                       </span>
-                      @if (u.role === 'Admin' && u.phase === 1) { <span class="badge badge-warning" title="Phase 1 features only">Phase 1</span> }
                     </td>
                     <td>
                       <span class="mono text-xs" style="max-width:320px;display:inline-block;white-space:normal;line-height:1.4">
@@ -261,9 +260,15 @@ export interface UserAccountData {
                       <div class="row" style="gap:var(--space-2);align-items:center">
                         <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--text)" (click)="openEditUserModal(u.key)">Edit</button>
                         <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--primary)" (click)="openResetPinModal(u.username)">Reset PIN</button>
+                        @if (auth.isAdmin() && !isSelf(u.username)) {
+                          <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--primary)" (click)="openAccessModal(u)">User Access</button>
+                        }
                         <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--text)" (click)="toggleUserStatus(u.key)">
                           {{ u.status === 'Active' ? 'Disable' : 'Enable' }}
                         </button>
+                        @if (isSelf(u.username) && u.role === 'Admin') {
+                          <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--primary)" (click)="openTransferModal()">Transfer Admin Role</button>
+                        }
                       </div>
                     </td>
                   </tr>
@@ -453,20 +458,12 @@ export interface UserAccountData {
           <div class="form-grid">
             <div class="field">
               <label>Role</label>
-              <select class="select" [(ngModel)]="formRole">
+              <select class="select" [(ngModel)]="formRole" [disabled]="isSelf(formUsername)">
                 <option value="Cashier">Cashier</option>
                 <option value="Admin">Admin</option>
               </select>
+              @if (isSelf(formUsername)) { <span class="hint">Your admin role is fixed. Use “Transfer Admin Role” to hand it to someone else.</span> }
             </div>
-            @if (formRole === 'Admin' && auth.hasPhase2()) {
-              <div class="field">
-                <label>Admin access</label>
-                <select class="select" [(ngModel)]="formPhase">
-                  <option [ngValue]="1">Phase 1 Admin (Phase 1 features only)</option>
-                  <option [ngValue]="2">Phase 2 Admin (Phase 1 + Phase 2)</option>
-                </select>
-              </div>
-            }
             <div class="field">
               <label>Set 4-digit PIN</label>
               <input class="input mono" type="password" maxlength="4" [(ngModel)]="formPin" placeholder="••••">
@@ -565,6 +562,62 @@ export interface UserAccountData {
       </div>
     </div>
 
+    <!-- ================= USER ACCESS MODAL ================= -->
+    <div class="modal-overlay" [class.open]="showAccessModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>User Access &middot; {{ accessUser?.name }}</h3>
+          <button class="icon-btn" (click)="showAccessModal = false">✕</button>
+        </div>
+        <div class="modal-body stack">
+          <p class="text-sm text-muted">Allow or deny each module for this user only. Changes apply to this user straight away and are checked on the server, not just in the menu.</p>
+          @if (accessLoading) { <p class="text-sm text-muted">Loading…</p> }
+          @else {
+            @for (m of accessModules; track m.key) {
+              <label class="checkbox-row"><input type="checkbox" [checked]="!!accessChoices[m.key]" (change)="accessChoices[m.key] = $any($event.target).checked"> {{ m.label }}</label>
+            }
+          }
+          @if (accessError) { <div class="text-sm" style="color:var(--danger-700)" role="alert">{{ accessError }}</div> }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="resetAccessToRoleDefaults()" [disabled]="accessLoading">Role defaults</button>
+          <button class="btn btn-secondary" (click)="showAccessModal = false">Cancel</button>
+          <button class="btn btn-primary" [disabled]="isSavingAccess || accessLoading" (click)="saveAccess()">{{ isSavingAccess ? 'Saving...' : 'Save access' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TRANSFER ADMIN ROLE MODAL ================= -->
+    <div class="modal-overlay" [class.open]="showTransferModal">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3>Transfer Admin Role</h3>
+          <button class="icon-btn" (click)="showTransferModal = false">✕</button>
+        </div>
+        <div class="modal-body stack">
+          <span class="hint">The selected user becomes the Admin and your account becomes a Cashier. You will be signed out.</span>
+          <div class="field">
+            <label>Transfer to</label>
+            <select class="select" [(ngModel)]="transferTo">
+              <option value="">Select a user</option>
+              @for (c of transferCandidates(); track c.key) {
+                <option [value]="c.username">{{ c.name }} ({{ c.username }})</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label>Confirm with your PIN / password</label>
+            <input class="input mono" type="password" [(ngModel)]="transferPin" placeholder="••••">
+          </div>
+          @if (transferError) { <span class="hint" style="color:var(--danger-700)">{{ transferError }}</span> }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showTransferModal = false">Cancel</button>
+          <button class="btn btn-primary" [disabled]="isTransferring" (click)="confirmTransfer()">{{ isTransferring ? 'Transferring...' : 'Transfer Admin Role' }}</button>
+        </div>
+      </div>
+    </div>
+
     @if (toastMessage) {
       <div class="toast-stack"><div class="toast"><span class="dot dot-success"></span><span>{{ toastMessage }}</span></div></div>
     }
@@ -573,6 +626,7 @@ export interface UserAccountData {
 export class UsersComponent implements OnInit {
   auth = inject(AuthService);
   api = inject(ApiService);
+  router = inject(Router);
   Math = Math;
 
   activeTab = 'accounts';
@@ -611,9 +665,16 @@ export class UsersComponent implements OnInit {
   leaveError = '';
   isSavingLeave = false;
   formAutoLock = '2 min';
-  formPhase: 1 | 2 = 2;
-  formSchedule: ScheduleMap = {};
+  /** Starts with the default working week so the schedule rows of the (always rendered) Add / Edit dialog never read a missing day. */
+  formSchedule: ScheduleMap = Object.fromEntries(this.daysList.map(d => [d, { active: d !== 'Sunday', start: d === 'Saturday' ? '10:00' : '09:00', end: d === 'Saturday' ? '16:00' : '18:00' }]));
   isSavingUser = false;
+
+  // Transfer admin role state
+  showTransferModal = false;
+  transferTo = '';
+  transferPin = '';
+  transferError = '';
+  isTransferring = false;
 
   // Reset PIN state
   showResetPinModal = false;
@@ -739,6 +800,12 @@ export class UsersComponent implements OnInit {
   }
 
   async ngOnInit() {
+    // The prototype's sample staff and audit trail belong to the original store only; a tenant lists just its own users.
+    const owner = localStorage.getItem('pos_cache_owner');
+    if (owner && owner !== 'default') {
+      this.userAccounts = {};
+      this.auditLogs = [];
+    }
     const saved = localStorage.getItem('pos_p2_user_accounts_v2');
     if (saved) {
       try { this.userAccounts = JSON.parse(saved); } catch {}
@@ -759,7 +826,6 @@ export class UsersComponent implements OnInit {
               name: u.full_name,
               username: u.username,
               role: u.role.toLowerCase() === 'admin' ? 'Admin' : 'Cashier',
-              phase: u.phase_access === 1 ? 1 : 2,
               avatar: u.full_name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2),
               sub: u.sub_text || `${u.role} · Counter Staff`,
               status: u.is_active ? 'Active' : 'Disabled',
@@ -776,7 +842,6 @@ export class UsersComponent implements OnInit {
             this.userAccounts[key].onLeave = !!u.on_leave;
             this.userAccounts[key].leaveReason = u.leave_reason || null;
             this.userAccounts[key].role = u.role.toLowerCase() === 'admin' ? 'Admin' : 'Cashier';
-            this.userAccounts[key].phase = u.phase_access === 1 ? 1 : 2;
           }
         });
         this.saveAccountsToStorage();
@@ -1081,7 +1146,6 @@ export class UsersComponent implements OnInit {
     this.formPin = '';
     this.formStatus = 'Active';
     this.formAutoLock = '2 min';
-    this.formPhase = this.auth.hasPhase2() ? 2 : 1;
 
     const s: ScheduleMap = {};
     this.daysList.forEach(d => {
@@ -1106,7 +1170,6 @@ export class UsersComponent implements OnInit {
     this.formPin = u.pin || '1234';
     this.formStatus = u.status;
     this.formAutoLock = u.autoLock || '2 min';
-    this.formPhase = u.phase === 1 ? 1 : 2;
 
     const s: ScheduleMap = {};
     this.daysList.forEach(d => {
@@ -1191,6 +1254,89 @@ export class UsersComponent implements OnInit {
     }
   }
 
+  /** True when the username belongs to the signed-in user. */
+  isSelf(username: string): boolean {
+    return !!username && username.trim().toLowerCase() === (this.auth.currentUser().username || '').toLowerCase();
+  }
+
+  /** Active users who are not on leave and can take over the admin role. */
+  transferCandidates(): UserAccountData[] {
+    return Object.values(this.userAccounts).filter(u => !this.isSelf(u.username) && u.status === 'Active' && !u.onLeave);
+  }
+
+  openTransferModal() {
+    this.transferTo = '';
+    this.transferPin = '';
+    this.transferError = '';
+    this.showTransferModal = true;
+  }
+
+  async confirmTransfer() {
+    if (this.isTransferring) return;
+    if (!this.transferTo) { this.transferError = 'Select the user who will become the Admin'; return; }
+    if (!this.transferPin) { this.transferError = 'Enter your PIN or password to confirm'; return; }
+    this.isTransferring = true;
+    this.transferError = '';
+    try {
+      await this.api.transferAdminRole(this.transferTo, this.transferPin);
+      this.showTransferModal = false;
+      this.triggerToast(`Admin role transferred to ${this.transferTo}. Please sign in again.`);
+      setTimeout(() => { this.auth.logout(); this.router.navigate(['/login']); }, 1500);
+    } catch (err: any) {
+      this.transferError = typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not transfer the admin role. Please try again.';
+    } finally {
+      this.isTransferring = false;
+    }
+  }
+
+  // --- User Access (module permissions) ---
+  showAccessModal = false;
+  accessUser: UserAccountData | null = null;
+  accessModules: { key: string; label: string }[] = ACCESS_MODULES;
+  accessChoices: Record<string, boolean> = {};
+  accessLoading = false;
+  accessError = '';
+  isSavingAccess = false;
+
+  async openAccessModal(u: UserAccountData) {
+    this.accessUser = u;
+    this.accessError = '';
+    this.accessLoading = true;
+    this.showAccessModal = true;
+    try {
+      const res = await this.api.getUserAccess(u.username);
+      this.accessModules = (res.available as { key: string; label: string }[])?.length ? res.available : ACCESS_MODULES;
+      this.accessChoices = { ...res.modules };
+    } catch (err: any) {
+      this.accessError = err?.error?.detail || 'Could not load the access for this user.';
+      this.accessChoices = {};
+    } finally {
+      this.accessLoading = false;
+    }
+  }
+
+  resetAccessToRoleDefaults() {
+    const admin = this.accessUser?.role === 'Admin';
+    const cashierDefaults = ['billing', 'hold_recall', 'returns'];
+    this.accessChoices = Object.fromEntries(this.accessModules.map(m => [m.key, admin || cashierDefaults.includes(m.key)]));
+  }
+
+  async saveAccess() {
+    if (!this.accessUser || this.isSavingAccess) return;
+    this.isSavingAccess = true;
+    this.accessError = '';
+    try {
+      await this.api.saveUserAccess(this.accessUser.username, this.accessChoices);
+      this.showAccessModal = false;
+      this.triggerToast(`Access updated for ${this.accessUser.name}`);
+      await this.loadAuditLogs();
+    } catch (err: any) {
+      this.accessError = typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not save the access. Please try again.';
+    } finally {
+      this.isSavingAccess = false;
+    }
+  }
+
   openResetPinModal(username: string) {
     this.resetPinUsername = username;
     this.resetPinValue = '';
@@ -1246,7 +1392,6 @@ export class UsersComponent implements OnInit {
     existing.pin = this.formPin;
     existing.status = this.formStatus;
     existing.autoLock = this.formAutoLock;
-    if (this.auth.hasPhase2()) existing.phase = this.formRole === 'Admin' ? this.formPhase : 2;
     existing.schedule = JSON.parse(JSON.stringify(this.formSchedule));
 
     this.userAccounts[key] = existing;
@@ -1260,8 +1405,7 @@ export class UsersComponent implements OnInit {
           role: existing.role.toLowerCase(),
           pin: existing.pin,
           is_active: existing.status === 'Active',
-          auto_lock: existing.autoLock,
-          ...(this.auth.hasPhase2() ? { phase_access: existing.phase ?? 2 } : {})
+          auto_lock: existing.autoLock
         });
       } else {
         await this.api.createUser({
@@ -1270,12 +1414,11 @@ export class UsersComponent implements OnInit {
           role: existing.role.toLowerCase(),
           full_name: existing.name,
           sub_text: existing.sub,
-          auto_lock: existing.autoLock,
-          ...(this.auth.hasPhase2() ? { phase_access: existing.phase ?? 2 } : {})
+          auto_lock: existing.autoLock
         });
       }
     } catch (err: any) {
-      // e.g. 403 when a Phase 1 admin tries to modify a Phase 2 admin: show the server's reason
+      // e.g. 400 when an admin tries to change their own role: show the server's reason
       if (err?.status === 403 || err?.status === 400) rejected = err?.error?.detail || 'Not allowed';
     }
 

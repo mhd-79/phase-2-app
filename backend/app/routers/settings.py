@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.schemas import StoreSettingsSchema, StoreSettingsUpdate
-from app.security import get_current_user, require_admin
+from app.security import get_current_user, require_module
 from app.database import db
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
@@ -16,11 +16,12 @@ async def get_store_settings():
         phone=store.phone,
         gstin=store.gstin,
         pricing_mode=store.pricing_mode,
-        idle_timeout_seconds=store.idle_timeout_seconds
+        idle_timeout_seconds=store.idle_timeout_seconds,
+        return_policy=getattr(store, "return_policy", None) or "BOTH"
     )
 
 @router.put("/store", response_model=StoreSettingsSchema)
-async def update_store_settings(req: StoreSettingsUpdate, user = Depends(require_admin)):
+async def update_store_settings(req: StoreSettingsUpdate, user = Depends(require_module("store_settings"))):
     data = req.dict(exclude_unset=True)
     store = await db.storesettings.upsert(
         where={"id": "store_main"},
@@ -32,11 +33,12 @@ async def update_store_settings(req: StoreSettingsUpdate, user = Depends(require
         phone=store.phone,
         gstin=store.gstin,
         pricing_mode=store.pricing_mode,
-        idle_timeout_seconds=store.idle_timeout_seconds
+        idle_timeout_seconds=store.idle_timeout_seconds,
+        return_policy=getattr(store, "return_policy", None) or "BOTH"
     )
 
 @router.post("/backup")
-async def trigger_backup(user = Depends(require_admin)):
+async def trigger_backup(user = Depends(require_module("backup"))):
     items = await db.item.find_many()
     sales = await db.sale.find_many(include={"items": True, "tenders": True})
     users = await db.user.find_many()

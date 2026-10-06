@@ -1,14 +1,16 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Optional
-from app.database import get_db
+from app.database import get_db, is_default_store
+from app.tenant_scoped import TenantList, TenantDict
 from app.schemas import VendorCreate, VendorUpdate, VendorSchema, VendorPaymentCreate
 from app.security import get_current_user
+from app.security import require_module
 from app.idempotency import enforce_idempotency, idempotency_manager
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
 # Seed vendors data if database is empty
-SEED_VENDORS = [
+_DEMO_VENDORS = [
     { "id": "V-001", "name": "Sunrise Distributors", "category": "Grocery & Staples", "contact": "Ramesh Gupta", "phone": "+91 98200 11223", "email": "ramesh@sunrisedist.in", "terms": "Net 30", "status": "Active", "payable": 84500.0 },
     { "id": "V-002", "name": "Coastal Beverages Co.", "category": "Beverages", "contact": "Anita Fernandes", "phone": "+91 90040 55211", "email": "anita@coastalbev.in", "terms": "Net 15", "status": "Active", "payable": 32100.0 },
     { "id": "V-003", "name": "Dairy Fresh Farms", "category": "Dairy", "contact": "Suresh Nair", "phone": "+91 89393 40021", "email": "suresh@dairyfresh.in", "terms": "Net 7", "status": "Active", "payable": 18450.0 },
@@ -19,7 +21,13 @@ SEED_VENDORS = [
     { "id": "V-008", "name": "Metro Cash & Carry", "category": "Ad-hoc Supply", "contact": "Walk-in Counter", "phone": "+91 98111 22334", "email": "—", "terms": "Due on Delivery", "status": "Active", "payable": 5400.0 }
 ]
 
+# per-tenant view of the vendor list used when the database cannot be reached: the original store keeps the demo vendors,
+# every other tenant starts empty and never shares entries with another tenant
+SEED_VENDORS = TenantList(_DEMO_VENDORS)
+
 async def seed_vendors_if_needed():
+    if not is_default_store():          # a new tenant starts with NO vendors
+        return
     db = get_db()
     if db.is_connected():
         try:
@@ -68,7 +76,7 @@ async def get_vendor(vendor_id: str):
             return VendorSchema(**v)
     raise HTTPException(status_code=404, detail="Vendor not found")
 
-@router.post("", response_model=VendorSchema)
+@router.post("", response_model=VendorSchema, dependencies=[Depends(require_module("vendors"))])
 async def create_vendor(data: VendorCreate, request: Request, current_user=Depends(get_current_user)):
     lock_key = await enforce_idempotency(request, "create_vendor", data.id or data.name)
     try:
@@ -124,7 +132,7 @@ async def create_vendor(data: VendorCreate, request: Request, current_user=Depen
             raise e
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{vendor_id}", response_model=VendorSchema)
+@router.put("/{vendor_id}", response_model=VendorSchema, dependencies=[Depends(require_module("vendors"))])
 async def update_vendor(vendor_id: str, data: VendorUpdate, request: Request, current_user=Depends(get_current_user)):
     lock_key = await enforce_idempotency(request, f"update_vendor_{vendor_id}")
     try:
@@ -230,7 +238,7 @@ async def get_vendor_ledger(vendor_id: str):
             }
     raise HTTPException(status_code=404, detail="Vendor not found")
 
-@router.post("/{vendor_id}/payments")
+@router.post("/{vendor_id}/payments", dependencies=[Depends(require_module("vendors"))])
 async def record_vendor_payment(vendor_id: str, data: VendorPaymentCreate, request: Request, current_user=Depends(get_current_user)):
     lock_key = await enforce_idempotency(request, "vendor_payment", f"{vendor_id}_{data.amount}_{data.mode}")
     try:

@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type UserRole = 'admin' | 'cashier';
+export type UserRole = 'admin' | 'cashier' | 'super_admin';
 
 export interface UserProfile {
   username: string;
@@ -12,6 +12,39 @@ export interface UserProfile {
   phase?: 1 | 2;
   /** Billing counter the user is currently working on (CashCounter.counter_name). Saved on the server. */
   activeCounter?: string | null;
+  /** Multi-tenant sign-ins only (a business created by the Super Admin). Empty for the original store. */
+  tenantId?: string | null;
+  tenantName?: string | null;
+  /** TRIAL | ACTIVE | EXPIRED ... as of sign-in; the banner re-reads the live value from the server. */
+  tenantStatus?: string | null;
+  subscriptionEnd?: string | null;
+  /** Module access the Admin allowed / denied for this user (Users & Roles -> User Access). Missing = the role's defaults. */
+  modules?: Record<string, boolean>;
+}
+
+/** Feature areas a user can be allowed or denied. Keys match the API. */
+export const ACCESS_MODULES: { key: string; label: string; route: string }[] = [
+  { key: 'billing', label: 'Billing', route: '/pos' },
+  { key: 'hold_recall', label: 'Hold & Recall', route: '/hold-bills' },
+  { key: 'returns', label: 'Returns', route: '/returns' },
+  { key: 'stock_upload', label: 'Stock Upload', route: '/stock-upload' },
+  { key: 'inventory', label: 'Inventory / Stock Maintenance', route: '/items-stock' },
+  { key: 'vendors', label: 'Vendor Management', route: '/vendors' },
+  { key: 'purchase_orders', label: 'Purchase Orders', route: '/purchase-orders' },
+  { key: 'reports', label: 'Reports', route: '/reports' },
+  { key: 'ai_insights', label: 'AI Insights', route: '/ai-insights' },
+  { key: 'users', label: 'Users & Roles', route: '/users' },
+  { key: 'store_settings', label: 'Store Settings', route: '/store-settings' },
+  { key: 'tax_config', label: 'Tax Configuration', route: '/tax-settings' },
+  { key: 'backup', label: 'Backup', route: '/store-settings' }
+];
+const CASHIER_MODULES = ['billing', 'hold_recall', 'returns'];
+
+export interface TenantSession {
+  tenantId?: string | null;
+  tenantName?: string | null;
+  tenantStatus?: string | null;
+  subscriptionEnd?: string | null;
 }
 
 const DEFAULT_ADMIN: UserProfile = {
@@ -38,8 +71,9 @@ export class AuthService {
     return DEFAULT_ADMIN;
   }
 
-  setSession(token: string, username: string, role: string, fullName: string, subText: string, autoLock: string = '2 min', phase: number = 2, activeCounter: string | null = null) {
-    const userRole = (role.toLowerCase() === 'admin' ? 'admin' : 'cashier') as UserRole;
+  setSession(token: string, username: string, role: string, fullName: string, subText: string, autoLock: string = '2 min', phase: number = 2, activeCounter: string | null = null, tenant: TenantSession = {}, modules?: Record<string, boolean>) {
+    const roleKey = role.toLowerCase();
+    const userRole = (roleKey === 'admin' || roleKey === 'super_admin' ? roleKey : 'cashier') as UserRole;
     const profile: UserProfile = {
       username,
       role: userRole,
@@ -47,8 +81,15 @@ export class AuthService {
       subText,
       autoLock,
       phase: phase === 1 ? 1 : 2,
-      activeCounter
+      activeCounter,
+      tenantId: tenant.tenantId ?? null,
+      tenantName: tenant.tenantName ?? null,
+      tenantStatus: tenant.tenantStatus ?? null,
+      subscriptionEnd: tenant.subscriptionEnd ?? null,
+      modules: modules ?? undefined
     };
+
+    this.switchCacheOwner(userRole === 'super_admin' ? 'platform' : (tenant.tenantId ?? 'default'));
 
     this.token.set(token);
     this.currentUser.set(profile);
@@ -56,6 +97,35 @@ export class AuthService {
 
     localStorage.setItem('pos_token', token);
     localStorage.setItem('pos_user_profile', JSON.stringify(profile));
+  }
+
+  /**
+   * Browser-side business caches (catalog, vendors, POs, sales log, user list ... in localStorage) are not tenant-aware.
+   * When a different business signs in on the same browser, the previous business's cache is stashed under its own key
+   * and the new business's stash (if any) is restored, so one tenant never sees another tenant's cached records.
+   */
+  private switchCacheOwner(owner: string) {
+    try {
+      const isCacheKey = (k: string) => k.startsWith('pos_demo_') || k.startsWith('pos_p2_') || k === 'ai_insights_sample_data';
+      const previous = localStorage.getItem('pos_cache_owner') ?? 'default';
+      if (previous === owner) { localStorage.setItem('pos_cache_owner', owner); return; }
+
+      const current: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && isCacheKey(k)) current[k] = localStorage.getItem(k) ?? '';
+      }
+      Object.keys(current).forEach(k => localStorage.removeItem(k));
+      if (Object.keys(current).length) localStorage.setItem(`pos_cache_stash::${previous}`, JSON.stringify(current));
+
+      const restored = localStorage.getItem(`pos_cache_stash::${owner}`);
+      if (restored) {
+        const data = JSON.parse(restored) as Record<string, string>;
+        Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, v));
+        localStorage.removeItem(`pos_cache_stash::${owner}`);
+      }
+      localStorage.setItem('pos_cache_owner', owner);
+    } catch {}
   }
 
   setActiveCounter(counterName: string | null) {
@@ -74,13 +144,40 @@ export class AuthService {
     return !!this.token() || !!localStorage.getItem('pos_token') || !!localStorage.getItem('pos_user_profile');
   }
 
+  /** Whether the signed-in user may open a module. The server enforces the same rule on every API call; this only drives what is shown. */
+  can(module: string): boolean {
+    const u = this.currentUser();
+    if (u.role === 'super_admin') return false;
+    const explicit = u.modules?.[module];
+    if (explicit !== undefined) return !!explicit;
+    return u.role === 'admin' || CASHIER_MODULES.includes(module);
+  }
+
+  /** First screen the user is allowed to open (where a blocked page sends them). */
+  homeRoute(): string {
+    return ACCESS_MODULES.find(m => this.can(m.key))?.route ?? '/login';
+  }
+
+  /** Applies module access re-read from the server (an Admin may have changed it since sign-in). */
+  setModules(modules: Record<string, boolean> | null | undefined) {
+    if (!modules) return;
+    const profile: UserProfile = { ...this.currentUser(), modules };
+    this.currentUser.set(profile);
+    localStorage.setItem('pos_user_profile', JSON.stringify(profile));
+  }
+
   isAdmin(): boolean {
     return this.currentRole() === 'admin';
   }
 
-  /** True unless the signed-in user is limited to Phase 1 features. */
+  /** Platform administrator (manages tenants). Not an admin of any store. */
+  isSuperAdmin(): boolean {
+    return this.currentRole() === 'super_admin';
+  }
+
+  /** Always true: the separate Phase 1 admin level is retired (a profile saved earlier with phase 1 still gets full access). */
   hasPhase2(): boolean {
-    return this.currentUser().phase !== 1;
+    return true;
   }
 
   getAutoLockTimeoutSeconds(): number {

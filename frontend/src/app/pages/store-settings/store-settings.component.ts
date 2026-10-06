@@ -2,12 +2,14 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { OkutoIqSubscriptionCardComponent } from '../../components/ai-chatbot/okuto-iq-subscription-card.component';
+import { PlatformSubscriptionCardComponent } from '../../components/platform-subscription-card/platform-subscription-card.component';
 
 @Component({
   selector: 'app-store-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, OkutoIqSubscriptionCardComponent],
+  imports: [CommonModule, FormsModule, OkutoIqSubscriptionCardComponent, PlatformSubscriptionCardComponent],
   template: `
     <main class="main">
       <div class="page-header">
@@ -18,6 +20,7 @@ import { OkutoIqSubscriptionCardComponent } from '../../components/ai-chatbot/ok
         </div>
       </div>
 
+      @if (auth.can('store_settings')) {
       <div class="card" style="max-width:720px;margin-bottom:var(--space-6)">
         <form (submit)="saveSettings(); $event.preventDefault()">
           <h3 style="margin-bottom:var(--space-4)">Store Receipt Profile</h3>
@@ -44,6 +47,16 @@ import { OkutoIqSubscriptionCardComponent } from '../../components/ai-chatbot/ok
           </div>
 
           <div class="field" style="margin-top:var(--space-4)">
+            <label>Return &amp; Exchange Policy</label>
+            <select class="select" [(ngModel)]="returnPolicy" name="returnPolicy">
+              <option value="BOTH">Return and Exchange both allowed</option>
+              <option value="RETURN">Return (refund) only</option>
+              <option value="EXCHANGE">Exchange only</option>
+            </select>
+            <span class="hint">What a cashier may do with a returned item on the Returns screen.</span>
+          </div>
+
+          <div class="field" style="margin-top:var(--space-4)">
             <label>Idle Lock Timeout (seconds)</label>
             <input class="input mono" type="number" [(ngModel)]="store.idleTimeout" name="idleTimeout">
             <span class="hint">Screen will automatically lock after this duration of inactivity.</span>
@@ -54,7 +67,9 @@ import { OkutoIqSubscriptionCardComponent } from '../../components/ai-chatbot/ok
           </div>
         </form>
       </div>
+      }
 
+      @if (auth.can('backup')) {
       <div class="card" style="max-width:720px">
         <h3>Database Backup &amp; Recovery</h3>
         <p class="text-sm text-muted" style="margin-bottom:var(--space-4)">Export full store database JSON file locally or sync to Azure Blob Storage.</p>
@@ -66,13 +81,16 @@ import { OkutoIqSubscriptionCardComponent } from '../../components/ai-chatbot/ok
           <p class="text-sm" style="color:var(--success-700);margin-top:var(--space-3)">{{ backupMsg }}</p>
         }
       </div>
+      }
 
+      <app-platform-subscription-card></app-platform-subscription-card>
       <app-okuto-iq-subscription-card></app-okuto-iq-subscription-card>
     </main>
   `
 })
 export class StoreSettingsComponent implements OnInit {
   api = inject(ApiService);
+  auth = inject(AuthService);
 
   store = {
     name: 'Okuto Mart',
@@ -83,17 +101,29 @@ export class StoreSettingsComponent implements OnInit {
   };
 
   backupMsg: string | null = null;
+  returnPolicy: 'RETURN' | 'EXCHANGE' | 'BOTH' = 'BOTH';
 
-  ngOnInit() {
+  async ngOnInit() {
+    this.returnPolicy = await this.api.getReturnPolicy();
+    const u = this.auth.currentUser();
+    if (u.tenantId) {
+      // a tenant never starts with the prototype store's identity
+      this.store = { name: u.tenantName || '', address: '', gstin: '', phone: '', idleTimeout: 45 };
+    }
     const saved = localStorage.getItem('pos_demo_store_settings');
     if (saved) {
       try { this.store = JSON.parse(saved); } catch {}
     }
   }
 
-  saveSettings() {
+  async saveSettings() {
     localStorage.setItem('pos_demo_store_settings', JSON.stringify(this.store));
-    alert('Store profile updated successfully');
+    try {
+      await this.api.saveReturnPolicy(this.returnPolicy);
+      alert('Store profile updated successfully');
+    } catch (err: any) {
+      alert(err?.error?.detail || 'Store profile saved, but the return policy could not be saved. Please try again.');
+    }
   }
 
   backupData() {

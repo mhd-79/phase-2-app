@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from app.database import db
+from app.database import db, is_default_store
 from app.security import get_current_user
 
 router = APIRouter(prefix="/reports/ai-insights", tags=["AI Insights"])
@@ -12,6 +12,12 @@ async def get_ai_insights(from_date: Optional[str] = None, to_date: Optional[str
     items = await db.item.find_many(where={"is_active": True})
     batches = await db.batch.find_many()
     sales = await db.sale.find_many(include={"items": True})
+
+    # A business with no sales yet has no trends to report. (The prototype's illustrative figures below are for the
+    # original store's demo only; a tenant must never be shown them.)
+    if not sales and not is_default_store():
+        return {"status": "success", "generated_at": datetime.now().isoformat(), "trends": [], "top_selling_by_quantity": [],
+                "top_revenue_generators": [], "slow_moving_items": []}
     
     # 1. Calculate sales velocity per item
     item_sales_map: Dict[str, Dict[str, Any]] = {}

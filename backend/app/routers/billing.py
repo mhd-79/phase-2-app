@@ -4,19 +4,21 @@ from datetime import datetime, timezone
 import json
 from app.schemas import SaleCreate, SaleReturnCreate, HeldBillCreate, PinVerifyRequest, CustomerCreate
 from app.security import get_current_user, verify_pin, get_phase_access, PHASE_2, require_phase2
+from app.security import require_module
 from app.routers.customers import _normalize_mobile, _clean, _view, _next_id
 from app.pricing_engine import compute_cart_totals, render_receipt_html
 from app.database import db
+from app.tenant_scoped import TenantList, TenantDict
 from app.idempotency import enforce_idempotency, idempotency_manager
 
 router = APIRouter(prefix="/billing", tags=["Billing & POS"])
 
 # Fallback store for offline / dummy DB mode
-_FALLBACK_SALES = []
-_FALLBACK_RETURNS = []
-_FALLBACK_HELD = []
+_FALLBACK_SALES = TenantList()
+_FALLBACK_RETURNS = TenantList()
+_FALLBACK_HELD = TenantList()
 
-@router.post("/calculate-totals")
+@router.post("/calculate-totals", dependencies=[Depends(require_module("billing"))])
 async def calculate_totals(payload: Dict[str, Any]):
     cart = payload.get("cart", [])
     pricing_mode = payload.get("pricing_mode", "exclusive")
@@ -33,7 +35,7 @@ async def calculate_totals(payload: Dict[str, Any]):
     totals = compute_cart_totals(cart, pricing_mode, manual_discount, active_discounts)
     return totals
 
-@router.post("/approve-discount")
+@router.post("/approve-discount", dependencies=[Depends(require_module("billing"))])
 async def approve_discount(req: PinVerifyRequest):
     if db.is_connected():
         try:
@@ -52,7 +54,7 @@ async def approve_discount(req: PinVerifyRequest):
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Admin PIN")
 
 # --- Customer on a bill (Phase 2 users: admin or cashier). Full customer management stays admin-only in /customers. ---
-@router.get("/customers/search")
+@router.get("/customers/search", dependencies=[Depends(require_module("billing"))])
 async def search_customers_for_bill(q: str = "", limit: int = 8, user = Depends(require_phase2)):
     """Find customers by customer number (CUST-0001) or mobile number while billing."""
     term = q.strip()
@@ -63,7 +65,7 @@ async def search_customers_for_bill(q: str = "", limit: int = 8, user = Depends(
     rows = await db.customer.find_many(where=where, order={"created_at": "desc"}, take=max(1, min(limit, 20)))
     return [_view(c) for c in rows]
 
-@router.post("/customers")
+@router.post("/customers", dependencies=[Depends(require_module("billing"))])
 async def create_customer_for_bill(data: CustomerCreate, user = Depends(require_phase2)):
     """Add a new customer from the Billing screen; the screen then attaches them to the current bill."""
     mobile = _normalize_mobile(data.mobile)
@@ -75,7 +77,7 @@ async def create_customer_for_bill(data: CustomerCreate, user = Depends(require_
     })
     return _view(c)
 
-@router.post("/sales")
+@router.post("/sales", dependencies=[Depends(require_module("billing"))])
 async def create_sale(req: SaleCreate, request: Request, user = Depends(get_current_user)):
     # Enforce idempotency: first click creates exactly one sale, repeated requests are rejected safely
     lock_key = await enforce_idempotency(request, "create_sale")
@@ -271,7 +273,7 @@ async def create_sale(req: SaleCreate, request: Request, user = Depends(get_curr
             raise e
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/sales/{invoice_no}")
+@router.get("/sales/{invoice_no}", dependencies=[Depends(require_module("billing", "returns", "reports"))])
 async def get_sale_by_invoice(invoice_no: str):
     if db.is_connected():
         try:
@@ -316,7 +318,36 @@ async def get_sale_by_invoice(invoice_no: str):
             
     raise HTTPException(status_code=404, detail="Invoice not found")
 
-@router.post("/returns")
+RETURN_CONDITIONS = ("Good", "Damaged", "Warranty")
+RETURN_ACTIONS = ("Return", "Exchange")
+
+
+async def _return_policy() -> str:
+    """What the store allows for a returned item (Store Settings): RETURN, EXCHANGE or BOTH."""
+    try:
+        store = await db.storesettings.find_unique(where={"id": "store_main"})
+        policy = (getattr(store, "return_policy", None) or "BOTH").upper()
+        return policy if policy in ("RETURN", "EXCHANGE", "BOTH") else "BOTH"
+    except Exception:
+        return "BOTH"
+
+
+def _return_line_options(r_item: Dict[str, Any], policy: str) -> tuple:
+    """Validated (condition, action) of one returned line. Both are optional: Good + whatever the store policy allows."""
+    condition = str(r_item.get("condition") or "Good").strip().capitalize()
+    if condition not in RETURN_CONDITIONS:
+        raise HTTPException(status_code=422, detail=f"Condition must be one of: {', '.join(RETURN_CONDITIONS)}.")
+    raw_action = r_item.get("action")
+    action = str(raw_action).strip().capitalize() if raw_action else ("Exchange" if policy == "EXCHANGE" else "Return")
+    if action not in RETURN_ACTIONS:
+        raise HTTPException(status_code=422, detail=f"Action must be one of: {', '.join(RETURN_ACTIONS)}.")
+    if (policy == "RETURN" and action == "Exchange") or (policy == "EXCHANGE" and action == "Return"):
+        allowed = "returns" if policy == "RETURN" else "exchanges"
+        raise HTTPException(status_code=400, detail=f"Store policy only allows {allowed} (set in Store Settings).")
+    return condition, action
+
+
+@router.post("/returns", dependencies=[Depends(require_module("returns"))])
 async def process_return(req: SaleReturnCreate, request: Request, user = Depends(get_current_user)):
     lock_key = await enforce_idempotency(request, "process_return", req.invoice_no)
     try:
@@ -335,49 +366,75 @@ async def process_return(req: SaleReturnCreate, request: Request, user = Depends
                 return_no = f"RET-FY26-{(count+1):05d}"
                 
                 total_refund = 0.0
+                exchange_value = 0.0
                 return_items_data = []
-                
-                for r_item in req.items:
+                policy = await _return_policy()
+                lines = []
+                for r_item in req.items:                        # validate every line before anything is changed
+                    lines.append((r_item, *_return_line_options(r_item, policy)))
+
+                for r_item, condition, action in lines:
                     sku = r_item["sku"]
                     qty = float(r_item["qty"])
                     matching_sale_item = next((i for i in sale.items if i.sku == sku), None)
                     if not matching_sale_item:
                         continue
-                        
+
                     unit_final_price = matching_sale_item.final_amount / matching_sale_item.qty if matching_sale_item.qty > 0 else matching_sale_item.price
                     refund_amount = round(qty * unit_final_price, 2)
-                    total_refund += refund_amount
-                    return_items_data.append({"sku": sku, "qty": qty, "refund_amount": refund_amount})
-                    
-                    # Restore Stock
-                    db_item = await db.item.find_unique(where={"sku": sku})
-                    if db_item:
-                        await db.item.update(where={"sku": sku}, data={"stock": db_item.stock + qty})
-                        
+                    if action == "Exchange":
+                        exchange_value += refund_amount         # no cash goes back: the value is set against the replacement bill
+                    else:
+                        total_refund += refund_amount
+                    item_reason = (str(r_item.get("reason") or "").strip()[:120]) or None
+                    return_items_data.append({"sku": sku, "qty": qty, "refund_amount": refund_amount, "action": action, "condition": condition,
+                                              "reason": item_reason})
+
+                    # Restore stock only for items in sellable condition. Damaged / Warranty items wait for an Admin to review them
+                    # (Stock Adjustment page) and decide what happens to the stock.
+                    if condition == "Good":
+                        db_item = await db.item.find_unique(where={"sku": sku})
+                        if db_item:
+                            await db.item.update(where={"sku": sku}, data={"stock": db_item.stock + qty})
+
                 ret_rec = await db.salereturn.create(data={
                     "return_no": return_no,
                     "invoice_no": req.invoice_no,
                     "sale_id": sale.id,
                     "created_by_username": username,
                     "total_refund": total_refund,
-                    "reason": req.reason or "Customer Return"
+                    # the return's own reason summarises the per-item reasons (kept for reports / history)
+                    "reason": (req.reason or "").strip() or ", ".join(dict.fromkeys(r["reason"] for r in return_items_data if r["reason"])) or None
                 })
-                
+
                 for r_data in return_items_data:
                     await db.returnitem.create(data={
                         "return_id": ret_rec.id,
                         "sku": r_data["sku"],
                         "qty": r_data["qty"],
-                        "refund_amount": r_data["refund_amount"]
+                        "refund_amount": r_data["refund_amount"],
+                        "action": r_data["action"],
+                        "condition": r_data["condition"],
+                        "reason": r_data["reason"],
+                        "review_status": None if r_data["condition"] == "Good" else "PENDING"
                     })
-                    
+
                 await db.sale.update(where={"id": sale.id}, data={"status": "RETURNED"})
-                
+
+                restored = sum(1 for r in return_items_data if r["condition"] == "Good")
+                held = len(return_items_data) - restored
+                message = f"Return processed successfully. Stock restored for {restored} line item(s)."
+                if held:
+                    message += f" {held} damaged / warranty item(s) are waiting for Admin review before any stock is added."
+                if exchange_value:
+                    message += f" Exchange value of Rs {exchange_value:.2f} to be set against the replacement bill."
                 res = {
                     "return_no": return_no,
                     "invoice_no": req.invoice_no,
                     "total_refund": total_refund,
-                    "message": f"Return processed successfully. Stock restored for {len(return_items_data)} line item(s)."
+                    "exchange_value": exchange_value,
+                    "pending_review": held,
+                    "message": message
                 }
                 if lock_key:
                     await idempotency_manager.release_lock(lock_key, res)
@@ -410,7 +467,7 @@ async def process_return(req: SaleReturnCreate, request: Request, user = Depends
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Hold & Recall ---
-@router.get("/held-bills")
+@router.get("/held-bills", dependencies=[Depends(require_module("hold_recall"))])
 async def get_held_bills():
     if db.is_connected():
         try:
@@ -428,9 +485,9 @@ async def get_held_bills():
             return result
         except Exception:
             pass
-    return _FALLBACK_HELD
+    return list(_FALLBACK_HELD)
 
-@router.post("/held-bills")
+@router.post("/held-bills", dependencies=[Depends(require_module("hold_recall"))])
 async def hold_bill(req: HeldBillCreate, request: Request, user = Depends(get_current_user)):
     held_id = req.id or f"HOLD-{int(datetime.now().timestamp()*1000)}"
     lock_key = await enforce_idempotency(request, "hold_bill", held_id)
@@ -489,7 +546,7 @@ async def hold_bill(req: HeldBillCreate, request: Request, user = Depends(get_cu
             raise e
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/held-bills/{held_id}")
+@router.delete("/held-bills/{held_id}", dependencies=[Depends(require_module("hold_recall"))])
 async def delete_held_bill(held_id: str):
     if db.is_connected():
         try:
@@ -499,6 +556,5 @@ async def delete_held_bill(held_id: str):
         except Exception:
             pass
             
-    global _FALLBACK_HELD
-    _FALLBACK_HELD = [h for h in _FALLBACK_HELD if h.get("id") != held_id]
+    _FALLBACK_HELD[:] = [h for h in _FALLBACK_HELD if h.get("id") != held_id]
     return {"message": "Held bill recalled/cleared"}

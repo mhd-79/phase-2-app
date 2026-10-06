@@ -1,12 +1,15 @@
 import re
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Literal
 from datetime import datetime, date
 
 # --- Auth ---
 class LoginRequest(BaseModel):
-    username: str
-    pin: str
+    # store staff: username + PIN; business owners / Super Admin: email + password
+    username: Optional[str] = None
+    pin: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -18,6 +21,12 @@ class TokenResponse(BaseModel):
     auto_lock: str = "2 min"
     phase_access: int = 2
     active_counter: Optional[str] = None
+    modules: Optional[Dict[str, bool]] = None      # effective module access (what the user may open)
+    # multi-tenant sign-ins only
+    tenant_id: Optional[str] = None
+    tenant_name: Optional[str] = None
+    tenant_status: Optional[str] = None
+    subscription_end: Optional[datetime] = None
 
 class UserSchema(BaseModel):
     id: str
@@ -33,6 +42,10 @@ class UserSchema(BaseModel):
     on_leave: bool = False
     leave_reason: Optional[str] = None
     leave_started_at: Optional[datetime] = None
+    modules: Optional[Dict[str, bool]] = None      # effective module access
+
+class UserAccessUpdate(BaseModel):
+    modules: Dict[str, bool]
 
 class LeaveRequest(BaseModel):
     on_leave: bool
@@ -49,7 +62,6 @@ class UserCreate(BaseModel):
     sub_text: str
     auto_lock: Optional[str] = "2 min"
     schedule_json: Optional[str] = None
-    phase_access: Optional[int] = Field(default=None, ge=1, le=2)
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -58,7 +70,9 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     auto_lock: Optional[str] = None
     schedule_json: Optional[str] = None
-    phase_access: Optional[int] = Field(default=None, ge=1, le=2)
+
+class TransferAdminRequest(BaseModel):
+    current_pin: str
 
 class PinVerifyRequest(BaseModel):
     pin: str
@@ -263,8 +277,9 @@ class SaleCreate(BaseModel):
 
 class SaleReturnCreate(BaseModel):
     invoice_no: str
-    reason: Optional[str] = "Customer return"
-    items: List[Dict[str, Any]] # [{"sku": "...", "qty": 1.0}]
+    reason: Optional[str] = None    # optional overall note; the reason is normally given per item
+    # [{"sku": "...", "qty": 1.0, "condition": "Good|Damaged|Warranty", "action": "Return|Exchange", "reason": "..."}]; all but sku / qty optional
+    items: List[Dict[str, Any]]
 
 class HeldBillCreate(BaseModel):
     id: Optional[str] = None
@@ -281,6 +296,7 @@ class StoreSettingsSchema(BaseModel):
     gstin: str
     pricing_mode: str
     idle_timeout_seconds: int
+    return_policy: str = "BOTH"          # RETURN | EXCHANGE | BOTH: what a cashier may do with a returned item
 
 class StoreSettingsUpdate(BaseModel):
     store_name: Optional[str] = None
@@ -289,6 +305,12 @@ class StoreSettingsUpdate(BaseModel):
     gstin: Optional[str] = None
     pricing_mode: Optional[str] = None
     idle_timeout_seconds: Optional[int] = None
+    return_policy: Optional[Literal["RETURN", "EXCHANGE", "BOTH"]] = None
+
+    @field_validator("return_policy", mode="before")
+    @classmethod
+    def _upper_policy(cls, v):
+        return v.strip().upper() if isinstance(v, str) else v
 
 # --- Phase 2: Vendors & Procurement ---
 class VendorCreate(BaseModel):

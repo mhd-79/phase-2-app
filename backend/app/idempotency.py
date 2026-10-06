@@ -2,6 +2,7 @@ import time
 import asyncio
 from typing import Dict, Any, Optional
 from fastapi import Request, HTTPException, status
+from app.database import current_tenant_schema
 
 class IdempotencyManager:
     """
@@ -72,7 +73,7 @@ async def enforce_idempotency(request: Request, action_type: str, body_identifie
     if not idempotency_key:
         return None
         
-    full_key = f"{action_type}:{idempotency_key}"
+    full_key = f"{current_tenant_schema.get() or 'default'}:{action_type}:{idempotency_key}"   # keys never collide across tenants
     
     # Check if previously completed
     cached = await idempotency_manager.get_cached(full_key)

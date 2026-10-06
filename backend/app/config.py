@@ -28,6 +28,29 @@ class Settings(BaseSettings):
     OKUTO_IQ_PERIOD_DAYS: int = int(os.getenv("OKUTO_IQ_PERIOD_DAYS", "30"))   # length of one activation / renewal
     OLLAMA_TIMEOUT_SECONDS: float = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
 
+    # --- Super Admin / multi-tenant platform (see superadmin.md) ---
+    SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "").strip().lower()        # bootstrap account; no default password exists
+    SUPER_ADMIN_PASSWORD: str = os.getenv("SUPER_ADMIN_PASSWORD", "")
+    SUPER_ADMIN_NAME: str = os.getenv("SUPER_ADMIN_NAME", "Platform Super Admin").strip()
+    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:4200").strip().rstrip("/")   # used in invitation links
+    INVITATION_EXPIRY_HOURS: int = int(os.getenv("INVITATION_EXPIRY_HOURS", "72"))
+    DEFAULT_TRIAL_DAYS: int = int(os.getenv("DEFAULT_TRIAL_DAYS", "14"))
+    TRIAL_REMINDER_DAYS: int = int(os.getenv("TRIAL_REMINDER_DAYS", "3"))               # "trial ending soon" notifications
+    EXPIRED_ACCESS_POLICY: str = os.getenv("EXPIRED_ACCESS_POLICY", "readonly").strip().lower()   # readonly | block
+    # Optional direct (non-pooled) connection string used only to create a new tenant's tables. When empty, the pooled
+    # host name is converted automatically (Neon: "-pooler" is removed). Poolers drop the per-schema setting that
+    # `prisma db push` relies on, which makes it try to create the tables in the main schema instead.
+    DIRECT_DATABASE_URL: str = os.getenv("DIRECT_DATABASE_URL", "").strip()
+    TENANT_CLIENT_POOL_SIZE: int = int(os.getenv("TENANT_CLIENT_POOL_SIZE", "20"))      # max simultaneously connected tenant DB clients
+    TENANT_CONNECTION_LIMIT: int = int(os.getenv("TENANT_CONNECTION_LIMIT", "3"))       # DB connections per tenant client
+    PAYMENT_PROVIDER: str = os.getenv("PAYMENT_PROVIDER", "none").strip().lower()       # none | dev (dev simulates success; never use in production)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "").strip()
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "").strip()
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "").strip()
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").strip().lower() not in ("0", "false", "no", "off")
+
 settings = Settings()
 
 

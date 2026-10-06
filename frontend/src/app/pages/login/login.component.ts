@@ -26,7 +26,54 @@ import { ApiService } from '../../services/api.service';
 
       <div class="login-panel">
         <div class="login-card">
-          @if (!showForgotView) {
+          @if (emailMode) {
+            @if (!showResetView) {
+              <h2 style="margin-bottom:var(--space-1)">Business sign-in</h2>
+              <p class="text-muted text-sm" style="margin-bottom:var(--space-6)">Use the email and password you created from your invitation.</p>
+
+              <div class="field">
+                <label for="emailInput">Email</label>
+                <input class="input" id="emailInput" type="email" autocomplete="username" [(ngModel)]="email" (keyup.enter)="attemptEmailLogin()" placeholder="you@business.com">
+              </div>
+              <div class="field" style="margin-top:var(--space-4)">
+                <label for="passwordInput">Password</label>
+                <input class="input" id="passwordInput" type="password" autocomplete="current-password" [(ngModel)]="password" (keyup.enter)="attemptEmailLogin()" placeholder="Password">
+              </div>
+
+              @if (errorMessage) {
+                <div class="text-sm" style="color:var(--danger-700);margin-top:var(--space-3);text-align:center;font-weight:500">{{ errorMessage }}</div>
+              }
+
+              <button type="button" class="btn btn-primary btn-lg btn-block" style="margin-top:var(--space-5)" [disabled]="isSubmitting" (click)="attemptEmailLogin()">
+                {{ isSubmitting ? 'Signing In...' : 'Sign In' }}
+              </button>
+              <div style="text-align:center;margin-top:var(--space-4)">
+                <button type="button" class="btn btn-ghost btn-sm text-xs" style="color:var(--primary);text-decoration:underline" (click)="openReset()">Forgot password?</button>
+              </div>
+              <div style="text-align:center;margin-top:var(--space-2)">
+                <button type="button" class="btn btn-ghost btn-sm text-xs" (click)="setEmailMode(false)">Staff sign-in with PIN</button>
+              </div>
+            } @else {
+              <h2 style="margin-bottom:var(--space-1)">Reset your password</h2>
+              <p class="text-muted text-sm" style="margin-bottom:var(--space-6)">We will email a link to choose a new password.</p>
+              <div class="field">
+                <label for="resetEmail">Email</label>
+                <input class="input" id="resetEmail" type="email" [(ngModel)]="email" placeholder="you@business.com">
+              </div>
+              @if (forgotError) {
+                <div class="text-sm" style="color:var(--danger-700);margin-top:var(--space-3);text-align:center;font-weight:500">{{ forgotError }}</div>
+              }
+              @if (forgotSuccess) {
+                <div class="card" style="background:var(--success-50, #f0fdf4);border:1px solid var(--success-200, #bbf7d0);color:var(--success-700, #15803d);padding:var(--space-3);margin-top:var(--space-4);border-radius:var(--radius-md);text-align:center;font-size:var(--text-sm)">{{ forgotSuccess }}</div>
+              }
+              <div class="row" style="gap:var(--space-3);margin-top:var(--space-6)">
+                <button type="button" class="btn btn-secondary flex-1" (click)="showResetView = false">Back to Sign In</button>
+                @if (!forgotSuccess) {
+                  <button type="button" class="btn btn-primary flex-1" [disabled]="isSubmittingForgot" (click)="submitPasswordReset()">{{ isSubmittingForgot ? 'Sending...' : 'Send link' }}</button>
+                }
+              </div>
+            }
+          } @else if (!showForgotView) {
             <h2 style="margin-bottom:var(--space-1)">Welcome back</h2>
             <p class="text-muted text-sm" style="margin-bottom:var(--space-6)">Sign in to Okuto Mart POS</p>
 
@@ -81,6 +128,10 @@ import { ApiService } from '../../services/api.service';
               <button type="button" class="btn btn-ghost btn-sm text-xs" style="color:var(--primary);text-decoration:underline" (click)="openForgotPin()">
                 Forgot PIN / Password?
               </button>
+            </div>
+
+            <div style="text-align:center;margin-top:var(--space-2)">
+              <button type="button" class="btn btn-ghost btn-sm text-xs" (click)="setEmailMode(true)">Sign in with email &amp; password</button>
             </div>
 
             <p class="demo-note">Enter your registered username and 4-digit PIN.</p>
@@ -157,6 +208,12 @@ export class LoginComponent {
   infoMessage: string | null = null;
   isSubmitting = false;
 
+  // Business accounts (multi-tenant): email + password, password reset
+  emailMode = false;
+  email = '';
+  password = '';
+  showResetView = false;
+
   // Forgot PIN state
   showForgotView = false;
   forgotUsername = '';
@@ -207,6 +264,59 @@ export class LoginComponent {
       this.pin = '';
     } finally {
       this.isSubmitting = false;
+    }
+  }
+
+  setEmailMode(on: boolean) {
+    this.emailMode = on;
+    this.errorMessage = null;
+    this.infoMessage = null;
+    this.showResetView = false;
+    this.pin = '';
+  }
+
+  async attemptEmailLogin() {
+    if (this.isSubmitting) return;
+    this.errorMessage = null;
+    if (!this.email.trim() || !this.password) {
+      this.errorMessage = 'Enter your email and password';
+      return;
+    }
+    this.isSubmitting = true;
+    try {
+      const res = await this.api.loginWithPassword(this.email.trim(), this.password);
+      if (res && res.access_token) {
+        this.router.navigate([res.role === 'super_admin' ? '/super-admin/dashboard' : '/pos']);
+      }
+    } catch (err: any) {
+      this.errorMessage = err?.error?.detail || err?.message || 'Sign-in failed. Please try again.';
+      this.password = '';
+    } finally {
+      this.isSubmitting = false;
+    }
+  }
+
+  openReset() {
+    this.showResetView = true;
+    this.forgotError = null;
+    this.forgotSuccess = null;
+  }
+
+  async submitPasswordReset() {
+    if (this.isSubmittingForgot) return;
+    this.forgotError = null;
+    this.forgotSuccess = null;
+    if (!this.email.trim()) {
+      this.forgotError = 'Please enter your email';
+      return;
+    }
+    this.isSubmittingForgot = true;
+    try {
+      this.forgotSuccess = await this.api.requestPasswordReset(this.email.trim());
+    } catch (err: any) {
+      this.forgotError = err?.error?.detail || 'Could not send the reset link. Please try again.';
+    } finally {
+      this.isSubmittingForgot = false;
     }
   }
 

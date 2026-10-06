@@ -7,6 +7,11 @@ export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   if (auth.isAuthenticated()) {
+    // A Super Admin only has the platform area; tenant screens would show another business's (or no) data.
+    if (auth.isSuperAdmin()) {
+      router.navigate(['/super-admin/dashboard']);
+      return false;
+    }
     return true;
   }
 

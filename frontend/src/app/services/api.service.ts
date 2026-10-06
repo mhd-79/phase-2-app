@@ -27,6 +27,11 @@ export interface CatalogItem {
   expDate?: string | null;
 }
 
+/** Prototype demo catalogue/categories belong to the original store only; a tenant's workspace starts empty. */
+const isOriginalStore = (): boolean => {
+  try { const o = localStorage.getItem('pos_cache_owner'); return !o || o === 'default'; } catch { return true; }
+};
+
 const DEFAULT_DEMO_ITEMS: CatalogItem[] = [
   { sku: "BEV-001", barcode: "8901030875021", name: "Cola 500ml", category: "Beverages", price: 45, wholesalePrice: 38, tax: 12, stock: 86, min: 20, pricingMethod: "qty", unit: "pcs" },
   { sku: "BEV-002", barcode: "8901030875038", name: "Orange Juice 1L", category: "Beverages", price: 110, wholesalePrice: 92, tax: 12, stock: 34, min: 15, pricingMethod: "qty", unit: "pcs" },
@@ -83,7 +88,7 @@ export class ApiService {
     try {
       const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/login`, { username, pin }).pipe(timeout(LOGIN_TIMEOUT_MS)));
       if (res && res.access_token) {
-        this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2, res.active_counter ?? null);
+        this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2, res.active_counter ?? null, {}, res.modules);
       }
       return res;
     } catch (err: any) {
@@ -106,6 +111,68 @@ export class ApiService {
         throw new Error('The server is taking too long to respond. Please try again.');
       }
       throw new Error(err?.error?.detail || 'Unable to reach the server. Please check your connection and try again.');
+    }
+  }
+
+  /** Public invitation / reset links (never sends a stored session token). Failures carry the API's {code, message}. */
+  async getInvitation(token: string): Promise<any> {
+    try {
+      return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/invitations/${encodeURIComponent(token)}`));
+    } catch (err: any) {
+      throw this.invitationError(err);
+    }
+  }
+
+  async acceptInvitation(token: string, password: string, confirmPassword: string): Promise<any> {
+    try {
+      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/invitations/${encodeURIComponent(token)}/accept`,
+        { password, confirm_password: confirmPassword }));
+    } catch (err: any) {
+      throw this.invitationError(err);
+    }
+  }
+
+  private invitationError(err: any): Error {
+    const d = err?.error?.detail;
+    if (d && typeof d === 'object' && !Array.isArray(d) && d.message) return Object.assign(new Error(d.message), { code: d.code });
+    if (typeof d === 'string') return new Error(d);
+    if (Array.isArray(d)) return new Error(d.map((x: any) => String(x.msg || '').replace(/^Value error, /, '')).join('; '));
+    return new Error(err?.status ? 'Something went wrong. Please try again.' : 'Cannot reach the server. Check your connection and try again.');
+  }
+
+  /** Public registration (Method 1): creates a PENDING_APPROVAL tenant request; the Super Admin is notified. */
+  async submitTenantRequest(body: Record<string, unknown>): Promise<any> {
+    try {
+      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/tenant-requests`, body));
+    } catch (err: any) {
+      if (err?.status === 429) throw new Error('Too many requests. Please wait a few minutes and try again.');
+      throw this.invitationError(err);
+    }
+  }
+
+  /** Sends a password-reset link when the email belongs to a business owner (the answer is always the same). */
+  async requestPasswordReset(email: string): Promise<string> {
+    const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/forgot-password`, { email }));
+    return res?.message || 'If an account exists for that email, a password reset link has been sent.';
+  }
+
+  /** Business owner or Super Admin: email + password. Never falls back to offline demo logins. */
+  async loginWithPassword(email: string, password: string): Promise<any> {
+    return this.finishTenantLogin({ email, password });
+  }
+
+  private async finishTenantLogin(body: Record<string, string>): Promise<any> {
+    try {
+      const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/login`, body).pipe(timeout(LOGIN_TIMEOUT_MS)));
+      if (res && res.access_token) {
+        this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2, res.active_counter ?? null,
+          { tenantId: res.tenant_id, tenantName: res.tenant_name, tenantStatus: res.tenant_status, subscriptionEnd: res.subscription_end }, res.modules);
+      }
+      return res;
+    } catch (err: any) {
+      if (err?.name === 'TimeoutError') throw new Error('The server is taking too long to respond. Please try again.');
+      if (err?.status) throw err;
+      throw new Error('Unable to reach the server. Please check your connection and try again.');
     }
   }
 
@@ -146,6 +213,24 @@ export class ApiService {
     }
   }
 
+  /** Re-reads the signed-in user's module access, so an Admin's change shows up without signing in again. */
+  async refreshAccess(): Promise<void> {
+    try {
+      const me = await firstValueFrom(this.http.get<any>(`${this.baseUrl}/auth/me`, { headers: this.getHeaders() }));
+      this.auth.setModules(me?.modules);
+    } catch {
+      // offline / expired session: keep what is known
+    }
+  }
+
+  async getUserAccess(username: string): Promise<any> {
+    return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/users/${encodeURIComponent(username)}/access`, { headers: this.getHeaders() }));
+  }
+
+  async saveUserAccess(username: string, modules: Record<string, boolean>): Promise<any> {
+    return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/users/${encodeURIComponent(username)}/access`, { modules }, { headers: this.getHeaders() }));
+  }
+
   async createUser(user: any): Promise<any> {
     const headers = this.getHeaders();
     return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/users`, user, { headers }));
@@ -154,6 +239,12 @@ export class ApiService {
   async updateUser(username: string, data: any): Promise<any> {
     const headers = this.getHeaders();
     return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/users/${username}`, data, { headers }));
+  }
+
+  /** The signed-in admin hands their admin role to another user (confirmed with their own PIN / password). */
+  async transferAdminRole(username: string, currentPin: string): Promise<any> {
+    const headers = this.getHeaders();
+    return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/users/${encodeURIComponent(username)}/transfer-admin`, { current_pin: currentPin }, { headers }));
   }
 
   /** Marks a user as on leave (reason required) or back at work. */
@@ -319,13 +410,13 @@ export class ApiService {
     try {
       const overrides = JSON.parse(localStorage.getItem('pos_demo_item_overrides_v2') || '{}');
       const custom = JSON.parse(localStorage.getItem('pos_demo_custom_items') || '[]');
-      const base = DEFAULT_DEMO_ITEMS.concat(custom);
+      const base = (isOriginalStore() ? DEFAULT_DEMO_ITEMS : []).concat(custom);
       // An edited demo item is saved into `custom` under its own SKU: the saved copy must replace the built-in one.
       const bySku = new Map<string, CatalogItem>();
       for (const item of base) bySku.set(item.sku, Object.assign({}, bySku.get(item.sku) || {}, item));
       return Array.from(bySku.values()).map(item => Object.assign({}, item, overrides[item.sku] || {}));
     } catch {
-      return DEFAULT_DEMO_ITEMS;
+      return isOriginalStore() ? DEFAULT_DEMO_ITEMS : [];
     }
   }
 
@@ -356,7 +447,7 @@ export class ApiService {
     const custom = JSON.parse(localStorage.getItem('pos_demo_custom_categories') || '[]');
     const items = this.getLocalCatalog();
     const itemCats = items.map(i => i.category).filter(Boolean);
-    const base = ["Beverages", "Snacks", "Dairy", "Bakery", "Grocery", "Personal Care"];
+    const base = isOriginalStore() ? ["Beverages", "Snacks", "Dairy", "Bakery", "Grocery", "Personal Care"] : [];
     return listUnique([...base, ...custom, ...itemCats]);
   }
 
@@ -503,7 +594,7 @@ export class ApiService {
       return await firstValueFrom(this.http.post(`${this.baseUrl}/billing/returns`, returnData, { headers: this.getHeaders() }));
     } catch {
       for (const item of returnData.items) {
-        await this.updateLocalStock(item.sku, item.qty);
+        if ((item.condition || 'Good') === 'Good') await this.updateLocalStock(item.sku, item.qty);   // damaged / warranty items wait for Admin review
       }
       return {
         return_no: `RET-FY26-${Date.now().toString().slice(-5)}`,
@@ -847,6 +938,33 @@ export class ApiService {
     } catch {
       return JSON.parse(localStorage.getItem('pos_p2_adjustments_v1') || '[]');
     }
+  }
+
+  /** Returned items a cashier marked Damaged / Warranty, waiting for the Admin to decide what happens to their stock. */
+  async getReturnReviews(status: 'PENDING' | 'RESOLVED' | 'ALL' = 'PENDING'): Promise<any[]> {
+    try {
+      return await firstValueFrom(this.http.get<any[]>(`${this.baseUrl}/stock-adjustments/return-reviews?status=${status}`, { headers: this.getHeaders() }));
+    } catch {
+      return [];
+    }
+  }
+
+  async resolveReturnReview(id: string, outcome: string, notes?: string): Promise<any> {
+    return firstValueFrom(this.http.post<any>(`${this.baseUrl}/stock-adjustments/return-reviews/${id}/resolve`, { outcome, notes: notes || null }, { headers: this.getHeaders() }));
+  }
+
+  /** What the store allows for a returned item (Store Settings): RETURN, EXCHANGE or BOTH. */
+  async getReturnPolicy(): Promise<'RETURN' | 'EXCHANGE' | 'BOTH'> {
+    try {
+      const s = await firstValueFrom(this.http.get<any>(`${this.baseUrl}/settings/store`, { headers: this.getHeaders() }));
+      return ['RETURN', 'EXCHANGE', 'BOTH'].includes(s?.return_policy) ? s.return_policy : 'BOTH';
+    } catch {
+      return 'BOTH';
+    }
+  }
+
+  async saveReturnPolicy(policy: 'RETURN' | 'EXCHANGE' | 'BOTH'): Promise<void> {
+    await firstValueFrom(this.http.put<any>(`${this.baseUrl}/settings/store`, { return_policy: policy }, { headers: this.getHeaders() }));
   }
 
   // --- Batch & Expiry ---

@@ -1,13 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Optional
-from app.database import get_db
+from app.database import get_db, is_default_store
+from app.tenant_scoped import TenantList, TenantDict
 from app.schemas import PurchaseOrderCreate
 from app.security import get_current_user
 from app.idempotency import enforce_idempotency, idempotency_manager
 
 router = APIRouter(prefix="/purchase-orders", tags=["purchase-orders"])
 
-SEED_POS = [
+_DEMO_POS = [
     {
         "id": "PO-2026-0139", "vendor_id": "V-004", "date": "2026-08-20", "expected": "2026-08-24", "status": "Closed", "approved_by": "Arjun M.",
         "lines": [
@@ -56,7 +57,11 @@ SEED_POS = [
     }
 ]
 
+SEED_POS = TenantList(_DEMO_POS)
+
 async def seed_pos_if_needed():
+    if not is_default_store():          # a new tenant starts with NO purchase orders
+        return
     db = get_db()
     if db.is_connected():
         try:
