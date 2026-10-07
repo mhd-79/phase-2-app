@@ -2,7 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { ACCESS_MODULES, AuthService } from '../../services/auth.service';
+import { AuthService } from '../../services/auth.service';
 import { ApiService } from '../../services/api.service';
 
 export interface DaySchedule {
@@ -48,6 +48,14 @@ export interface UserAccountData {
   selector: 'app-users',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  styles: [`
+    .ur-table th { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .ur-table td { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+    .ur-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-subtle); color: var(--primary-hover); font-size: 11px; font-weight: 700;
+                 display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ur-avatar-lg { width: 44px; height: 44px; font-size: 15px; }
+    .ur-act { padding: 0 6px; min-height: auto; font-weight: 600; color: var(--text); }
+  `],
   template: `
     <main class="main">
       <div class="page-header">
@@ -57,7 +65,7 @@ export interface UserAccountData {
           <p>Manage access roles, credentials, and review detailed user productivity &amp; sales performance metrics.</p>
         </div>
         <div class="page-actions">
-          <button class="btn btn-primary" (click)="openAddUserModal()">+ Add User</button>
+          @if (auth.can('users', 'create')) { <button class="btn btn-primary" (click)="openAddUserModal()">+ Add User</button> }
         </div>
       </div>
 
@@ -195,79 +203,103 @@ export interface UserAccountData {
           </div>
         }
 
-        <div class="grid grid-2" style="margin-bottom:var(--space-5)">
-          <div class="card">
-            <div class="row" style="gap:var(--space-3);margin-bottom:var(--space-3);align-items:center">
-              <span class="badge badge-primary">Admin</span>
-              <h4 style="margin:0;font-size:var(--text-base);font-weight:700">Full access</h4>
-            </div>
-            <p class="text-sm text-muted" style="margin:0;line-height:1.5">Item/stock upload, vendor management, POs, tax/store configuration, reports, backup, user management, price overrides and discount approval.</p>
+        <!-- Summary -->
+        <div class="grid grid-3" style="margin-bottom:var(--space-4)">
+          <div class="card stat-card">
+            <span class="stat-label">Total Users</span>
+            <span class="stat-value">{{ userList.length }}</span>
           </div>
-          <div class="card">
-            <div class="row" style="gap:var(--space-3);margin-bottom:var(--space-3);align-items:center">
-              <span class="badge badge-neutral">Cashier</span>
-              <h4 style="margin:0;font-size:var(--text-base);font-weight:700">Billing screen access only</h4>
-            </div>
-            <p class="text-sm text-muted" style="margin:0;line-height:1.5">Ring up sales, hold/recall bills, process returns. No access to procurement, stock maintenance, reports, tax or settings.</p>
+          <div class="card stat-card">
+            <span class="stat-label">Active Users</span>
+            <span class="stat-value" style="color:var(--success-700)">{{ activeUserCount() }}</span>
+            <span class="stat-delta text-muted">{{ userList.length - activeUserCount() }} disabled</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Pending Invites</span>
+            <span class="stat-value">{{ pendingInviteCount() }}</span>
+            <span class="stat-delta text-muted">New users are added directly with a PIN</span>
           </div>
         </div>
 
+        <!-- Tenant Admin -->
+        @if (tenantAdmin(); as ta) {
+          <div class="card" style="margin-bottom:var(--space-4)">
+            <div class="row-between wrap" style="gap:var(--space-3);align-items:center">
+              <div class="row" style="gap:var(--space-3);align-items:center">
+                <div class="ur-avatar ur-avatar-lg">{{ ta.avatar }}</div>
+                <div>
+                  <div class="row" style="gap:var(--space-2);align-items:center">
+                    <strong>{{ ta.name }}</strong>
+                    <span class="badge badge-primary">Tenant Admin</span>
+                  </div>
+                  <div class="text-xs text-muted mono">{{ ta.username }}</div>
+                </div>
+              </div>
+              @if (isSelf(ta.username) && auth.can('users', 'edit')) {
+                <button class="btn btn-secondary btn-sm" (click)="openTransferModal()">Transfer Tenant Admin</button>
+              }
+            </div>
+            <p class="text-xs text-muted" style="margin:var(--space-3) 0 0 0">
+              Each business has one Tenant Admin. The Tenant Admin's role is fixed; it can only be handed to another active user, who becomes the Tenant Admin while the current one becomes a Cashier.
+            </p>
+          </div>
+        }
+
+        <!-- Users -->
         <div class="card card-flush">
-          <div class="card-header row-between" style="padding:var(--space-4) var(--space-5)">
-            <h3 style="margin:0;font-size:var(--text-lg);font-weight:700">Configured User Accounts &amp; Schedules</h3>
-            <button class="btn btn-primary btn-sm" (click)="openAddUserModal()">+ Add User</button>
+          <div class="card-header row-between" style="padding:var(--space-3) var(--space-5)">
+            <h3 style="margin:0;font-size:var(--text-md);font-weight:700">All Users <span class="text-sm text-muted" style="font-weight:400">({{ userList.length }})</span></h3>
+            @if (auth.can('users', 'create')) { <button class="btn btn-primary btn-sm" (click)="openAddUserModal()">+ Add User</button> }
           </div>
           <div class="table-scroll">
-            <table class="table">
+            <table class="table ur-table">
               <thead>
                 <tr>
-                  <th style="font-size:11px;letter-spacing:0.04em">NAME</th>
-                  <th style="font-size:11px;letter-spacing:0.04em">USERNAME</th>
-                  <th style="font-size:11px;letter-spacing:0.04em">ROLE</th>
-                  <th style="font-size:11px;letter-spacing:0.04em">WORKING SCHEDULE</th>
-                  <th style="font-size:11px;letter-spacing:0.04em">STATUS</th>
-                  <th style="font-size:11px;letter-spacing:0.04em">AUTO-LOCK</th>
-                  <th style="font-size:11px;letter-spacing:0.04em">ACTIONS</th>
+                  <th>User</th>
+                  <th>Email / Username</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 @for (u of userList; track u.key) {
                   <tr>
-                    <td><strong>{{ u.name }}</strong></td>
+                    <td>
+                      <div class="row" style="gap:var(--space-2);align-items:center">
+                        <div class="ur-avatar">{{ u.avatar }}</div>
+                        <div>
+                          <strong>{{ u.name }}</strong>
+                          <div class="text-xs text-muted" [attr.title]="formatWorkingSchedule(u.schedule)">Auto-lock {{ u.autoLock || '2 min' }}</div>
+                        </div>
+                      </div>
+                    </td>
                     <td class="mono text-xs">{{ u.username }}</td>
                     <td>
-                      <span class="badge" [class.badge-primary]="u.role === 'Admin'" [class.badge-neutral]="u.role !== 'Admin'">
-                        {{ u.role }}
-                      </span>
-                    </td>
-                    <td>
-                      <span class="mono text-xs" style="max-width:320px;display:inline-block;white-space:normal;line-height:1.4">
-                        {{ formatWorkingSchedule(u.schedule) }}
+                      <span class="badge" [class.badge-primary]="u.role === 'Admin'" [class.badge-neutral]="u.role !== 'Admin'"
+                            [attr.title]="u.role === 'Admin' ? 'Full access to every module, unless limited in User Access' : 'Billing, Hold & Recall and Returns, unless changed in User Access'">
+                        {{ isTenantAdmin(u) ? 'Tenant Admin' : u.role }}
                       </span>
                     </td>
                     <td>
                       @if (u.status === 'Active' && u.onLeave) {
                         <span class="badge badge-warning">On Leave</span>
-                        @if (u.leaveReason) { <div class="text-xs text-muted" style="max-width:220px;white-space:normal;margin-top:2px">Reason: {{ u.leaveReason }}</div> }
+                        @if (u.leaveReason) { <div class="text-xs text-muted" style="max-width:200px;white-space:normal;margin-top:2px">{{ u.leaveReason }}</div> }
                       } @else {
                         <span class="badge" [class.badge-success]="u.status === 'Active'" [class.badge-danger]="u.status !== 'Active'">
                           {{ u.status }}
                         </span>
                       }
                     </td>
-                    <td class="text-xs">{{ u.autoLock || '2 min' }}</td>
                     <td>
-                      <div class="row" style="gap:var(--space-2);align-items:center">
-                        <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--text)" (click)="openEditUserModal(u.key)">Edit</button>
-                        <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--primary)" (click)="openResetPinModal(u.username)">Reset PIN</button>
-                        @if (auth.isAdmin() && !isSelf(u.username)) {
-                          <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--primary)" (click)="openAccessModal(u)">User Access</button>
-                        }
-                        <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--text)" (click)="toggleUserStatus(u.key)">
+                      <div class="row" style="gap:var(--space-1);align-items:center">
+                        @if (auth.can('users', 'edit')) { <button class="btn btn-ghost btn-xs ur-act" (click)="openEditUserModal(u.key)">Edit</button> }
+                        @if (auth.can('users', 'edit')) { <button class="btn btn-ghost btn-xs ur-act" style="color:var(--primary)" (click)="openResetPinModal(u.username)">Reset PIN</button> }
+                        @if (auth.can('users', 'edit')) { <button class="btn btn-ghost btn-xs ur-act" (click)="toggleUserStatus(u.key)">
                           {{ u.status === 'Active' ? 'Disable' : 'Enable' }}
-                        </button>
-                        @if (isSelf(u.username) && u.role === 'Admin') {
-                          <button class="btn btn-ghost btn-xs" style="padding:0 4px;min-height:auto;font-weight:600;color:var(--primary)" (click)="openTransferModal()">Transfer Admin Role</button>
+                        </button> }
+                        @if (auth.isAdmin() && auth.can('users', 'edit') && !isSelf(u.username)) {
+                          <button class="btn btn-ghost btn-xs ur-act" style="color:var(--primary)" (click)="openAccess(u.username)" title="Set what this user can view, create, edit and delete">Access</button>
                         }
                       </div>
                     </td>
@@ -558,31 +590,6 @@ export interface UserAccountData {
           <button class="btn btn-primary" [disabled]="isResettingPin" (click)="confirmResetPin()">
             {{ isResettingPin ? 'Resetting...' : 'Save New PIN' }}
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ================= USER ACCESS MODAL ================= -->
-    <div class="modal-overlay" [class.open]="showAccessModal">
-      <div class="modal">
-        <div class="modal-header">
-          <h3>User Access &middot; {{ accessUser?.name }}</h3>
-          <button class="icon-btn" (click)="showAccessModal = false">✕</button>
-        </div>
-        <div class="modal-body stack">
-          <p class="text-sm text-muted">Allow or deny each module for this user only. Changes apply to this user straight away and are checked on the server, not just in the menu.</p>
-          @if (accessLoading) { <p class="text-sm text-muted">Loading…</p> }
-          @else {
-            @for (m of accessModules; track m.key) {
-              <label class="checkbox-row"><input type="checkbox" [checked]="!!accessChoices[m.key]" (change)="accessChoices[m.key] = $any($event.target).checked"> {{ m.label }}</label>
-            }
-          }
-          @if (accessError) { <div class="text-sm" style="color:var(--danger-700)" role="alert">{{ accessError }}</div> }
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="resetAccessToRoleDefaults()" [disabled]="accessLoading">Role defaults</button>
-          <button class="btn btn-secondary" (click)="showAccessModal = false">Cancel</button>
-          <button class="btn btn-primary" [disabled]="isSavingAccess || accessLoading" (click)="saveAccess()">{{ isSavingAccess ? 'Saving...' : 'Save access' }}</button>
         </div>
       </div>
     </div>
@@ -1254,6 +1261,30 @@ export class UsersComponent implements OnInit {
     }
   }
 
+  activeUserCount(): number {
+    return this.userList.filter(u => u.status === 'Active').length;
+  }
+
+  /** There is no invitation flow for staff: users are created directly with a PIN, so nothing is ever pending. */
+  pendingInviteCount(): number {
+    return 0;
+  }
+
+  /** The business's Tenant Admin: the signed-in Admin, otherwise the first Admin of the business. */
+  tenantAdmin(): UserAccountData | undefined {
+    const admins = this.userList.filter(u => u.role === 'Admin');
+    return admins.find(u => this.isSelf(u.username)) ?? admins[0];
+  }
+
+  isTenantAdmin(u: UserAccountData): boolean {
+    return this.tenantAdmin()?.key === u.key;
+  }
+
+  /** Opens the User Access screen (view / create / edit / delete per module) with this user already chosen. */
+  openAccess(username: string) {
+    void this.router.navigate(['/user-access'], { queryParams: { user: username } });
+  }
+
   /** True when the username belongs to the signed-in user. */
   isSelf(username: string): boolean {
     return !!username && username.trim().toLowerCase() === (this.auth.currentUser().username || '').toLowerCase();
@@ -1286,54 +1317,6 @@ export class UsersComponent implements OnInit {
       this.transferError = typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not transfer the admin role. Please try again.';
     } finally {
       this.isTransferring = false;
-    }
-  }
-
-  // --- User Access (module permissions) ---
-  showAccessModal = false;
-  accessUser: UserAccountData | null = null;
-  accessModules: { key: string; label: string }[] = ACCESS_MODULES;
-  accessChoices: Record<string, boolean> = {};
-  accessLoading = false;
-  accessError = '';
-  isSavingAccess = false;
-
-  async openAccessModal(u: UserAccountData) {
-    this.accessUser = u;
-    this.accessError = '';
-    this.accessLoading = true;
-    this.showAccessModal = true;
-    try {
-      const res = await this.api.getUserAccess(u.username);
-      this.accessModules = (res.available as { key: string; label: string }[])?.length ? res.available : ACCESS_MODULES;
-      this.accessChoices = { ...res.modules };
-    } catch (err: any) {
-      this.accessError = err?.error?.detail || 'Could not load the access for this user.';
-      this.accessChoices = {};
-    } finally {
-      this.accessLoading = false;
-    }
-  }
-
-  resetAccessToRoleDefaults() {
-    const admin = this.accessUser?.role === 'Admin';
-    const cashierDefaults = ['billing', 'hold_recall', 'returns'];
-    this.accessChoices = Object.fromEntries(this.accessModules.map(m => [m.key, admin || cashierDefaults.includes(m.key)]));
-  }
-
-  async saveAccess() {
-    if (!this.accessUser || this.isSavingAccess) return;
-    this.isSavingAccess = true;
-    this.accessError = '';
-    try {
-      await this.api.saveUserAccess(this.accessUser.username, this.accessChoices);
-      this.showAccessModal = false;
-      this.triggerToast(`Access updated for ${this.accessUser.name}`);
-      await this.loadAuditLogs();
-    } catch (err: any) {
-      this.accessError = typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not save the access. Please try again.';
-    } finally {
-      this.isSavingAccess = false;
     }
   }
 

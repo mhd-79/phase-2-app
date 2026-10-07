@@ -1,4 +1,3 @@
-import random
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Optional
 from app.database import get_db
@@ -6,10 +5,36 @@ from app.tenant_scoped import TenantList, TenantDict
 from app.schemas import GRNCreate, DirectGRNCreate, LandedCostAllocationInput
 from app.security import get_current_user
 from app.idempotency import enforce_idempotency, idempotency_manager
+from app.procurement import (PO_RECEIVABLE, norm_po_status, parse_date, today, unique_id, with_gst, db_error, tx, batch_no_supported)
 
 router = APIRouter(prefix="/grn", tags=["goods-receipt-notes"])
 
 _FALLBACK_GRNS = TenantList()
+
+
+def _batch_fields(rl, label: str):
+    """(batch_no, mfg_date, expiry_date) of a receipt line, checked."""
+    batch_no = (rl.batchNo or "").strip() or None
+    mfg = parse_date(rl.mfgDate, f"Mfg date of {label}")
+    exp = parse_date(rl.expiryDate, f"Expiry date of {label}")
+    if mfg and exp and exp < mfg:
+        raise HTTPException(status_code=400, detail=f"Expiry date of {label} cannot be before its manufacturing date")
+    return batch_no, mfg, exp
+
+
+async def _receive_line(t, sku: str, name: str, qty: float, batch_no, mfg, exp):
+    """Stock in: Item.stock goes up, the batch is recorded (when it has an expiry date) and becomes the item's current batch."""
+    item = await t.item.find_unique(where={"sku": sku})
+    if item:
+        data = {"stock": {"increment": qty}}
+        if batch_no and batch_no_supported():
+            data["batch_no"] = batch_no
+        await t.item.update(where={"sku": sku}, data=data)
+        name = item.name
+    if batch_no and exp:
+        await t.batch.create(data={"sku": sku, "name": name, "batch_no": batch_no, "mfg_date": mfg or today(), "expiry_date": exp, "qty": qty})
+    return name
+
 
 @router.get("")
 async def list_grn_logs(vendor_id: Optional[str] = None):
@@ -19,13 +44,16 @@ async def list_grn_logs(vendor_id: Optional[str] = None):
             where_clause = {}
             if vendor_id:
                 where_clause["vendor_id"] = vendor_id
-                
+
             grns = await db.goodsreceiptnote.find_many(
                 where=where_clause,
                 include={"lines": True},
                 order={"created_at": "desc"}
             )
-            
+            po_ids = list({g.po_id for g in grns if g.po_id})
+            po_lines = await db.purchaseorderline.find_many(where={"po_id": {"in": po_ids}}) if po_ids else []
+            remaining = {(l.po_id, l.sku): l.ordered_qty - l.received_qty for l in po_lines}
+
             result = []
             for g in grns:
                 result.append({
@@ -36,13 +64,19 @@ async def list_grn_logs(vendor_id: Optional[str] = None):
                     "total": g.total,
                     "landedCostAllocation": g.landed_cost_allocation,
                     "lines": [
-                        {"sku": l.sku, "name": l.name, "qty": l.qty, "cost": l.cost} for l in g.lines
+                        {"sku": l.sku, "name": l.name, "qty": l.qty, "cost": l.cost, "taxRate": getattr(l, "tax_rate", 0.0) or 0.0}
+                        for l in g.lines
+                    ],
+                    # what is still outstanding on the PO for the items of this receipt (empty when everything arrived)
+                    "variances": [
+                        {"sku": l.sku, "name": l.name, "remaining": remaining[(g.po_id, l.sku)]}
+                        for l in g.lines if g.po_id and abs(remaining.get((g.po_id, l.sku), 0.0)) > 1e-9
                     ]
                 })
             return result
         except Exception:
             pass
-            
+
     # Fallback
     res = []
     for g in _FALLBACK_GRNS:
@@ -53,101 +87,71 @@ async def list_grn_logs(vendor_id: Optional[str] = None):
 
 @router.post("/receipt")
 async def record_goods_receipt(data: GRNCreate, request: Request, current_user=Depends(get_current_user)):
-    lock_key = await enforce_idempotency(request, "record_goods_receipt", f"{data.poId}_{len(data.lines)}")
+    # lines left at zero are ignored; anything else must be a positive quantity of a distinct item
+    wanted: dict = {}
+    for rl in data.lines:
+        if rl.qty < 0:
+            raise HTTPException(status_code=400, detail=f"Quantity received for {rl.sku} cannot be negative")
+        if rl.qty > 0:
+            if rl.sku in wanted:
+                raise HTTPException(status_code=400, detail=f"{rl.sku} is listed twice in this receipt")
+            wanted[rl.sku] = rl
+    if not wanted:
+        raise HTTPException(status_code=400, detail="Enter the quantity received for at least one item")
+    batches = {sku: _batch_fields(rl, sku) for sku, rl in wanted.items()}
+
+    lock_key = await enforce_idempotency(request, "record_goods_receipt", f"{data.poId}_" + ",".join(f"{s}:{r.qty}" for s, r in wanted.items()))
     try:
         db = get_db()
         if db.is_connected():
             try:
-                po = await db.purchaseorder.find_unique(
-                    where={"id": data.poId},
-                    include={"lines": True}
-                )
+                po = await db.purchaseorder.find_unique(where={"id": data.poId}, include={"lines": True})
                 if not po:
                     raise HTTPException(status_code=404, detail="Purchase order not found")
-                
-                vendor_id = data.vendorId or po.vendor_id
-                variances = []
-                total_cost = 0.0
-                receipt_lines_db = []
-
-                # Transaction-safe stock update (NFR-P2-001)
-                for rl in data.lines:
-                    po_line = next((l for l in po.lines if l.sku == rl.sku), None)
+                status = norm_po_status(po.status)
+                if status not in PO_RECEIVABLE:
+                    raise HTTPException(status_code=400, detail=f"Stock cannot be received against a purchase order that is {status}")
+                lines_by_sku = {l.sku: l for l in po.lines}
+                for sku, rl in wanted.items():
+                    po_line = lines_by_sku.get(sku)
                     if not po_line:
-                        continue
-                        
-                    new_received = po_line.received_qty + rl.qty
-                    await db.purchaseorderline.update(
-                        where={"id": po_line.id},
-                        data={"received_qty": new_received}
-                    )
-                    
-                    # Stock update
-                    item = await db.item.find_unique(where={"sku": rl.sku})
-                    if item:
-                        new_stock = max(0.0, item.stock + rl.qty)
-                        await db.item.update(
-                            where={"sku": rl.sku},
-                            data={"stock": new_stock}
-                        )
-                        name = item.name
-                    else:
-                        name = po_line.name
-                        
-                    line_cost = po_line.cost * rl.qty
-                    total_cost += line_cost
-                    receipt_lines_db.append({"sku": rl.sku, "name": name, "qty": rl.qty, "cost": po_line.cost})
-                    
-                    remaining = po_line.ordered_qty - new_received
-                    if remaining != 0:
-                        variances.append({"sku": rl.sku, "name": name, "remaining": remaining})
-                        
-                # Check PO completion status
-                updated_lines = await db.purchaseorderline.find_many(where={"po_id": data.poId})
-                all_done = all(l.received_qty >= l.ordered_qty for l in updated_lines)
-                any_done = any(l.received_qty > 0 for l in updated_lines)
-                
-                new_status = "Received" if all_done else ("Partially Received" if any_done else po.status)
-                await db.purchaseorder.update(
-                    where={"id": data.poId},
-                    data={"status": new_status}
-                )
-                
-                rand_suffix = str(random.randint(1000, 9999))
-                grn_id = f"GRN-2026-{rand_suffix}"
-                
-                grn = await db.goodsreceiptnote.create(
-                    data={
-                        "id": grn_id,
-                        "po_id": data.poId,
-                        "vendor_id": vendor_id,
-                        "date": "2026-09-07",
-                        "total": total_cost
-                    }
-                )
-                
-                for rld in receipt_lines_db:
-                    await db.goodsreceiptnoteline.create(
-                        data={
-                            "grn_id": grn_id,
-                            "sku": rld["sku"],
-                            "name": rld["name"],
-                            "qty": rld["qty"],
-                            "cost": rld["cost"]
-                        }
-                    )
-                    
-                # Update vendor payable
-                vendor = await db.vendor.find_unique(where={"id": vendor_id})
-                if vendor:
-                    await db.vendor.update(
-                        where={"id": vendor_id},
-                        data={"payable": vendor.payable + total_cost}
-                    )
-                    
+                        raise HTTPException(status_code=400, detail=f"{sku} is not on purchase order {po.id}")
+                    still_due = po_line.ordered_qty - po_line.received_qty
+                    if rl.qty > still_due + 1e-9:
+                        raise HTTPException(status_code=400, detail=f"Only {still_due:g} of {sku} is still to be received on {po.id}")
+
+                vendor_id = po.vendor_id
+                grn_id = await unique_id(f"GRN-{today()[:4]}", lambda c: db.goodsreceiptnote.find_unique(where={"id": c}))
+                total_cost = 0.0
+                received_now = {}
+                grn_lines = []
+                variances = []
+                async with tx(db) as t:
+                    for sku, rl in wanted.items():
+                        po_line = lines_by_sku[sku]
+                        new_received = po_line.received_qty + rl.qty
+                        await t.purchaseorderline.update(where={"id": po_line.id}, data={"received_qty": new_received})
+                        received_now[sku] = new_received
+                        batch_no, mfg, exp = batches[sku]
+                        name = await _receive_line(t, sku, po_line.name, rl.qty, batch_no or getattr(po_line, "batch_no", None), mfg, exp)
+                        tax = getattr(po_line, "tax_rate", 0.0) or 0.0
+                        total_cost += with_gst(po_line.cost * rl.qty, tax)
+                        grn_lines.append({"grn_id": grn_id, "sku": sku, "name": name, "qty": rl.qty, "cost": po_line.cost, "tax_rate": tax})
+                        remaining = po_line.ordered_qty - new_received
+                        if remaining != 0:
+                            variances.append({"sku": sku, "name": name, "remaining": remaining})
+
+                    all_done = all(received_now.get(l.sku, l.received_qty) >= l.ordered_qty for l in po.lines)
+                    new_status = "Received" if all_done else "Partially Received"
+                    await t.purchaseorder.update(where={"id": po.id}, data={"status": new_status})
+                    await t.goodsreceiptnote.create(data={"id": grn_id, "po_id": po.id, "vendor_id": vendor_id, "date": today(), "total": total_cost})
+                    for gl in grn_lines:
+                        await t.goodsreceiptnoteline.create(data=gl)
+                    await t.vendor.update(where={"id": vendor_id}, data={"payable": {"increment": total_cost}})
+
                 res = {
                     "grnId": grn_id,
-                    "poId": data.poId,
+                    "poId": po.id,
                     "status": new_status,
                     "total": total_cost,
                     "variances": variances,
@@ -158,13 +162,12 @@ async def record_goods_receipt(data: GRNCreate, request: Request, current_user=D
                 return res
             except HTTPException:
                 raise
-            except Exception:
-                pass
-                
-        # Fallback
-        rand_suffix = str(random.randint(1000, 9999))
-        grn_id = f"GRN-2026-{rand_suffix}"
-        total_cost = sum(l.qty * 30.0 for l in data.lines)
+            except Exception as exc:
+                raise db_error(exc)
+
+        # Fallback (no database connection)
+        grn_id = f"GRN-{today()[:4]}-{len(_FALLBACK_GRNS) + 1001}"
+        total_cost = sum(l.qty * 30.0 for l in wanted.values())
         res = {
             "grnId": grn_id,
             "poId": data.poId,
@@ -186,54 +189,37 @@ async def record_goods_receipt(data: GRNCreate, request: Request, current_user=D
 
 @router.post("/direct")
 async def record_direct_receipt(data: DirectGRNCreate, request: Request, current_user=Depends(get_current_user)):
-    lock_key = await enforce_idempotency(request, "record_direct_receipt", f"{data.vendorId}_{len(data.lines)}")
+    if not data.lines:
+        raise HTTPException(status_code=400, detail="Add at least one item to receive")
+    for l in data.lines:
+        if not (l.qty > 0):
+            raise HTTPException(status_code=400, detail=f"Quantity for {l.sku} must be greater than zero")
+        if l.cost < 0:
+            raise HTTPException(status_code=400, detail=f"Purchase price for {l.sku} cannot be negative")
+        if not (0 <= l.taxRate <= 100):
+            raise HTTPException(status_code=400, detail=f"GST for {l.sku} must be between 0 and 100%")
+    batches = [_batch_fields(l, l.sku) for l in data.lines]
+    lock_key = await enforce_idempotency(request, "record_direct_receipt", f"{data.vendorId}_" + ",".join(f"{l.sku}:{l.qty}" for l in data.lines))
     try:
         db = get_db()
-        total_cost = sum(line.qty * line.cost for line in data.lines)
-        rand_suffix = str(random.randint(1000, 9999))
-        grn_id = f"GRN-DIRECT-{rand_suffix}"
-        
+        total_cost = sum(with_gst(line.qty * line.cost, line.taxRate) for line in data.lines)
+
         if db.is_connected():
             try:
-                await db.goodsreceiptnote.create(
-                    data={
-                        "id": grn_id,
-                        "po_id": None,
-                        "vendor_id": data.vendorId,
-                        "date": "2026-09-07",
-                        "total": total_cost
-                    }
-                )
-                
-                for line in data.lines:
-                    # Stock update
-                    item = await db.item.find_unique(where={"sku": line.sku})
-                    if item:
-                        await db.item.update(
-                            where={"sku": line.sku},
-                            data={"stock": max(0.0, item.stock + line.qty)}
-                        )
-                        name = item.name
-                    else:
-                        name = line.name
-                        
-                    await db.goodsreceiptnoteline.create(
-                        data={
-                            "grn_id": grn_id,
-                            "sku": line.sku,
-                            "name": name,
-                            "qty": line.qty,
-                            "cost": line.cost
-                        }
-                    )
-                    
                 vendor = await db.vendor.find_unique(where={"id": data.vendorId})
-                if vendor:
-                    await db.vendor.update(
-                        where={"id": data.vendorId},
-                        data={"payable": vendor.payable + total_cost}
-                    )
-                    
+                if not vendor:
+                    raise HTTPException(status_code=404, detail="Vendor not found")
+                if vendor.status != "Active":
+                    raise HTTPException(status_code=400, detail=f"{vendor.name} is inactive: activate the vendor before receiving stock from them")
+                grn_id = await unique_id("GRN-DIRECT", lambda c: db.goodsreceiptnote.find_unique(where={"id": c}))
+                async with tx(db) as t:
+                    await t.goodsreceiptnote.create(data={"id": grn_id, "po_id": None, "vendor_id": data.vendorId, "date": today(), "total": total_cost})
+                    for line, (batch_no, mfg, exp) in zip(data.lines, batches):
+                        name = await _receive_line(t, line.sku, line.name or line.sku, line.qty, batch_no, mfg, exp)
+                        await t.goodsreceiptnoteline.create(data={"grn_id": grn_id, "sku": line.sku, "name": name, "qty": line.qty,
+                                                                  "cost": line.cost, "tax_rate": line.taxRate})
+                    await t.vendor.update(where={"id": data.vendorId}, data={"payable": {"increment": total_cost}})
+
                 res = {
                     "grnId": grn_id,
                     "vendorId": data.vendorId,
@@ -243,12 +229,14 @@ async def record_direct_receipt(data: DirectGRNCreate, request: Request, current
                 if lock_key:
                     await idempotency_manager.release_lock(lock_key, res)
                 return res
-            except Exception:
-                pass
-                
-        # Fallback
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise db_error(exc)
+
+        # Fallback (no database connection)
         res = {
-            "grnId": grn_id,
+            "grnId": f"GRN-DIRECT-{len(_FALLBACK_GRNS) + 1001}",
             "vendorId": data.vendorId,
             "total": total_cost,
             "message": "Direct GRN recorded, stock and payables updated"

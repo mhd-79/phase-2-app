@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 
 @Component({
@@ -32,7 +33,7 @@ import { ApiService } from '../../services/api.service';
           <select class="select" [ngModel]="selectedInvoice" (ngModelChange)="onInvoiceSelect($event)" style="max-width:360px">
             <option value="">— Not linked to an invoice —</option>
             @for (inv of invoices(); track inv.id) {
-              <option [value]="inv.id">{{ inv.id }} &middot; {{ inv.date }} &middot; ₹{{ inv.total.toFixed(2) }}</option>
+              <option [value]="inv.id">{{ inv.id }} &middot; {{ inv.kind === 'PO' ? 'Purchase Order (all receipts)' : 'Goods Receipt' }} &middot; {{ inv.date }} &middot; ₹{{ inv.total.toFixed(2) }}</option>
             }
             <option value="__manual__">Other — enter invoice number…</option>
           </select>
@@ -104,11 +105,7 @@ import { ApiService } from '../../services/api.service';
         <div class="field">
           <label>Reason</label>
           <select class="select" [(ngModel)]="returnReason">
-            <option>Damaged in transit</option>
-            <option>Quality issue</option>
-            <option>Wrong item supplied</option>
-            <option>Excess supply</option>
-            <option>Other</option>
+            @for (r of reasons; track r) { <option>{{ r }}</option> }
           </select>
         </div>
         <div class="field">
@@ -117,9 +114,13 @@ import { ApiService } from '../../services/api.service';
         </div>
       </div>
 
-      <button class="btn btn-danger btn-lg" style="margin-top:var(--space-4)" [disabled]="isSubmitting || (selectedInvoice === '__manual__' && !invoiceInfo())" (click)="submitReturn()">
-        {{ isSubmitting ? 'Processing Return...' : 'Process Return & Raise Debit Note' }}
-      </button>
+      @if (submitError) { <span class="hint" style="color:var(--danger-700);display:block;margin-top:var(--space-3)">{{ submitError }}</span> }
+      <div class="row wrap" style="gap:var(--space-3);margin-top:var(--space-4)">
+        <button class="btn btn-danger btn-lg" [disabled]="isSubmitting || (selectedInvoice === '__manual__' && !invoiceInfo())" (click)="submitReturn(true)">
+          {{ isSubmitting ? 'Processing Return...' : 'Process Return & Raise Debit Note' }}
+        </button>
+        <button class="btn btn-secondary btn-lg" [disabled]="isSubmitting || (selectedInvoice === '__manual__' && !invoiceInfo())" (click)="submitReturn(false)">Save as Draft</button>
+      </div>
     </div>
 
     <div class="card card-flush">
@@ -134,9 +135,12 @@ import { ApiService } from '../../services/api.service';
                 <th>Debit Note #</th>
                 <th>Vendor</th>
                 <th>Purchase Invoice</th>
+                <th>Purchase Order</th>
                 <th>Date</th>
                 <th>Reason</th>
+                <th>Status</th>
                 <th class="num">Amount</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -145,9 +149,19 @@ import { ApiService } from '../../services/api.service';
                   <td class="mono">{{ r.id }}</td>
                   <td>{{ r.vendorName || r.vendorId }}</td>
                   <td class="mono">{{ r.invoiceId || '—' }}</td>
+                  <td class="mono">{{ r.poId || '—' }}</td>
                   <td>{{ r.date }}</td>
                   <td>{{ r.reason }}</td>
+                  <td><span class="badge" [ngClass]="r.status === 'Draft' ? 'badge-warning' : 'badge-success'">{{ r.status || 'Processed' }}</span></td>
                   <td class="num mono">₹{{ r.total.toFixed(2) }}</td>
+                  <td>
+                    @if (r.status === 'Draft') {
+                      <div class="row" style="gap:var(--space-1)">
+                        <button class="btn btn-ghost btn-sm" style="color:var(--primary)" [disabled]="isSubmitting" (click)="processDraft(r)">Process</button>
+                        <button class="btn btn-ghost btn-sm" style="color:var(--danger-700)" [disabled]="isSubmitting" (click)="discardDraft(r)">Discard</button>
+                      </div>
+                    }
+                  </td>
                 </tr>
               }
             </tbody>
@@ -163,6 +177,7 @@ import { ApiService } from '../../services/api.service';
 })
 export class PurchaseReturnsComponent implements OnInit {
   private api = inject(ApiService);
+  private route = inject(ActivatedRoute);
 
   vendors = signal<any[]>([]);
   catalog = signal<any[]>([]);
@@ -177,7 +192,9 @@ export class PurchaseReturnsComponent implements OnInit {
   loadingInvoice = false;
 
   selectedVendorId = '';
-  returnReason = 'Damaged in transit';
+  reasons = ['Damaged', 'Wrong Product', 'Wrong Quantity', 'Expired', 'Quality Issue', 'Warranty'];
+  returnReason = 'Damaged';
+  submitError = '';
   returnLines: any[] = [];
   isSubmitting = false;
 
@@ -189,7 +206,8 @@ export class PurchaseReturnsComponent implements OnInit {
     const vList = await this.api.getVendors();
     this.vendors.set(vList);
     if (vList.length > 0 && !this.selectedVendorId) {
-      this.selectedVendorId = vList[0].id;
+      const wanted = this.route.snapshot.queryParamMap.get('vendor');       // e.g. opened from a vendor's page
+      this.selectedVendorId = vList.some((v: any) => v.id === wanted) ? (wanted as string) : vList[0].id;
     }
     await this.loadInvoices();
 
@@ -252,7 +270,7 @@ export class PurchaseReturnsComponent implements OnInit {
       // only for invoice items that do not have a line yet (e.g. one that was removed)
       const item = this.unusedInvoiceItems()[0];
       if (!item) return;
-      this.returnLines.push({ sku: item.sku, name: item.name, qty: null, cost: item.cost, picked: true });
+      this.returnLines.push({ sku: item.sku, name: item.name, qty: null, cost: item.cost, taxRate: item.taxRate || 0, picked: true });
       return;
     }
     const item = this.catalog()[0];
@@ -261,7 +279,8 @@ export class PurchaseReturnsComponent implements OnInit {
       sku: item.sku,
       name: item.name,
       qty: 5,
-      cost: Math.round(item.price * 0.65)
+      cost: Math.round(item.price * 0.65),
+      taxRate: item.tax || 0
     });
   }
 
@@ -272,6 +291,7 @@ export class PurchaseReturnsComponent implements OnInit {
       if (item) {
         line.name = item.name;
         line.cost = item.cost;
+        line.taxRate = item.taxRate || 0;
         line.qty = null;
       }
       return;
@@ -280,6 +300,7 @@ export class PurchaseReturnsComponent implements OnInit {
     if (item) {
       line.name = item.name;
       line.cost = Math.round(item.price * 0.65);
+      line.taxRate = item.tax || 0;
     }
   }
 
@@ -328,7 +349,7 @@ export class PurchaseReturnsComponent implements OnInit {
         this.invoiceError = `Everything on ${inv.id} has already been returned.`;
       } else {
         // One line per item on the invoice; enter the quantity to send back on the lines you are returning
-        this.returnLines = this.lineOptions().map((l: any) => ({ sku: l.sku, name: l.name, qty: null, cost: l.cost }));
+        this.returnLines = this.lineOptions().map((l: any) => ({ sku: l.sku, name: l.name, qty: null, cost: l.cost, taxRate: l.taxRate || 0 }));
       }
     } catch (err: any) {
       this.invoiceInfo.set(null);
@@ -344,14 +365,21 @@ export class PurchaseReturnsComponent implements OnInit {
   }
 
   getDebitNoteTotal(): number {
-    return this.returnLines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0);
+    return this.returnLines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0) * (1 + (l.taxRate || 0) / 100), 0);
   }
 
-  async submitReturn() {
+  private errorText(err: any, fallback: string): string {
+    return typeof err?.error?.detail === 'string' ? err.error.detail : fallback;
+  }
+
+  /** Process the return now (stock and payable change), or keep it as a Draft. */
+  async submitReturn(process = true) {
     if (this.isSubmitting) return;
+    this.submitError = '';
     const validLines = this.returnLines.filter(l => l.qty > 0).map(l => ({ sku: l.sku, name: l.name, qty: l.qty, cost: l.cost }));
     if (validLines.length === 0) {
       if (this.invoiceInfo()) this.invoiceError = 'Enter the quantity to return on at least one item.';
+      else this.submitError = 'Enter the quantity to return on at least one item.';
       return;
     }
     this.invoiceError = '';
@@ -364,7 +392,7 @@ export class PurchaseReturnsComponent implements OnInit {
 
     this.isSubmitting = true;
     try {
-      await this.api.createPurchaseReturn(this.selectedVendorId, validLines, this.returnReason, inv?.id ?? null);
+      await this.api.createPurchaseReturn(this.selectedVendorId, validLines, this.returnReason, inv?.id ?? null, process);
       this.returnLines = [];
       if (inv) {
         await this.openInvoice(inv.id);   // refresh what can still be returned
@@ -373,7 +401,37 @@ export class PurchaseReturnsComponent implements OnInit {
       }
       await this.loadData();
     } catch (err: any) {
-      alert(typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not process the return. Please try again.');
+      this.submitError = this.errorText(err, 'Could not save the return. Please try again.');
+    } finally {
+      this.isSubmitting = false;
+    }
+  }
+
+  async processDraft(r: any) {
+    if (this.isSubmitting) return;
+    if (!confirm(`Process ${r.id}? Stock will be reduced and ${r.vendorName || r.vendorId}'s payable credited by ₹${r.total.toFixed(2)}.`)) return;
+    this.isSubmitting = true;
+    this.submitError = '';
+    try {
+      await this.api.processPurchaseReturn(r.id);
+      await this.loadData();
+    } catch (err: any) {
+      this.submitError = this.errorText(err, 'Could not process the draft return. Please try again.');
+    } finally {
+      this.isSubmitting = false;
+    }
+  }
+
+  async discardDraft(r: any) {
+    if (this.isSubmitting) return;
+    if (!confirm(`Discard draft ${r.id}?`)) return;
+    this.isSubmitting = true;
+    this.submitError = '';
+    try {
+      await this.api.discardPurchaseReturn(r.id);
+      await this.loadData();
+    } catch (err: any) {
+      this.submitError = this.errorText(err, 'Could not discard the draft. Please try again.');
     } finally {
       this.isSubmitting = false;
     }

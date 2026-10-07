@@ -2,6 +2,14 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
+/** The start page ("/" and any unknown address): the Login page, unless a valid session exists — then the user's own home screen. */
+export const rootRedirectGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (!auth.isAuthenticated()) return router.parseUrl('/login');
+  return router.parseUrl(auth.isSuperAdmin() ? '/super-admin/dashboard' : auth.homeRoute());
+};
+
 export const authGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);

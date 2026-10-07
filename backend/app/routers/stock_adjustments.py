@@ -13,7 +13,7 @@ router = APIRouter(prefix="/stock-adjustments", tags=["stock-adjustments"])
 
 _FALLBACK_ADJUSTMENTS = TenantList()
 
-@router.get("", dependencies=[Depends(require_module("inventory"))])
+@router.get("", dependencies=[Depends(require_module("stock_adjustment"))])
 async def list_stock_adjustments():
     db = get_db()
     if db.is_connected():
@@ -60,7 +60,7 @@ def _review_row(r) -> dict:
 
 
 @router.get("/return-reviews")
-async def list_return_reviews(status: str = "PENDING", user=Depends(require_module("inventory"))):
+async def list_return_reviews(status: str = "PENDING", user=Depends(require_module("stock_adjustment"))):
     db = get_db()
     if not db.is_connected():
         return []
@@ -73,7 +73,7 @@ async def list_return_reviews(status: str = "PENDING", user=Depends(require_modu
 
 
 @router.post("/return-reviews/{item_id}/resolve")
-async def resolve_return_review(item_id: str, req: ReturnReviewResolve, user=Depends(require_module("inventory"))):
+async def resolve_return_review(item_id: str, req: ReturnReviewResolve, user=Depends(require_module("stock_adjustment"))):
     db = get_db()
     outcome = REVIEW_OUTCOMES.get((req.outcome or "").upper())
     if outcome is None:
@@ -112,7 +112,7 @@ async def resolve_return_review(item_id: str, req: ReturnReviewResolve, user=Dep
             "message": f"{outcome['label']}: stock {'unchanged' if not delta else ('+' if delta > 0 else '') + str(delta)}"}
 
 
-@router.post("", dependencies=[Depends(require_module("inventory", "stock_upload"))])
+@router.post("", dependencies=[Depends(require_module("stock_adjustment", "stock_upload"))])
 async def record_stock_adjustment(data: StockAdjustmentCreate, request: Request, current_user=Depends(get_current_user)):
     lock_key = await enforce_idempotency(request, "stock_adjustment", f"{data.sku}_{data.delta}")
     try:

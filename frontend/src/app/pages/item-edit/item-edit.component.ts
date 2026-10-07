@@ -2,7 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
-import { ApiService, CatalogItem } from '../../services/api.service';
+import { ApiService, CatalogItem, DEFAULT_TAX_SLABS, TaxSlab } from '../../services/api.service';
 
 @Component({
   selector: 'app-item-edit',
@@ -23,7 +23,7 @@ import { ApiService, CatalogItem } from '../../services/api.service';
 
       <div class="card" style="max-width:760px">
         <form (submit)="saveItem(); $event.preventDefault()" class="stack">
-          <div class="form-grid">
+          <div class="form-grid id-grid">
             <div class="field">
               <label for="fSku">SKU</label>
               <input class="input mono" id="fSku" [(ngModel)]="item.sku" name="sku" placeholder="e.g. GRO-007" required [disabled]="isEdit">
@@ -31,6 +31,10 @@ import { ApiService, CatalogItem } from '../../services/api.service';
             <div class="field">
               <label for="fBarcode">Barcode</label>
               <input class="input mono" id="fBarcode" [(ngModel)]="item.barcode" name="barcode" placeholder="EAN/UPC">
+            </div>
+            <div class="field">
+              <label for="fBatchNo">Batch No.</label>
+              <input class="input mono" id="fBatchNo" [(ngModel)]="item.batchNo" name="batchNo" placeholder="Optional" maxlength="40">
             </div>
           </div>
 
@@ -54,11 +58,9 @@ import { ApiService, CatalogItem } from '../../services/api.service';
             <div class="field">
               <label for="fTax">Tax Rate</label>
               <select class="select" id="fTax" [(ngModel)]="item.tax" name="tax">
-                <option [ngValue]="0">GST 0%</option>
-                <option [ngValue]="5">GST 5%</option>
-                <option [ngValue]="12">GST 12%</option>
-                <option [ngValue]="18">GST 18%</option>
-                <option [ngValue]="28">GST 28%</option>
+                @for (slab of taxOptions(); track slab.rate) {
+                  <option [ngValue]="slab.rate">{{ slab.name }}</option>
+                }
               </select>
             </div>
           </div>
@@ -142,7 +144,11 @@ import { ApiService, CatalogItem } from '../../services/api.service';
         </div>
       </div>
     }
-  `
+  `,
+  styles: [`
+    .id-grid { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 640px) { .id-grid { grid-template-columns: 1fr; } }
+  `]
 })
 export class ItemEditComponent implements OnInit {
   api = inject(ApiService);
@@ -150,6 +156,7 @@ export class ItemEditComponent implements OnInit {
   route = inject(ActivatedRoute);
 
   isEdit = false;
+  taxSlabs: TaxSlab[] = DEFAULT_TAX_SLABS;
   categories: string[] = [];
   showNewCatModal = false;
   newCategoryName = '';
@@ -169,10 +176,19 @@ export class ItemEditComponent implements OnInit {
     pricingMethod: 'qty',
     unit: 'pcs',
     mfgDate: '',
-    expDate: ''
+    expDate: '',
+    batchNo: ''
   };
 
+  /** The configured GST slabs; an item whose current rate is no longer a slab keeps it as an option so nothing changes silently. */
+  taxOptions(): { rate: number; name: string }[] {
+    const list: { rate: number; name: string }[] = this.taxSlabs.map(s => ({ rate: s.rate, name: s.name }));
+    if (this.item && !list.some(s => s.rate === this.item.tax)) list.push({ rate: this.item.tax, name: `GST ${this.item.tax}%` });
+    return list.sort((a, b) => a.rate - b.rate);
+  }
+
   async ngOnInit() {
+    void this.api.getTaxSlabs().then(slabs => (this.taxSlabs = slabs));
     this.categories = await this.api.getCategories();
     this.route.queryParams.subscribe(async (params) => {
       if (params['sku']) {
@@ -184,7 +200,8 @@ export class ItemEditComponent implements OnInit {
             ...found,
             costPrice: found.costPrice || Math.round(found.price * 0.7),
             mfgDate: found.mfgDate || '',
-            expDate: found.expDate || ''
+            expDate: found.expDate || '',
+            batchNo: found.batchNo || ''
           };
         }
       }

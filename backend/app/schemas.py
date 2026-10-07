@@ -1,6 +1,6 @@
 import re
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import List, Optional, Any, Dict, Literal
+from typing import List, Optional, Any, Dict, Literal, Union
 from datetime import datetime, date
 
 # --- Auth ---
@@ -22,6 +22,7 @@ class TokenResponse(BaseModel):
     phase_access: int = 2
     active_counter: Optional[str] = None
     modules: Optional[Dict[str, bool]] = None      # effective module access (what the user may open)
+    permissions: Optional[Dict[str, Dict[str, bool]]] = None   # per module: view / create / edit / delete
     # multi-tenant sign-ins only
     tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
@@ -43,9 +44,11 @@ class UserSchema(BaseModel):
     leave_reason: Optional[str] = None
     leave_started_at: Optional[datetime] = None
     modules: Optional[Dict[str, bool]] = None      # effective module access
+    permissions: Optional[Dict[str, Dict[str, bool]]] = None
 
 class UserAccessUpdate(BaseModel):
-    modules: Dict[str, bool]
+    # per module either on / off (all four actions) or {"view": .., "create": .., "edit": .., "delete": ..}
+    modules: Dict[str, Union[bool, Dict[str, bool]]]
 
 class LeaveRequest(BaseModel):
     on_leave: bool
@@ -115,6 +118,7 @@ class ItemSchema(BaseModel):
     is_active: bool = True
     mfg_date: Optional[date] = None
     exp_date: Optional[date] = None
+    batch_no: Optional[str] = None
 
 class ItemCreate(BaseModel):
     sku: str
@@ -131,6 +135,7 @@ class ItemCreate(BaseModel):
     unit: str = "pcs"
     mfg_date: Optional[date] = None
     exp_date: Optional[date] = None
+    batch_no: Optional[str] = None
 
     @field_validator("mfg_date", "exp_date", mode="before")
     @classmethod
@@ -158,6 +163,7 @@ class ItemUpdate(BaseModel):
     is_active: Optional[bool] = None
     mfg_date: Optional[date] = None
     exp_date: Optional[date] = None
+    batch_no: Optional[str] = None
 
     @field_validator("mfg_date", "exp_date", mode="before")
     @classmethod
@@ -288,6 +294,19 @@ class HeldBillCreate(BaseModel):
     item_count: float
     total: float
 
+# --- Tax slabs ---
+class TaxSlabInput(BaseModel):
+    name: str
+    rate: Optional[float] = None       # required when adding a slab; a slab's rate cannot be changed afterwards
+
+class TaxSlabSchema(BaseModel):
+    id: str
+    name: str
+    rate: float
+    cgst: float
+    sgst: float
+    itemCount: int = 0      # items currently priced at this rate
+
 # --- Store Settings ---
 class StoreSettingsSchema(BaseModel):
     store_name: str
@@ -323,6 +342,7 @@ class VendorCreate(BaseModel):
     terms: str = "Net 30"
     status: str = "Active"
     payable: float = 0.0
+    gstin: Optional[str] = None
 
 class VendorUpdate(BaseModel):
     name: Optional[str] = None
@@ -332,6 +352,7 @@ class VendorUpdate(BaseModel):
     email: Optional[str] = None
     terms: Optional[str] = None
     status: Optional[str] = None
+    gstin: Optional[str] = None
 
 class VendorSchema(BaseModel):
     id: str
@@ -343,25 +364,39 @@ class VendorSchema(BaseModel):
     terms: str
     status: str
     payable: float
+    gstin: Optional[str] = None
 
 class VendorPaymentCreate(BaseModel):
     amount: float
     mode: str = "Bank Transfer" # "Bank Transfer" | "Cheque" | "UPI" | "Cash"
+    reference: Optional[str] = None
 
 class POLineInput(BaseModel):
     sku: str
     name: str
     qty: float
     cost: float
+    taxRate: Optional[float] = None     # GST %; blank = the item's own tax rate
+    batchNo: Optional[str] = None
 
 class PurchaseOrderCreate(BaseModel):
     vendorId: str
     expected: str
+    date: Optional[str] = None          # PO date, defaults to today
+    status: str = "Pending"             # "Draft" | "Pending"
     lines: List[POLineInput]
+
+class PurchaseOrderUpdate(BaseModel):
+    vendorId: Optional[str] = None
+    expected: Optional[str] = None
+    lines: Optional[List[POLineInput]] = None
 
 class GRNLineInput(BaseModel):
     sku: str
     qty: float
+    batchNo: Optional[str] = None
+    mfgDate: Optional[str] = None
+    expiryDate: Optional[str] = None
 
 class GRNCreate(BaseModel):
     poId: str
@@ -372,6 +407,11 @@ class DirectGRNLineInput(BaseModel):
     sku: str
     qty: float
     cost: float
+    name: Optional[str] = None
+    taxRate: float = 0.0
+    batchNo: Optional[str] = None
+    mfgDate: Optional[str] = None
+    expiryDate: Optional[str] = None
 
 class DirectGRNCreate(BaseModel):
     vendorId: str
@@ -390,8 +430,9 @@ class PurchaseReturnLineInput(BaseModel):
 class PurchaseReturnCreate(BaseModel):
     vendorId: str
     lines: List[PurchaseReturnLineInput]
-    reason: str = "Damaged in transit"
+    reason: str = "Damaged"
     invoiceId: Optional[str] = None   # purchase invoice (GRN id / PO id) the return is made against
+    process: bool = True              # False = save as Draft (no stock / payable change until it is processed)
 
 class StockAdjustmentCreate(BaseModel):
     sku: str

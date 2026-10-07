@@ -2,20 +2,45 @@ import json
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List
 from app.schemas import DiscountSchema, DiscountCreate
-from app.security import require_admin
+from app.security import require_module
 from app.database import db
 from app.tenant_scoped import TenantList, TenantDict
 from app.idempotency import enforce_idempotency, idempotency_manager
+from app.procurement import parse_date, db_error
 
 router = APIRouter(prefix="/discounts", tags=["Discounts"])
 
 _FALLBACK_DISCOUNTS = TenantList()
 
+
+def _checked(req: DiscountCreate) -> DiscountCreate:
+    """Validates a discount and stores it in the form the billing engine reads (type percent | flat, dates YYYY-MM-DD)."""
+    if not req.name.strip():
+        raise HTTPException(status_code=400, detail="Enter a discount name")
+    if req.type not in ("percent", "flat", "fixed"):
+        raise HTTPException(status_code=400, detail="Discount type must be percentage or fixed amount")
+    if not (req.value > 0):
+        raise HTTPException(status_code=400, detail="Discount value must be greater than zero")
+    if req.type == "percent" and req.value > 100:
+        raise HTTPException(status_code=400, detail="Percentage discount cannot exceed 100%")
+    if req.applies_to not in ("all", "selected"):
+        raise HTTPException(status_code=400, detail="Discount must apply to all products or to selected products")
+    if req.applies_to == "selected" and not req.product_skus:
+        raise HTTPException(status_code=400, detail="Select at least one product")
+    if req.status not in ("active", "inactive"):
+        raise HTTPException(status_code=400, detail="Status must be active or inactive")
+    start, end = parse_date(req.start_date, "Start date"), parse_date(req.end_date, "End date")
+    if start and end and end < start:
+        raise HTTPException(status_code=400, detail="End date cannot be earlier than the start date")
+    return req.model_copy(update={"name": req.name.strip(), "type": "percent" if req.type == "percent" else "flat",
+                                  "start_date": start, "end_date": end,
+                                  "product_skus": list(dict.fromkeys(req.product_skus)) if req.applies_to == "selected" else []})
+
 @router.get("", response_model=List[DiscountSchema])
 async def get_discounts():
     if db.is_connected():
         try:
-            discounts = await db.discount.find_many()
+            discounts = await db.discount.find_many(order={"created_at": "asc"})
             result = []
             for d in discounts:
                 skus = []
@@ -40,7 +65,8 @@ async def get_discounts():
     return list(_FALLBACK_DISCOUNTS)
 
 @router.post("", response_model=DiscountSchema)
-async def create_discount(req: DiscountCreate, request: Request, user = Depends(require_admin)):
+async def create_discount(req: DiscountCreate, request: Request, user = Depends(require_module("discounts"))):
+    req = _checked(req)
     lock_key = await enforce_idempotency(request, "create_discount", req.name)
     try:
         if db.is_connected():
@@ -63,10 +89,10 @@ async def create_discount(req: DiscountCreate, request: Request, user = Depends(
                 if lock_key:
                     await idempotency_manager.release_lock(lock_key, res.dict())
                 return res
-            except Exception:
-                pass
-                
-        # Fallback
+            except Exception as exc:
+                raise db_error(exc)
+
+        # Fallback (no database connection)
         res = DiscountSchema(
             id=f"disc-{len(_FALLBACK_DISCOUNTS)+1}",
             name=req.name,
@@ -90,7 +116,8 @@ async def create_discount(req: DiscountCreate, request: Request, user = Depends(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{discount_id}", response_model=DiscountSchema)
-async def update_discount(discount_id: str, req: DiscountCreate, request: Request, user = Depends(require_admin)):
+async def update_discount(discount_id: str, req: DiscountCreate, request: Request, user = Depends(require_module("discounts"))):
+    req = _checked(req)
     lock_key = await enforce_idempotency(request, f"update_discount_{discount_id}")
     try:
         if db.is_connected():
@@ -121,10 +148,10 @@ async def update_discount(discount_id: str, req: DiscountCreate, request: Reques
                 return res
             except HTTPException:
                 raise
-            except Exception:
-                pass
-                
-        # Fallback
+            except Exception as exc:
+                raise db_error(exc)
+
+        # Fallback (no database connection)
         for d in _FALLBACK_DISCOUNTS:
             if d.id == discount_id:
                 d.name = req.name
@@ -156,14 +183,14 @@ async def update_discount(discount_id: str, req: DiscountCreate, request: Reques
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{discount_id}")
-async def delete_discount(discount_id: str, user = Depends(require_admin)):
+async def delete_discount(discount_id: str, user = Depends(require_module("discounts"))):
     if db.is_connected():
         try:
             existing = await db.discount.find_unique(where={"id": discount_id})
             if existing:
                 await db.discount.delete(where={"id": discount_id})
-        except Exception:
-            pass
-            
+        except Exception as exc:
+            raise db_error(exc)
+
     _FALLBACK_DISCOUNTS[:] = [d for d in _FALLBACK_DISCOUNTS if d.id != discount_id]
     return {"message": "Discount rule deleted"}

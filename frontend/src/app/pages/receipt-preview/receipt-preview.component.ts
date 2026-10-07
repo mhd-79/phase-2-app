@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { ThermalReceiptComponent } from '../../components/thermal-receipt/thermal-receipt.component';
 
 @Component({
   selector: 'app-receipt-preview',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ThermalReceiptComponent],
   template: `
     <main class="main">
       <div class="page-header">
@@ -29,25 +30,10 @@ import { AuthService } from '../../services/auth.service';
         </div>
       </div>
 
-      <div class="card mono" style="max-width:400px;margin:0 auto;padding:var(--space-6);background:#fff;border:1px solid var(--border)">
-        <div style="text-align:center;margin-bottom:var(--space-3)">
-          <strong>{{ storeName }}</strong>
-          <div class="text-xs text-muted">{{ storeLine }}</div>
-        </div>
-        <hr class="divider">
-        <div class="row-between text-sm"><span>Invoice</span><span class="mono">{{ invoiceNo }}</span></div>
-        <div class="row-between text-sm"><span>Date</span><span class="mono">{{ saleDate | date:'medium' }}</span></div>
-        <hr class="divider">
-        @for (line of lines; track line.sku) {
-          <div class="row-between text-sm">
-            <span>{{ line.name }} &times;{{ line.qty }}</span>
-            <span class="mono">₹{{ (line.price * line.qty).toFixed(2) }}</span>
-          </div>
-        }
-        <hr class="divider">
-        <div class="row-between" style="font-weight:700"><span>Grand Total</span><span class="mono">₹{{ grandTotal.toFixed(2) }}</span></div>
-        <hr class="divider">
-        <p class="text-xs text-muted" style="text-align:center">Thank you for shopping with us!</p>
+      <div class="printable-receipt">
+        <app-thermal-receipt [storeName]="storeName" [storeLine]="storeLine" [invoiceNo]="invoiceNo" [time]="saleDate"
+          [lines]="lines" [taxable]="taxable" [gstTotal]="gstTotal" [discountTotal]="discountTotal" [grandTotal]="grandTotal"
+          [pricingMode]="pricingMode" [tenders]="tenders" />
       </div>
     </main>
   `
@@ -63,6 +49,11 @@ export class ReceiptPreviewComponent implements OnInit {
   invoiceNo = 'INV-FY26-01025';
   saleDate = new Date();
   grandTotal = 435.0;
+  taxable: number | null = null;
+  gstTotal: number | null = null;
+  discountTotal = 0;
+  pricingMode: string | null = null;
+  tenders: { mode: string; amount: number }[] = [];
   lines = [
     { sku: 'BEV-001', name: 'Cola 500ml', qty: 2, price: 45 },
     { sku: 'GRO-001', name: 'Basmati Rice 1kg', qty: 2, price: 135 },
@@ -95,6 +86,11 @@ export class ReceiptPreviewComponent implements OnInit {
     if (sale) {
       this.lines = sale.lines || [];
       this.grandTotal = sale.grandTotal || sale.grand_total || 0;
+      this.taxable = sale.taxable_total ?? sale.taxable ?? null;
+      this.gstTotal = sale.gst_total ?? sale.gstTotal ?? null;
+      this.discountTotal = sale.discount_total ?? sale.discountTotal ?? 0;
+      this.pricingMode = sale.pricing_mode ?? sale.pricingMode ?? null;
+      this.tenders = (sale.tenders || []).map((t: any) => ({ mode: t.mode, amount: Number(t.amount) || 0 }));
       this.saleDate = new Date(sale.time);
     }
   }

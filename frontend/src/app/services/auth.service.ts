@@ -1,4 +1,9 @@
 import { Injectable, signal } from '@angular/core';
+import { isTokenExpired } from './session';
+
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+export const PERMISSION_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+export type ModulePermissions = Record<PermissionAction, boolean>;
 
 export type UserRole = 'admin' | 'cashier' | 'super_admin';
 
@@ -20,23 +25,30 @@ export interface UserProfile {
   subscriptionEnd?: string | null;
   /** Module access the Admin allowed / denied for this user (Users & Roles -> User Access). Missing = the role's defaults. */
   modules?: Record<string, boolean>;
+  /** What the user may do in each module: view / create / edit / delete. Missing = the role's defaults. */
+  permissions?: Record<string, ModulePermissions>;
 }
 
 /** Feature areas a user can be allowed or denied. Keys match the API. */
-export const ACCESS_MODULES: { key: string; label: string; route: string }[] = [
-  { key: 'billing', label: 'Billing', route: '/pos' },
-  { key: 'hold_recall', label: 'Hold & Recall', route: '/hold-bills' },
-  { key: 'returns', label: 'Returns', route: '/returns' },
-  { key: 'stock_upload', label: 'Stock Upload', route: '/stock-upload' },
-  { key: 'inventory', label: 'Inventory / Stock Maintenance', route: '/items-stock' },
-  { key: 'vendors', label: 'Vendor Management', route: '/vendors' },
-  { key: 'purchase_orders', label: 'Purchase Orders', route: '/purchase-orders' },
-  { key: 'reports', label: 'Reports', route: '/reports' },
-  { key: 'ai_insights', label: 'AI Insights', route: '/ai-insights' },
-  { key: 'users', label: 'Users & Roles', route: '/users' },
-  { key: 'store_settings', label: 'Store Settings', route: '/store-settings' },
-  { key: 'tax_config', label: 'Tax Configuration', route: '/tax-settings' },
-  { key: 'backup', label: 'Backup', route: '/store-settings' }
+export const ACCESS_MODULES: { key: string; label: string; group: string; route: string }[] = [
+  { key: 'billing', label: 'Billing', group: 'Billing', route: '/pos' },
+  { key: 'hold_recall', label: 'Hold & Recall', group: 'Billing', route: '/hold-bills' },
+  { key: 'returns', label: 'Returns', group: 'Billing', route: '/returns' },
+  { key: 'items_stock', label: 'Items & Stock', group: 'Inventory', route: '/items-stock' },
+  { key: 'stock_upload', label: 'Stock Upload', group: 'Inventory', route: '/stock-upload' },
+  { key: 'vendors', label: 'Vendors', group: 'Procurement', route: '/vendors' },
+  { key: 'purchase_orders', label: 'Purchase Orders', group: 'Procurement', route: '/purchase-orders' },
+  { key: 'purchase_returns', label: 'Purchase Returns', group: 'Procurement', route: '/purchase-returns' },
+  { key: 'stock_adjustment', label: 'Stock Adjustment', group: 'Stock Maintenance', route: '/stock-adjustment' },
+  { key: 'batch_expiry', label: 'Batch & Expiry', group: 'Stock Maintenance', route: '/batch-expiry' },
+  { key: 'reorder_alerts', label: 'Reorder Alerts', group: 'Stock Maintenance', route: '/reorder-alerts' },
+  { key: 'physical_audit', label: 'Physical Audit', group: 'Stock Maintenance', route: '/stock-audit' },
+  { key: 'reports', label: 'Reports', group: 'Insights', route: '/reports' },
+  { key: 'ai_insights', label: 'AI Insights', group: 'Insights', route: '/ai-insights' },
+  { key: 'discounts', label: 'Discounts', group: 'Administration', route: '/discounts' },
+  { key: 'tax_config', label: 'Tax Configuration', group: 'Administration', route: '/tax-settings' },
+  { key: 'users', label: 'Users & Roles', group: 'Administration', route: '/users' },
+  { key: 'store_settings', label: 'Store Settings', group: 'Administration', route: '/store-settings' }
 ];
 const CASHIER_MODULES = ['billing', 'hold_recall', 'returns'];
 
@@ -71,7 +83,7 @@ export class AuthService {
     return DEFAULT_ADMIN;
   }
 
-  setSession(token: string, username: string, role: string, fullName: string, subText: string, autoLock: string = '2 min', phase: number = 2, activeCounter: string | null = null, tenant: TenantSession = {}, modules?: Record<string, boolean>) {
+  setSession(token: string, username: string, role: string, fullName: string, subText: string, autoLock: string = '2 min', phase: number = 2, activeCounter: string | null = null, tenant: TenantSession = {}, modules?: Record<string, boolean>, permissions?: Record<string, ModulePermissions>) {
     const roleKey = role.toLowerCase();
     const userRole = (roleKey === 'admin' || roleKey === 'super_admin' ? roleKey : 'cashier') as UserRole;
     const profile: UserProfile = {
@@ -86,7 +98,8 @@ export class AuthService {
       tenantName: tenant.tenantName ?? null,
       tenantStatus: tenant.tenantStatus ?? null,
       subscriptionEnd: tenant.subscriptionEnd ?? null,
-      modules: modules ?? undefined
+      modules: modules ?? undefined,
+      permissions: permissions ?? undefined
     };
 
     this.switchCacheOwner(userRole === 'super_admin' ? 'platform' : (tenant.tenantId ?? 'default'));
@@ -140,14 +153,25 @@ export class AuthService {
     localStorage.removeItem('pos_user_profile');
   }
 
+  /** A valid session: a sign-in token that has not expired. A leftover profile without a token, or an expired token, is not a session (and is cleared). */
   isAuthenticated(): boolean {
-    return !!this.token() || !!localStorage.getItem('pos_token') || !!localStorage.getItem('pos_user_profile');
+    const token = this.token() || localStorage.getItem('pos_token');
+    if (!token) return false;
+    if (isTokenExpired(token)) {
+      this.logout();
+      return false;
+    }
+    return true;
   }
 
-  /** Whether the signed-in user may open a module. The server enforces the same rule on every API call; this only drives what is shown. */
-  can(module: string): boolean {
+  /** Whether the signed-in user may open a module (action 'view'), or create / edit / delete in it. The server enforces the same rules on every
+   *  API call; this only drives what is shown. */
+  can(module: string, action: PermissionAction = 'view'): boolean {
     const u = this.currentUser();
     if (u.role === 'super_admin') return false;
+    const perms = u.permissions?.[module];
+    if (perms) return !!perms[action];
+    // a session saved before per-action permissions: a module that may be opened allows every action
     const explicit = u.modules?.[module];
     if (explicit !== undefined) return !!explicit;
     return u.role === 'admin' || CASHIER_MODULES.includes(module);
@@ -159,9 +183,9 @@ export class AuthService {
   }
 
   /** Applies module access re-read from the server (an Admin may have changed it since sign-in). */
-  setModules(modules: Record<string, boolean> | null | undefined) {
-    if (!modules) return;
-    const profile: UserProfile = { ...this.currentUser(), modules };
+  setModules(modules: Record<string, boolean> | null | undefined, permissions?: Record<string, ModulePermissions> | null) {
+    if (!modules && !permissions) return;
+    const profile: UserProfile = { ...this.currentUser(), ...(modules ? { modules } : {}), ...(permissions ? { permissions } : {}) };
     this.currentUser.set(profile);
     localStorage.setItem('pos_user_profile', JSON.stringify(profile));
   }

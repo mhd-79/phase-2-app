@@ -44,13 +44,23 @@ class Settings(BaseSettings):
     TENANT_CLIENT_POOL_SIZE: int = int(os.getenv("TENANT_CLIENT_POOL_SIZE", "20"))      # max simultaneously connected tenant DB clients
     TENANT_CONNECTION_LIMIT: int = int(os.getenv("TENANT_CONNECTION_LIMIT", "3"))       # DB connections per tenant client
     PAYMENT_PROVIDER: str = os.getenv("PAYMENT_PROVIDER", "none").strip().lower()       # none | dev (dev simulates success; never use in production)
+    # Outgoing email (every email goes through app/mailer.py). Local development uses MailHog: SMTP_HOST=localhost, SMTP_PORT=1025,
+    # no username / password (web UI http://localhost:8025). Any other SMTP provider is a change of these variables only.
     SMTP_HOST: str = os.getenv("SMTP_HOST", "").strip()
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER: str = os.getenv("SMTP_USER", "").strip()
+    SMTP_USERNAME: str = (os.getenv("SMTP_USERNAME") or os.getenv("SMTP_USER") or "").strip()          # SMTP_USER: name used by earlier releases
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-    SMTP_FROM: str = os.getenv("SMTP_FROM", "").strip()
+    SMTP_FROM_EMAIL: str = (os.getenv("SMTP_FROM_EMAIL") or os.getenv("SMTP_FROM") or "").strip()      # SMTP_FROM: name used by earlier releases
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "Okuto Mart").strip()
+    # STARTTLS is used whenever the server offers it. A server that does not offer it (MailHog) is used as is, but only when no login
+    # is configured: credentials are never sent over an unencrypted connection.
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").strip().lower() not in ("0", "false", "no", "off")
 
 settings = Settings()
+# names used by earlier releases still work when the new ones are empty or missing (an empty SMTP_USERNAME= line counts as missing)
+if not settings.SMTP_USERNAME:
+    settings.SMTP_USERNAME = os.getenv("SMTP_USER", "").strip()
+if not settings.SMTP_FROM_EMAIL:
+    settings.SMTP_FROM_EMAIL = os.getenv("SMTP_FROM", "").strip()
 
 

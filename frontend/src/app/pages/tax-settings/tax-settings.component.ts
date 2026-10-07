@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ApiService, DEFAULT_TAX_SLABS, TaxSlab } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-tax-settings',
@@ -40,29 +42,140 @@ import { FormsModule } from '@angular/forms';
       </div>
 
       <div class="card card-flush" style="max-width:640px">
-        <div class="card-header">
+        <div class="card-header row-between">
           <h3>Configured Tax Slabs (GST)</h3>
+          @if (auth.can('tax_config', 'create')) { <button class="btn btn-primary btn-sm" (click)="openAdd()">+ Add Slab</button> }
         </div>
         <table class="table">
           <thead>
-            <tr><th>Slab Name</th><th>Rate (%)</th><th>CGST</th><th>SGST</th></tr>
+            <tr><th>Slab Name</th><th>Rate (%)</th><th>CGST</th><th>SGST</th><th></th></tr>
           </thead>
           <tbody>
-            <tr><td>GST 0% (Exempt)</td><td class="mono">0%</td><td class="mono">0%</td><td class="mono">0%</td></tr>
-            <tr><td>GST 5% (Essential Retail)</td><td class="mono">5%</td><td class="mono">2.5%</td><td class="mono">2.5%</td></tr>
-            <tr><td>GST 12% (Standard Packaged)</td><td class="mono">12%</td><td class="mono">6.0%</td><td class="mono">6.0%</td></tr>
-            <tr><td>GST 18% (Personal Care &amp; Snacks)</td><td class="mono">18%</td><td class="mono">9.0%</td><td class="mono">9.0%</td></tr>
-            <tr><td>GST 28% (Luxury / Deferral)</td><td class="mono">28%</td><td class="mono">14.0%</td><td class="mono">14.0%</td></tr>
+            @for (slab of slabs; track slab.id) {
+              <tr>
+                <td>{{ slab.name }}</td>
+                <td class="mono">{{ slab.rate }}%</td>
+                <td class="mono">{{ slab.cgst }}%</td>
+                <td class="mono">{{ slab.sgst }}%</td>
+                <td>
+                  <div class="row" style="gap:var(--space-1)">
+                    @if (auth.can('tax_config', 'edit')) { <button class="btn btn-ghost btn-sm" (click)="openEdit(slab)">Edit</button> }
+                    @if (auth.can('tax_config', 'delete')) { <button class="btn btn-ghost btn-sm" style="color:var(--danger-700)" [disabled]="slabs.length <= 1" (click)="remove(slab)">Delete</button> }
+                  </div>
+                </td>
+              </tr>
+            }
           </tbody>
         </table>
+        @if (pageError) { <div class="card-body"><span class="text-sm" style="color:var(--danger-700)">{{ pageError }}</span></div> }
       </div>
     </main>
+
+    <!-- Add / Edit slab -->
+    @if (showModal) {
+      <div class="modal-overlay open">
+        <div class="modal modal-sm">
+          <div class="modal-header">
+            <h3>{{ editing ? 'Edit Tax Slab' : 'Add Tax Slab' }}</h3>
+            <button class="icon-btn" (click)="showModal = false">✕</button>
+          </div>
+          <div class="modal-body stack">
+            <div class="field">
+              <label for="slabName">Slab Name</label>
+              <input class="input" id="slabName" [(ngModel)]="formName" maxlength="60" placeholder="e.g. GST 3% (Jewellery)" (keyup.enter)="save()">
+            </div>
+            <div class="field">
+              <label for="slabRate">GST Rate (%)</label>
+              <input class="input mono" id="slabRate" type="number" min="0" max="100" step="0.01" [(ngModel)]="formRate" [disabled]="!!editing" placeholder="e.g. 3" (keyup.enter)="save()">
+              @if (editing) {
+                <span class="hint">The rate of an existing slab is fixed so the tax already saved on items stays correct. Add a new slab for a new rate.</span>
+              } @else if (formRate !== null && formRate >= 0) {
+                <span class="hint">CGST {{ formRate / 2 }}% + SGST {{ formRate / 2 }}%</span>
+              }
+            </div>
+            @if (formError) { <span class="hint" style="color:var(--danger-700)">{{ formError }}</span> }
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" [disabled]="isSaving" (click)="showModal = false">Cancel</button>
+            <button class="btn btn-primary" [disabled]="isSaving" (click)="save()">{{ isSaving ? 'Saving...' : (editing ? 'Save Changes' : 'Add Slab') }}</button>
+          </div>
+        </div>
+      </div>
+    }
   `
 })
 export class TaxSettingsComponent implements OnInit {
+  private api = inject(ApiService);
+  auth = inject(AuthService);
   pricingMode: 'exclusive' | 'inclusive' = 'exclusive';
 
-  ngOnInit() {
+  slabs: TaxSlab[] = DEFAULT_TAX_SLABS;
+  pageError = '';
+  showModal = false;
+  editing: TaxSlab | null = null;
+  formName = '';
+  formRate: number | null = null;
+  formError = '';
+  isSaving = false;
+
+  async loadSlabs() {
+    this.slabs = await this.api.getTaxSlabs();
+  }
+
+  openAdd() {
+    this.editing = null;
+    this.formName = '';
+    this.formRate = null;
+    this.formError = '';
+    this.showModal = true;
+  }
+
+  openEdit(slab: TaxSlab) {
+    this.editing = slab;
+    this.formName = slab.name;
+    this.formRate = slab.rate;
+    this.formError = '';
+    this.showModal = true;
+  }
+
+  async remove(slab: TaxSlab) {
+    this.pageError = '';
+    const used = slab.itemCount ? `
+
+${slab.itemCount} item(s) are priced at ${slab.rate}%. They keep that rate; only the slab is removed from the list.` : '';
+    if (!confirm(`Delete the tax slab "${slab.name}"?${used}`)) return;
+    try {
+      await this.api.deleteTaxSlab(slab.id);
+      await this.loadSlabs();
+    } catch (err: any) {
+      this.pageError = typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not delete the tax slab. Please try again.';
+    }
+  }
+
+  async save() {
+    if (this.isSaving) return;
+    const name = this.formName.trim();
+    if (!name) { this.formError = 'Enter a slab name'; return; }
+    if (!this.editing && (this.formRate === null || this.formRate === undefined || isNaN(Number(this.formRate)) || this.formRate < 0 || this.formRate > 100)) {
+      this.formError = 'Enter a GST rate between 0 and 100';
+      return;
+    }
+    this.formError = '';
+    this.isSaving = true;
+    try {
+      if (this.editing) await this.api.renameTaxSlab(this.editing.id, name);
+      else await this.api.addTaxSlab(name, Number(this.formRate));
+      this.showModal = false;
+      await this.loadSlabs();
+    } catch (err: any) {
+      this.formError = typeof err?.error?.detail === 'string' ? err.error.detail : 'Could not save the tax slab. Please try again.';
+    } finally {
+      this.isSaving = false;
+    }
+  }
+
+  async ngOnInit() {
+    void this.loadSlabs();
     try {
       const raw = JSON.parse(localStorage.getItem('pos_demo_tax_settings') || '{}');
       if (raw.pricingMode) this.pricingMode = raw.pricingMode;

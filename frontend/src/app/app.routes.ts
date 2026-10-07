@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './guards/auth.guard';
+import { authGuard, rootRedirectGuard } from './guards/auth.guard';
 import { adminGuard, moduleGuard, phase2Guard, superAdminGuard } from './guards/role.guard';
 
 import { LoginComponent } from './pages/login/login.component';
@@ -30,6 +30,7 @@ import { AiInsightsComponent } from './pages/ai-insights/ai-insights.component';
 
 // Super Admin / multi-tenant platform
 import { AcceptInvitationComponent } from './pages/accept-invitation/accept-invitation.component';
+import { UserAccessComponent } from './pages/user-access/user-access.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { SaDashboardComponent } from './pages/super-admin/sa-dashboard.component';
 import { SaTenantsComponent } from './pages/super-admin/sa-tenants.component';
@@ -65,25 +66,27 @@ export const routes: Routes = [
   { path: 'receipt-preview', component: ReceiptPreviewComponent, canActivate: [authGuard] },
   
   // Admin Only Management & Procurement Routes (Phase 2 routes additionally require Phase 2 access)
-  { path: 'items-stock', component: ItemsStockComponent, canActivate: [authGuard, moduleGuard('inventory')] },
-  { path: 'item-edit', component: ItemEditComponent, canActivate: [authGuard, moduleGuard('inventory')] },
+  { path: 'items-stock', component: ItemsStockComponent, canActivate: [authGuard, moduleGuard('items_stock')] },
+  { path: 'item-edit', component: ItemEditComponent, canActivate: [authGuard, moduleGuard('items_stock')] },
   { path: 'stock-upload', component: StockUploadComponent, canActivate: [authGuard, moduleGuard('stock_upload')] },
   { path: 'vendors', component: VendorsComponent, canActivate: [authGuard, moduleGuard('vendors'), phase2Guard] },
   { path: 'vendor-detail', component: VendorDetailComponent, canActivate: [authGuard, moduleGuard('vendors'), phase2Guard] },
   { path: 'purchase-orders', component: PurchaseOrdersComponent, canActivate: [authGuard, moduleGuard('purchase_orders'), phase2Guard] },
   { path: 'po-detail', component: PoDetailComponent, canActivate: [authGuard, moduleGuard('purchase_orders'), phase2Guard] },
-  { path: 'purchase-returns', component: PurchaseReturnsComponent, canActivate: [authGuard, moduleGuard('purchase_orders'), phase2Guard] },
-  { path: 'stock-adjustment', component: StockAdjustmentComponent, canActivate: [authGuard, moduleGuard('inventory'), phase2Guard] },
-  { path: 'batch-expiry', component: BatchExpiryComponent, canActivate: [authGuard, moduleGuard('inventory'), phase2Guard] },
-  { path: 'reorder-alerts', component: ReorderAlertsComponent, canActivate: [authGuard, moduleGuard('inventory'), phase2Guard] },
-  { path: 'stock-audit', component: StockAuditComponent, canActivate: [authGuard, moduleGuard('inventory'), phase2Guard] },
-  { path: 'discounts', component: DiscountsComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'purchase-returns', component: PurchaseReturnsComponent, canActivate: [authGuard, moduleGuard('purchase_returns'), phase2Guard] },
+  { path: 'stock-adjustment', component: StockAdjustmentComponent, canActivate: [authGuard, moduleGuard('stock_adjustment'), phase2Guard] },
+  { path: 'batch-expiry', component: BatchExpiryComponent, canActivate: [authGuard, moduleGuard('batch_expiry'), phase2Guard] },
+  { path: 'reorder-alerts', component: ReorderAlertsComponent, canActivate: [authGuard, moduleGuard('reorder_alerts'), phase2Guard] },
+  { path: 'stock-audit', component: StockAuditComponent, canActivate: [authGuard, moduleGuard('physical_audit'), phase2Guard] },
+  { path: 'discounts', component: DiscountsComponent, canActivate: [authGuard, moduleGuard('discounts')] },
   { path: 'tax-settings', component: TaxSettingsComponent, canActivate: [authGuard, moduleGuard('tax_config')] },
   { path: 'users', component: UsersComponent, canActivate: [authGuard, moduleGuard('users')] },
-  { path: 'store-settings', component: StoreSettingsComponent, canActivate: [authGuard, moduleGuard('store_settings', 'backup')] },
+  { path: 'user-access', component: UserAccessComponent, canActivate: [authGuard, adminGuard, moduleGuard('users')] },
+  { path: 'store-settings', component: StoreSettingsComponent, canActivate: [authGuard, moduleGuard('store_settings')] },
   { path: 'reports', component: ReportsComponent, canActivate: [authGuard, moduleGuard('reports')] },
   { path: 'ai-insights', component: AiInsightsComponent, canActivate: [authGuard, moduleGuard('ai_insights'), phase2Guard] },
   
-  { path: '', redirectTo: 'pos', pathMatch: 'full' },
-  { path: '**', redirectTo: 'pos' }
+  // The start page and unknown addresses: Login, or the user's home screen when they already have a valid session
+  { path: '', pathMatch: 'full', canActivate: [rootRedirectGuard], children: [] },
+  { path: '**', canActivate: [rootRedirectGuard], children: [] }
 ];

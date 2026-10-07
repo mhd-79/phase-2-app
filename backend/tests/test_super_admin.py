@@ -31,7 +31,7 @@ def platform(monkeypatch):
     for mod in (svc, sa, pp, notifier, audit, tenancy, security):
         monkeypatch.setattr(mod, "control_db", ctl)
     monkeypatch.setattr(database, "_default_client", default_store)
-    for key in ("SMTP_HOST", "SMTP_FROM"):
+    for key in ("SMTP_HOST", "SMTP_FROM_EMAIL"):
         monkeypatch.setattr(settings, key, "")
     monkeypatch.setattr(settings, "PAYMENT_PROVIDER", "none")
     monkeypatch.setattr(settings, "EXPIRED_ACCESS_POLICY", "readonly")

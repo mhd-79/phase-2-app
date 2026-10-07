@@ -4,17 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, CatalogItem } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 
-export interface DiscountRule {
-  id: string;
-  name: string;
-  type: 'percent' | 'fixed';
-  value: number;
-  appliesTo: 'all' | 'selected';
-  productSkus?: string[];
-  startDate?: string;
-  endDate?: string;
-  status: 'active' | 'inactive';
-}
+import { DiscountRule, isDiscountLive, localToday } from '../../services/pricing';
+export type { DiscountRule };
+
+/** The sample rule of the original prototype. It is no longer shown or applied: discounts come from the database. */
+export const DEFAULT_DISCOUNT_RULES: DiscountRule[] = [
+  { id: 'DISC-101', name: 'Festive Weekend 10% Off', type: 'percent', value: 10, appliesTo: 'all', startDate: '2026-09-11', endDate: '', status: 'active', productSkus: [] }
+];
 
 @Component({
   selector: 'app-discounts',
@@ -29,10 +25,12 @@ export interface DiscountRule {
           <p>Configure percentage or fixed-amount discounts. The POS applies active, in-date discounts automatically.</p>
         </div>
         <div class="page-actions">
-          <button class="btn btn-primary" (click)="openAddModal()">+ Add Discount</button>
+          @if (auth.can('discounts', 'create')) { <button class="btn btn-primary" (click)="openAddModal()">+ Add Discount</button> }
         </div>
       </div>
 
+      @if (loadError) { <div class="card" style="margin-bottom:var(--space-4);border-color:var(--danger-500)"><span class="text-sm" style="color:var(--danger-700)">{{ loadError }}</span></div> }
+      @if (saveError && !showModal) { <div class="card" style="margin-bottom:var(--space-4);border-color:var(--danger-500)"><span class="text-sm" style="color:var(--danger-700)">{{ saveError }}</span></div> }
       <div class="card card-flush">
         <div class="card-header"><h3>Discounts</h3></div>
         <div class="table-scroll">
@@ -65,12 +63,15 @@ export interface DiscountRule {
                     <span class="badge" [class.badge-success]="d.status === 'active'" [class.badge-neutral]="d.status !== 'active'">
                       {{ d.status === 'active' ? 'Active' : 'Inactive' }}
                     </span>
+                    @if (d.status === 'active' && !isLive(d)) {
+                      <div class="text-xs text-muted">{{ d.startDate && d.startDate > today ? 'Starts ' + d.startDate : 'Expired ' + d.endDate }}</div>
+                    }
                   </td>
                   <td>
                     <div class="row" style="gap:var(--space-2)">
-                      <button class="btn btn-ghost btn-sm" (click)="openEditModal(d)">Edit</button>
-                      <button class="btn btn-ghost btn-sm" (click)="toggleStatus(d)">{{ d.status === 'active' ? 'Deactivate' : 'Activate' }}</button>
-                      <button class="btn btn-ghost btn-sm" style="color:var(--danger-700)" (click)="deleteRule(d.id)">Delete</button>
+                      @if (auth.can('discounts', 'edit')) { <button class="btn btn-ghost btn-sm" (click)="openEditModal(d)">Edit</button> }
+                      @if (auth.can('discounts', 'edit')) { <button class="btn btn-ghost btn-sm" (click)="toggleStatus(d)">{{ d.status === 'active' ? 'Deactivate' : 'Activate' }}</button> }
+                      @if (auth.can('discounts', 'delete')) { <button class="btn btn-ghost btn-sm" style="color:var(--danger-700)" (click)="deleteRule(d.id)">Delete</button> }
                     </div>
                   </td>
                 </tr>
@@ -115,10 +116,24 @@ export interface DiscountRule {
               <label class="checkbox-row"><input type="radio" name="dScope" value="selected" [(ngModel)]="form.appliesTo"> Selected Products</label>
             </div>
             @if (form.appliesTo === 'selected') {
+              <div style="position:relative;margin-top:var(--space-2)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
+                     style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input class="input" type="text" [(ngModel)]="productSearch" name="productSearch" placeholder="Search by product name or SKU"
+                       style="padding-left:36px;padding-right:36px" aria-label="Search products">
+                @if (productSearch) {
+                  <button type="button" class="icon-btn" (click)="productSearch = ''" aria-label="Clear search"
+                          style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:28px;height:28px;min-height:0">✕</button>
+                }
+              </div>
+              <span class="hint">{{ (form.productSkus || []).length }} selected@if (productSearch.trim()) { &middot; {{ filteredProducts().length }} match "{{ productSearch.trim() }}" }</span>
               <div class="table-scroll" style="max-height:220px;border:1px solid var(--border);border-radius:var(--radius-md);margin-top:var(--space-2)">
                 <table class="table">
                   <tbody>
-                    @for (item of catalog(); track item.sku) {
+                    @if (filteredProducts().length === 0) {
+                      <tr><td class="text-sm text-muted" style="white-space:normal">No products match "{{ productSearch.trim() }}".</td></tr>
+                    }
+                    @for (item of filteredProducts(); track item.sku) {
                       <tr>
                         <td style="white-space:normal">
                           <label class="checkbox-row">
@@ -144,6 +159,7 @@ export interface DiscountRule {
             <label class="checkbox-row"><input type="checkbox" [(ngModel)]="formIsActive"> Active</label>
             <span class="hint">Only Admin can create, edit, activate, deactivate or delete discounts. Cashiers see the configured value at POS but cannot change it.</span>
           </div>
+          @if (saveError) { <span class="hint" style="color:var(--danger-700)">{{ saveError }}</span> }
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" (click)="showModal = false">Cancel</button>
@@ -163,9 +179,22 @@ export class DiscountsComponent implements OnInit {
   showModal = false;
   editingId: string | null = null;
 
-  rules: DiscountRule[] = [
-    { id: 'DISC-101', name: 'Festive Weekend 10% Off', type: 'percent', value: 10, appliesTo: 'all', startDate: '2026-09-11', endDate: '', status: 'active', productSkus: [] }
-  ];
+  rules: DiscountRule[] = [];
+  today = localToday();
+  loadError = '';
+  saveError = '';
+  productSearch = '';
+
+  /** Products matching the search box (name or SKU, as you type); everything when it is empty. Ticked products stay ticked while the list is filtered. */
+  filteredProducts(): CatalogItem[] {
+    const term = this.productSearch.trim().toLowerCase();
+    if (!term) return this.catalog();
+    return this.catalog().filter((i) => i.name.toLowerCase().includes(term) || i.sku.toLowerCase().includes(term));
+  }
+
+  isLive(d: DiscountRule): boolean {
+    return isDiscountLive(d);
+  }
 
   form: Partial<DiscountRule> = {
     name: '',
@@ -182,14 +211,35 @@ export class DiscountsComponent implements OnInit {
   async ngOnInit() {
     const items = await this.api.getCatalog();
     this.catalog.set(items);
-    const saved = localStorage.getItem('pos_demo_discounts');
-    if (saved) {
-      try { this.rules = JSON.parse(saved); } catch {}
-    }
+    await this.loadRules();
   }
 
-  saveRulesToStorage() {
-    localStorage.setItem('pos_demo_discounts', JSON.stringify(this.rules));
+  /** Loads the discounts from the database; rules saved by older versions in this browser are moved there once. */
+  async loadRules() {
+    this.loadError = '';
+    let list = await this.api.getDiscounts();
+    if (list === null) {
+      this.loadError = 'Could not load discounts from the server. Check your connection and refresh.';
+      list = [];
+    } else {
+      list = await this.migrateBrowserRules(list);
+    }
+    this.rules = list;
+  }
+
+  /** Discounts created before Discount Management used the database only exist in this browser: save them to the database so Billing applies them. */
+  private async migrateBrowserRules(current: DiscountRule[]): Promise<DiscountRule[]> {
+    let old: DiscountRule[] = [];
+    try { old = JSON.parse(localStorage.getItem('pos_demo_discounts') || '[]'); } catch {}
+    const same = (a: DiscountRule, b: DiscountRule) => a.name.trim().toLowerCase() === b.name.trim().toLowerCase() && a.type === b.type && Number(a.value) === Number(b.value);
+    // the prototype's sample rule is not a real discount; anything already in the database is not added twice
+    const mine = old.filter(r => r.id !== 'DISC-101' && !current.some(c => same(c, r)));
+    let retryLater = false;
+    for (const r of mine) {
+      try { await this.api.createDiscount(r); } catch (err: any) { if (!err?.status) retryLater = true; }   // a rejected rule is dropped; an unreachable server is retried next time
+    }
+    if (!retryLater) { try { localStorage.removeItem('pos_demo_discounts'); } catch {} }
+    return mine.length ? ((await this.api.getDiscounts()) || current) : current;
   }
 
   scopeLabel(d: DiscountRule): string {
@@ -199,6 +249,8 @@ export class DiscountsComponent implements OnInit {
   }
 
   openAddModal() {
+    this.productSearch = '';
+    this.saveError = '';
     this.editingId = null;
     this.form = {
       name: '',
@@ -214,6 +266,8 @@ export class DiscountsComponent implements OnInit {
   }
 
   openEditModal(d: DiscountRule) {
+    this.productSearch = '';
+    this.saveError = '';
     this.editingId = d.id;
     this.form = { ...d, productSkus: [...(d.productSkus || [])] };
     this.formIsActive = d.status === 'active';
@@ -233,14 +287,30 @@ export class DiscountsComponent implements OnInit {
     }
   }
 
-  toggleStatus(rule: DiscountRule) {
-    rule.status = rule.status === 'active' ? 'inactive' : 'active';
-    this.saveRulesToStorage();
+  async toggleStatus(rule: DiscountRule) {
+    this.saveError = '';
+    try {
+      await this.api.updateDiscount(rule.id, { ...rule, status: rule.status === 'active' ? 'inactive' : 'active' });
+      await this.loadRules();
+    } catch (err: any) {
+      this.saveError = this.errorText(err, 'Could not change the discount status. Please try again.');
+    }
   }
 
-  deleteRule(id: string) {
-    this.rules = this.rules.filter((d) => d.id !== id);
-    this.saveRulesToStorage();
+  async deleteRule(id: string) {
+    if (!confirm('Delete this discount?')) return;
+    this.saveError = '';
+    try {
+      await this.api.deleteDiscount(id);
+      await this.loadRules();
+    } catch (err: any) {
+      this.saveError = this.errorText(err, 'Could not delete the discount. Please try again.');
+    }
+  }
+
+  private errorText(err: any, fallback: string): string {
+    const detail = err?.error?.detail;
+    return typeof detail === 'string' ? detail : fallback;
   }
 
   isSaving = false;
@@ -265,10 +335,9 @@ export class DiscountsComponent implements OnInit {
     }
 
     this.isSaving = true;
+    this.saveError = '';
     try {
-      const id = this.editingId || `DISC-${Date.now()}`;
-      const rule: DiscountRule = {
-        id,
+      const rule: Partial<DiscountRule> = {
         name: this.form.name.trim(),
         type: this.form.type || 'percent',
         value: this.form.value || 0,
@@ -278,16 +347,12 @@ export class DiscountsComponent implements OnInit {
         endDate: this.form.endDate || undefined,
         status: this.formIsActive ? 'active' : 'inactive'
       };
-
-      if (this.editingId) {
-        const idx = this.rules.findIndex((r) => r.id === id);
-        if (idx > -1) this.rules[idx] = rule;
-      } else {
-        this.rules.push(rule);
-      }
-
-      this.saveRulesToStorage();
+      if (this.editingId) await this.api.updateDiscount(this.editingId, rule);
+      else await this.api.createDiscount(rule);
       this.showModal = false;
+      await this.loadRules();
+    } catch (err: any) {
+      this.saveError = this.errorText(err, 'Could not save the discount. Please try again.');
     } finally {
       this.isSaving = false;
     }

@@ -59,6 +59,7 @@
 .item-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  align-content: start;      /* few items: rows keep their natural height instead of stretching to fill the panel */
   gap: var(--space-3);
   overflow-y: auto;
   padding-right: 4px;

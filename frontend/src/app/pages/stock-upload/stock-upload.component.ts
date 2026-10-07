@@ -205,7 +205,8 @@ PC-005,8901030880605,BAT-2026-005,Face Wash 100ml,Personal Care,72,149,128,18,25
 
       const sku = row['sku'] || '';
       const name = row['name'] || '';
-      const barcode = row['barcode'] || '';
+      // Excel turns long barcodes into scientific notation (e.g. 2E+12) and the real number is lost: never store that
+      const barcode = /^\d+(\.\d+)?e[+-]?\d+$/i.test(row['barcode'] || '') ? '' : (row['barcode'] || '');
       const batchNo = row['batchno'] || row['batch'] || '';
       const rawCategory = (row['category'] || 'Grocery').trim();
       // Match an existing category regardless of letter case; anything else is a new category to be created on commit.
@@ -384,8 +385,12 @@ PC-005,8901030880605,BAT-2026-005,Face Wash 100ml,Personal Care,72,149,128,18,25
       const existing = this.existingItems.get(r.row.sku);
       try {
         if (existing) {
-          // Existing item: the uploaded quantity is added to its stock; provided prices, tax % and dates are refreshed, everything else stays as is.
+          // Existing item: the uploaded quantity is added to its stock; every other provided column (name, category, barcode, batch no, prices, tax %, dates) is refreshed. Blank cells leave a value as is.
           const item: CatalogItem = { ...existing };
+          if (r.row.name) item.name = r.row.name;
+          if (r.row.category) item.category = r.row.category;
+          if (r.row.barcode) item.barcode = r.row.barcode;
+          if (r.row.batch_no) item.batchNo = r.row.batch_no;
           if (r.row.tax_rate != null) item.tax = r.row.tax_rate;
           if (r.row.mfg_date) item.mfgDate = r.row.mfg_date;
           if (r.row.exp_date) item.expDate = r.row.exp_date;
@@ -410,7 +415,8 @@ PC-005,8901030880605,BAT-2026-005,Face Wash 100ml,Personal Care,72,149,128,18,25
             pricingMethod: 'qty',
             unit: 'pcs',
             mfgDate: r.row.mfg_date || null,
-            expDate: r.row.exp_date && (!r.row.mfg_date || r.row.exp_date >= r.row.mfg_date) ? r.row.exp_date : null
+            expDate: r.row.exp_date && (!r.row.mfg_date || r.row.exp_date >= r.row.mfg_date) ? r.row.exp_date : null,
+            batchNo: r.row.batch_no || null
           };
           await this.api.saveItem(item, false, true);
           created++;

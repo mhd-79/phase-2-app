@@ -20,7 +20,7 @@ from fastapi import HTTPException, status as http
 from app import mailer, notifier, platform_audit as audit, tenancy
 from app.config import settings
 from app.database import control_db
-from app.security import create_access_token, get_pin_hash, pwd_context, user_modules
+from app.security import create_access_token, get_pin_hash, pwd_context, user_modules, user_permissions
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -629,7 +629,7 @@ async def login_with_password(email: str, password: str) -> dict:
             raise _login_fail()
         fields = {"username": user.username, "role": user.role, "full_name": user.full_name, "sub_text": user.sub_text,
                   "auto_lock": user.auto_lock or "15 min", "phase_access": user.phase_access or 2, "active_counter": user.active_counter,
-                  "modules": user_modules(user)}
+                  "modules": user_modules(user), "permissions": user_permissions(user)}
     denied = _access_error(tenant, sub)
     if denied:
         raise denied

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -92,12 +92,18 @@ async def require_admin(current_user = Depends(get_current_user)):
 # --- Module access (Users & Roles -> User Access) ---------------------------------------------------------
 # Every feature area is a module. A user's access starts from their role's defaults and the Admin can then Allow or Deny any
 # module for that one user (stored on the user's own row, so it never affects other users or other tenants).
-MODULES = {
-    "billing": "Billing", "hold_recall": "Hold & Recall", "returns": "Returns", "stock_upload": "Stock Upload",
-    "inventory": "Inventory / Stock Maintenance", "vendors": "Vendor Management", "purchase_orders": "Purchase Orders",
-    "reports": "Reports", "ai_insights": "AI Insights", "users": "Users & Roles", "store_settings": "Store Settings",
-    "tax_config": "Tax Configuration", "backup": "Backup",
-}
+MODULE_GROUPS = [
+    ("Billing", {"billing": "Billing", "hold_recall": "Hold & Recall", "returns": "Returns"}),
+    ("Inventory", {"items_stock": "Items & Stock", "stock_upload": "Stock Upload"}),
+    ("Procurement", {"vendors": "Vendors", "purchase_orders": "Purchase Orders", "purchase_returns": "Purchase Returns"}),
+    ("Stock Maintenance", {"stock_adjustment": "Stock Adjustment", "batch_expiry": "Batch & Expiry", "reorder_alerts": "Reorder Alerts",
+                           "physical_audit": "Physical Audit"}),
+    ("Insights", {"reports": "Reports", "ai_insights": "AI Insights"}),
+    ("Administration", {"discounts": "Discounts", "tax_config": "Tax Configuration", "users": "Users & Roles", "store_settings": "Store Settings"}),
+]
+MODULES = {key: label for _, items in MODULE_GROUPS for key, label in items.items()}
+# keys saved by an earlier version of this screen expand to the modules they used to cover
+_LEGACY_KEYS = {"inventory": ("items_stock", "stock_adjustment", "batch_expiry", "reorder_alerts", "physical_audit"), "backup": ("store_settings",)}
 CASHIER_MODULES = {"billing", "hold_recall", "returns"}
 
 
@@ -105,33 +111,81 @@ def _raw_field(user, name):
     return user.get(name) if isinstance(user, dict) else getattr(user, name, None)
 
 
-def user_modules(user) -> dict:
-    """Effective module access of a user: role defaults, then the Admin's per-user Allow / Deny choices."""
+ACTIONS = ("view", "create", "edit", "delete")
+ACTION_LABELS = {"view": "view", "create": "create in", "edit": "edit in", "delete": "delete from"}
+# POST requests that only read (calculate a total, preview an upload, check a PIN) need View, not Create
+READ_ONLY_POSTS = ("/calculate-totals", "/upload/preview", "/approve-discount", "/email")
+
+
+def user_permissions(user) -> dict:
+    """What a user may do in each module: {module: {view, create, edit, delete}}.
+    Role defaults give every action of an allowed module; the Admin's per-user choices then refine them. A module saved by an earlier
+    version as a single on/off value means all four actions. Create / Edit / Delete only count while View is on."""
     is_admin = _raw_field(user, "role") == "admin"
-    access = {m: (is_admin or m in CASHIER_MODULES) for m in MODULES}
+    full = {a: True for a in ACTIONS}
+    none = {a: False for a in ACTIONS}
+    perms = {m: dict(full if (is_admin or m in CASHIER_MODULES) else none) for m in MODULES}
     raw = _raw_field(user, "modules_json")
     if raw:
         try:
             import json
-            for key, allowed in (json.loads(raw) if isinstance(raw, str) else raw).items():
-                if key in access:
-                    access[key] = bool(allowed)
+            saved = json.loads(raw) if isinstance(raw, str) else raw
+            for old, new_keys in _LEGACY_KEYS.items():
+                if old in saved:
+                    for k in new_keys:
+                        saved.setdefault(k, saved[old] if old != "backup" else perms["store_settings"]["view"])
+            for key, value in saved.items():
+                if key not in perms:
+                    continue
+                if isinstance(value, dict):
+                    perms[key] = {a: bool(value.get(a, False)) for a in ACTIONS}
+                else:
+                    perms[key] = dict(full if value else none)
+                if not perms[key]["view"]:
+                    perms[key] = dict(none)
         except Exception:
             pass
-    return access
+    return perms
 
 
-def has_module(user, *modules: str) -> bool:
-    access = user_modules(user)
-    return any(access.get(m, False) for m in modules)
+def user_modules(user) -> dict:
+    """Which modules a user may open (the View permission of each)."""
+    return {m: p["view"] for m, p in user_permissions(user).items()}
+
+
+def has_module(user, *modules: str, action: str = "view") -> bool:
+    perms = user_permissions(user)
+    return any(perms.get(m, {}).get(action, False) for m in modules)
+
+
+def action_for_request(request) -> str:
+    """The permission a request needs: GET = View, POST on a collection = Create, PUT / PATCH or POST on an existing record
+    (e.g. /purchase-orders/{id}/approve) = Edit, DELETE = Delete."""
+    if request is None or request.method in ("GET", "HEAD", "OPTIONS"):
+        return "view"
+    if request.method == "DELETE":
+        return "delete"
+    if request.method in ("PUT", "PATCH"):
+        return "edit"
+    route = request.scope.get("route")
+    path = getattr(route, "path", None) or request.url.path
+    if any(path.endswith(suffix) for suffix in READ_ONLY_POSTS):
+        return "view"
+    return "edit" if "{" in path else "create"
 
 
 def require_module(*modules: str):
-    """FastAPI dependency: the signed-in user must have at least one of the modules. Checked on the server for every request."""
-    def checker(current_user=Depends(get_current_user)):
-        if getattr(current_user, "role", None) == "super_admin" or not has_module(current_user, *modules):
+    """FastAPI dependency: the signed-in user must hold the permission this request needs (View / Create / Edit / Delete, by HTTP method)
+    on at least one of the modules. Checked on the server for every request."""
+    def checker(current_user=Depends(get_current_user), request: Request = None):
+        action = action_for_request(request)
+        if getattr(current_user, "role", None) == "super_admin" or not has_module(current_user, *modules, action=action):
             label = " / ".join(MODULES.get(m, m) for m in modules)
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"You do not have access to {label}. Ask your Admin to allow it.")
+            if action != "view" and has_module(current_user, *modules):
+                detail = f"You do not have permission to {ACTION_LABELS[action]} {label}. Ask your Admin to allow it."
+            else:
+                detail = f"You do not have access to {label}. Ask your Admin to allow it."
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
         return current_user
     return checker
 

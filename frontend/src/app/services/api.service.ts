@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { DiscountRule } from './pricing';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 import { OfflineDbService } from './offline-db.service';
@@ -7,6 +8,21 @@ import { environment } from '../../environments/environment';
 
 /** Max time to wait for POST /auth/login before giving up (Railway cold starts can take a few seconds). */
 const LOGIN_TIMEOUT_MS = 20000;
+
+export interface TaxSlab {
+  id: string;
+  name: string;
+  rate: number;
+  cgst: number;
+  sgst: number;
+  /** Items currently priced at this rate. */
+  itemCount?: number;
+}
+
+/** The GST slabs every store starts with; shown when the server cannot be reached. */
+export const DEFAULT_TAX_SLABS: TaxSlab[] = [
+  [0, 'GST 0% (Exempt)'], [5, 'GST 5% (Essential Retail)'], [12, 'GST 12% (Standard Packaged)'], [18, 'GST 18% (Personal Care & Snacks)'], [28, 'GST 28% (Luxury / Deferral)']
+].map(([rate, name]) => ({ id: `default-${rate}`, name: name as string, rate: rate as number, cgst: (rate as number) / 2, sgst: (rate as number) / 2 }));
 
 export interface CatalogItem {
   sku: string;
@@ -25,6 +41,8 @@ export interface CatalogItem {
   /** Manufacturing / expiry date as YYYY-MM-DD (empty or missing when not set). */
   mfgDate?: string | null;
   expDate?: string | null;
+  /** Batch number of the item (its own, or its earliest-expiring open batch when none was entered). */
+  batchNo?: string | null;
 }
 
 /** Prototype demo catalogue/categories belong to the original store only; a tenant's workspace starts empty. */
@@ -88,7 +106,7 @@ export class ApiService {
     try {
       const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/login`, { username, pin }).pipe(timeout(LOGIN_TIMEOUT_MS)));
       if (res && res.access_token) {
-        this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2, res.active_counter ?? null, {}, res.modules);
+        this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2, res.active_counter ?? null, {}, res.modules, res.permissions);
       }
       return res;
     } catch (err: any) {
@@ -166,7 +184,7 @@ export class ApiService {
       const res = await firstValueFrom(this.http.post<any>(`${this.baseUrl}/auth/login`, body).pipe(timeout(LOGIN_TIMEOUT_MS)));
       if (res && res.access_token) {
         this.auth.setSession(res.access_token, res.username, res.role, res.full_name, res.sub_text, res.auto_lock || '2 min', res.phase_access ?? 2, res.active_counter ?? null,
-          { tenantId: res.tenant_id, tenantName: res.tenant_name, tenantStatus: res.tenant_status, subscriptionEnd: res.subscription_end }, res.modules);
+          { tenantId: res.tenant_id, tenantName: res.tenant_name, tenantStatus: res.tenant_status, subscriptionEnd: res.subscription_end }, res.modules, res.permissions);
       }
       return res;
     } catch (err: any) {
@@ -217,7 +235,7 @@ export class ApiService {
   async refreshAccess(): Promise<void> {
     try {
       const me = await firstValueFrom(this.http.get<any>(`${this.baseUrl}/auth/me`, { headers: this.getHeaders() }));
-      this.auth.setModules(me?.modules);
+      this.auth.setModules(me?.modules, me?.permissions);
     } catch {
       // offline / expired session: keep what is known
     }
@@ -227,7 +245,7 @@ export class ApiService {
     return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/users/${encodeURIComponent(username)}/access`, { headers: this.getHeaders() }));
   }
 
-  async saveUserAccess(username: string, modules: Record<string, boolean>): Promise<any> {
+  async saveUserAccess(username: string, modules: Record<string, boolean | Record<string, boolean>>): Promise<any> {
     return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/users/${encodeURIComponent(username)}/access`, { modules }, { headers: this.getHeaders() }));
   }
 
@@ -393,7 +411,8 @@ export class ApiService {
           pricingMethod: i.pricing_method || i.pricingMethod || 'qty',
           unit: i.unit || 'pcs',
           mfgDate: i.mfg_date || null,
-          expDate: i.exp_date || null
+          expDate: i.exp_date || null,
+          batchNo: i.batch_no || null
         }));
         await this.offlineDb.saveCatalog(mapped);
         return mapped;
@@ -481,7 +500,8 @@ export class ApiService {
         pricing_method: item.pricingMethod,
         unit: item.unit,
         mfg_date: item.mfgDate || null,
-        exp_date: item.expDate || null
+        exp_date: item.expDate || null,
+        batch_no: item.batchNo || null
       };
       if (isEdit) {
         await firstValueFrom(this.http.put(`${this.baseUrl}/catalog/items/${encodeURIComponent(item.sku)}`, body, { headers: this.getHeaders() }));
@@ -664,7 +684,8 @@ export class ApiService {
   async createVendor(vendor: any): Promise<any> {
     try {
       return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/vendors`, vendor, { headers: this.getHeaders() }));
-    } catch {
+    } catch (err: any) {
+      if (err?.status) throw err;   // the server answered (e.g. invalid GSTIN): show its message instead of saving a local copy
       const overrides = JSON.parse(localStorage.getItem('pos_p2_vendors_v1') || '{"payableDelta":{}, "created":[]}');
       overrides.created = overrides.created || [];
       vendor.id = vendor.id || ("V-" + Date.now().toString().slice(-6));
@@ -673,6 +694,39 @@ export class ApiService {
       overrides.created.push(vendor);
       localStorage.setItem('pos_p2_vendors_v1', JSON.stringify(overrides));
       return vendor;
+    }
+  }
+
+  /** Edit a vendor (contact, GSTIN, payment terms) or set it Active / Inactive. */
+  async updateVendor(id: string, changes: any): Promise<any> {
+    return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/vendors/${encodeURIComponent(id)}`, changes, { headers: this.getHeaders() }));
+  }
+
+  /** Products a vendor supplies (preferred-vendor items and everything on its POs / receipts). */
+  async getVendorProducts(vendorId: string): Promise<any[]> {
+    try {
+      return await firstValueFrom(this.http.get<any[]>(`${this.baseUrl}/vendors/${encodeURIComponent(vendorId)}/products`, { headers: this.getHeaders() }));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Performance scorecard of one vendor (fill rate, on-time delivery, returns) from AI Insights; null when that module is not available. */
+  async getVendorPerformance(vendorId: string): Promise<any> {
+    try {
+      const res: any = await firstValueFrom(this.http.get<any>(`${this.baseUrl}/ai-insights/vendor-intelligence`, { headers: this.getHeaders() }));
+      return (res?.vendors || []).find((v: any) => v.vendor_id === vendorId) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Finance summary of a vendor (outstanding / due / overdue, aging, purchases, POs, payments, performance, price history, alerts). Null when the server is unreachable. */
+  async getVendorSummary(vendorId: string): Promise<any> {
+    try {
+      return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/vendors/${encodeURIComponent(vendorId)}/summary`, { headers: this.getHeaders() }));
+    } catch {
+      return null;
     }
   }
 
@@ -699,10 +753,11 @@ export class ApiService {
     }
   }
 
-  async recordVendorPayment(vendorId: string, amount: number, mode: string): Promise<any> {
+  async recordVendorPayment(vendorId: string, amount: number, mode: string, reference?: string): Promise<any> {
     try {
-      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/vendors/${vendorId}/payments`, { amount, mode }, { headers: this.getHeaders() }));
-    } catch {
+      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/vendors/${vendorId}/payments`, { amount, mode, reference: reference?.trim() || null }, { headers: this.getHeaders() }));
+    } catch (err: any) {
+      if (err?.status) throw err;
       const overrides = JSON.parse(localStorage.getItem('pos_p2_vendors_v1') || '{"payableDelta":{}, "created":[]}');
       overrides.payableDelta = overrides.payableDelta || {};
       overrides.payableDelta[vendorId] = (overrides.payableDelta[vendorId] || 0) - amount;
@@ -710,7 +765,7 @@ export class ApiService {
 
       const log = JSON.parse(localStorage.getItem('pos_p2_vendor_payments_v1') || '[]');
       const id = "PMT-" + String(1000 + log.length + 1).slice(-4);
-      log.push({ id, vendorId, amount, mode: mode || "Bank Transfer", date: "2026-09-07" });
+      log.push({ id, vendorId, amount, mode: mode || "Bank Transfer", reference: reference || null, date: new Date().toISOString().slice(0, 10) });
       localStorage.setItem('pos_p2_vendor_payments_v1', JSON.stringify(log));
 
       return { id, message: `${id} recorded — payable balance updated` };
@@ -718,21 +773,22 @@ export class ApiService {
   }
 
   // --- Purchase Orders & GRN ---
-  async getPurchaseOrders(status?: string, search?: string): Promise<any[]> {
+  async getPurchaseOrders(status?: string, search?: string, vendorId?: string): Promise<any[]> {
     try {
       let url = `${this.baseUrl}/purchase-orders`;
       const params = [];
       if (status) params.push(`status=${encodeURIComponent(status)}`);
       if (search) params.push(`search=${encodeURIComponent(search)}`);
+      if (vendorId) params.push(`vendor_id=${encodeURIComponent(vendorId)}`);
       if (params.length) url += `?${params.join('&')}`;
       return await firstValueFrom(this.http.get<any[]>(url, { headers: this.getHeaders() }));
     } catch {
       const seed = [
-        { id: "PO-2026-0139", vendorId: "V-004", date: "2026-08-20", expected: "2026-08-24", status: "Closed", approvedBy: "Arjun M.", lines: [{ sku: "BAK-001", name: "White Bread 400g", orderedQty: 60, receivedQty: 60, cost: 28 }] },
-        { id: "PO-2026-0142", vendorId: "V-001", date: "2026-08-28", expected: "2026-09-02", status: "Closed", approvedBy: "Arjun M.", lines: [{ sku: "GRO-001", name: "Basmati Rice 1kg", orderedQty: 100, receivedQty: 100, cost: 95 }] },
+        { id: "PO-2026-0139", vendorId: "V-004", date: "2026-08-20", expected: "2026-08-24", status: "Received", approvedBy: "Arjun M.", lines: [{ sku: "BAK-001", name: "White Bread 400g", orderedQty: 60, receivedQty: 60, cost: 28 }] },
+        { id: "PO-2026-0142", vendorId: "V-001", date: "2026-08-28", expected: "2026-09-02", status: "Received", approvedBy: "Arjun M.", lines: [{ sku: "GRO-001", name: "Basmati Rice 1kg", orderedQty: 100, receivedQty: 100, cost: 95 }] },
         { id: "PO-2026-0145", vendorId: "V-002", date: "2026-09-02", expected: "2026-09-06", status: "Partially Received", approvedBy: "Arjun M.", lines: [{ sku: "BEV-001", name: "Cola 500ml", orderedQty: 200, receivedQty: 160, cost: 30 }, { sku: "BEV-002", name: "Orange Juice 1L", orderedQty: 100, receivedQty: 100, cost: 78 }, { sku: "BEV-003", name: "Mineral Water 1L", orderedQty: 300, receivedQty: 0, cost: 12 }] },
         { id: "PO-2026-0148", vendorId: "V-003", date: "2026-09-05", expected: "2026-09-08", status: "Approved", approvedBy: "Arjun M.", lines: [{ sku: "DAI-001", name: "Toned Milk 500ml", orderedQty: 150, receivedQty: 0, cost: 20 }, { sku: "DAI-002", name: "Curd Cup 200g", orderedQty: 100, receivedQty: 0, cost: 16 }, { sku: "DAI-003", name: "Paneer 200g", orderedQty: 40, receivedQty: 0, cost: 65 }] },
-        { id: "PO-2026-0150", vendorId: "V-005", date: "2026-09-06", expected: "2026-09-10", status: "Pending Approval", approvedBy: null, lines: [{ sku: "SNK-002", name: "Choco Cookies 200g", orderedQty: 80, receivedQty: 0, cost: 42 }] },
+        { id: "PO-2026-0150", vendorId: "V-005", date: "2026-09-06", expected: "2026-09-10", status: "Pending", approvedBy: null, lines: [{ sku: "SNK-002", name: "Choco Cookies 200g", orderedQty: 80, receivedQty: 0, cost: 42 }] },
         { id: "PO-2026-0151", vendorId: "V-006", date: "2026-09-07", expected: "2026-09-12", status: "Draft", approvedBy: null, lines: [{ sku: "PC-002", name: "Shampoo 340ml", orderedQty: 50, receivedQty: 0, cost: 150 }] }
       ];
       const state = JSON.parse(localStorage.getItem('pos_p2_pos_v1') || '{"created":[], "lineOverrides":{}, "statusOverride":{}, "approvedByOverride":{}}');
@@ -750,6 +806,7 @@ export class ApiService {
         return copy;
       });
       if (status) list = list.filter(p => p.status === status);
+      if (vendorId) list = list.filter(p => p.vendorId === vendorId);
       if (search) {
         const term = search.toLowerCase();
         list = list.filter(p => p.id.toLowerCase().includes(term) || p.vendorId.toLowerCase().includes(term));
@@ -770,14 +827,15 @@ export class ApiService {
   async createPurchaseOrder(data: any): Promise<any> {
     try {
       return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-orders`, data, { headers: this.getHeaders() }));
-    } catch {
+    } catch (err: any) {
+      if (err?.status) throw err;   // the server answered (e.g. inactive vendor): show its message instead of saving a local copy
       const state = JSON.parse(localStorage.getItem('pos_p2_pos_v1') || '{"created":[], "lineOverrides":{}, "statusOverride":{}, "approvedByOverride":{}}');
       const seq = parseInt(localStorage.getItem('pos_p2_po_seq') || '151', 10) + 1;
       localStorage.setItem('pos_p2_po_seq', String(seq));
       const po = {
         id: `PO-2026-0${seq}`, vendorId: data.vendorId, date: data.date || new Date().toISOString().slice(0, 10), expected: data.expected || new Date().toISOString().slice(0, 10),
-        status: 'Pending Approval', approvedBy: null,
-        lines: data.lines.map((l: any) => ({ sku: l.sku, name: l.name, orderedQty: l.qty, receivedQty: 0, cost: l.cost }))
+        status: data.status || 'Pending', approvedBy: null,
+        lines: data.lines.map((l: any) => ({ sku: l.sku, name: l.name, orderedQty: l.qty, receivedQty: 0, cost: l.cost, taxRate: l.taxRate || 0, batchNo: l.batchNo || null }))
       };
       state.created = state.created || [];
       state.created.push(po);
@@ -786,22 +844,35 @@ export class ApiService {
     }
   }
 
-  async approvePurchaseOrder(poId: string): Promise<any> {
+  /** Edit a Draft / Pending purchase order (vendor, expected date, products). */
+  async updatePurchaseOrder(poId: string, changes: any): Promise<any> {
+    return await firstValueFrom(this.http.put<any>(`${this.baseUrl}/purchase-orders/${encodeURIComponent(poId)}`, changes, { headers: this.getHeaders() }));
+  }
+
+  /** Moves a purchase order along its status flow: submit (Draft > Pending), approve, order, or cancel. */
+  async purchaseOrderAction(poId: string, action: 'submit' | 'approve' | 'order' | 'cancel'): Promise<any> {
     try {
-      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-orders/${poId}/approve`, {}, { headers: this.getHeaders() }));
-    } catch {
+      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-orders/${encodeURIComponent(poId)}/${action}`, {}, { headers: this.getHeaders() }));
+    } catch (err: any) {
+      if (err?.status) throw err;
+      const target = ({ submit: 'Pending', approve: 'Approved', order: 'Ordered', cancel: 'Cancelled' } as Record<string, string>)[action];
       const state = JSON.parse(localStorage.getItem('pos_p2_pos_v1') || '{"created":[], "lineOverrides":{}, "statusOverride":{}, "approvedByOverride":{}}');
-      state.statusOverride[poId] = 'Approved';
-      state.approvedByOverride[poId] = 'Arjun M.';
+      state.statusOverride[poId] = target;
+      if (action === 'approve') state.approvedByOverride[poId] = 'Arjun M.';
       localStorage.setItem('pos_p2_pos_v1', JSON.stringify(state));
-      return { id: poId, status: 'Approved', approvedBy: 'Arjun M.' };
+      return { id: poId, status: target, approvedBy: action === 'approve' ? 'Arjun M.' : null };
     }
+  }
+
+  async approvePurchaseOrder(poId: string): Promise<any> {
+    return this.purchaseOrderAction(poId, 'approve');
   }
 
   async recordGoodsReceipt(poId: string, lines: any[], vendorId: string): Promise<any> {
     try {
       return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/grn/receipt`, { poId, lines, vendorId }, { headers: this.getHeaders() }));
-    } catch {
+    } catch (err: any) {
+      if (err?.status) throw err;   // the server answered (e.g. more than ordered): show its message instead of faking the receipt locally
       const state = JSON.parse(localStorage.getItem('pos_p2_pos_v1') || '{"created":[], "lineOverrides":{}, "statusOverride":{}, "approvedByOverride":{}}');
       const po = await this.getPurchaseOrderById(poId);
       state.lineOverrides[poId] = state.lineOverrides[poId] || {};
@@ -842,7 +913,8 @@ export class ApiService {
   async recordDirectReceipt(vendorId: string, lines: any[]): Promise<any> {
     try {
       return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/grn/direct`, { vendorId, lines }, { headers: this.getHeaders() }));
-    } catch {
+    } catch (err: any) {
+      if (err?.status) throw err;
       let total = 0;
       lines.forEach((l: any) => { this.updateLocalStock(l.sku, l.qty); total += l.qty * l.cost; });
       const grnId = "GRN-DIRECT-" + String(1000 + Math.floor(Math.random() * 8999)).slice(-4);
@@ -879,19 +951,28 @@ export class ApiService {
     return await firstValueFrom(this.http.get<any>(`${this.baseUrl}/purchase-returns/invoices/${encodeURIComponent(invoiceRef)}`, { headers: this.getHeaders(), params: { vendor_id: vendorId } }));
   }
 
-  async createPurchaseReturn(vendorId: string, lines: any[], reason: string, invoiceId?: string | null): Promise<any> {
+  async createPurchaseReturn(vendorId: string, lines: any[], reason: string, invoiceId?: string | null, process = true): Promise<any> {
     try {
-      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-returns`, { vendorId, lines, reason, invoiceId: invoiceId || null }, { headers: this.getHeaders() }));
+      return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-returns`, { vendorId, lines, reason, invoiceId: invoiceId || null, process }, { headers: this.getHeaders() }));
     } catch (err: any) {
-      if (invoiceId && err?.status) throw err;   // a return against an invoice is validated by the server: show its answer, do not fake it offline
+      if (err?.status) throw err;   // a return is validated by the server (stock, invoice quantities): show its answer, do not fake it offline
       let total = 0;
       lines.forEach((l: any) => { this.updateLocalStock(l.sku, -l.qty); total += l.qty * l.cost; });
       const dnId = "DN-" + String(1000 + Math.floor(Math.random() * 8999)).slice(-4);
       const log = JSON.parse(localStorage.getItem('pos_p2_purchase_returns_v1') || '[]');
-      log.push({ id: dnId, vendorId, date: '2026-09-07', lines, total, reason });
+      log.push({ id: dnId, vendorId, date: new Date().toISOString().slice(0, 10), lines, total, reason, status: 'Processed' });
       localStorage.setItem('pos_p2_purchase_returns_v1', JSON.stringify(log));
       return { id: dnId, total };
     }
+  }
+
+  /** Processes a Draft purchase return: reduces stock and credits the vendor. */
+  async processPurchaseReturn(returnId: string): Promise<any> {
+    return await firstValueFrom(this.http.post<any>(`${this.baseUrl}/purchase-returns/${encodeURIComponent(returnId)}/process`, {}, { headers: this.getHeaders() }));
+  }
+
+  async discardPurchaseReturn(returnId: string): Promise<any> {
+    return await firstValueFrom(this.http.delete<any>(`${this.baseUrl}/purchase-returns/${encodeURIComponent(returnId)}`, { headers: this.getHeaders() }));
   }
 
   async getPurchaseReturns(vendorId?: string): Promise<any[]> {
@@ -903,6 +984,73 @@ export class ApiService {
       if (vendorId) return log.filter((r: any) => r.vendorId === vendorId);
       return log;
     }
+  }
+
+  // --- Discount Management (the database is the one source of truth; Billing reads the same rows) ---
+  private discountFromApi(d: any): DiscountRule {
+    return {
+      id: d.id, name: d.name, type: d.type === 'percent' ? 'percent' : 'fixed', value: d.value,
+      appliesTo: d.applies_to === 'selected' ? 'selected' : 'all', productSkus: d.product_skus || [],
+      startDate: d.start_date || undefined, endDate: d.end_date || undefined, status: d.status === 'active' ? 'active' : 'inactive'
+    };
+  }
+
+  private discountToApi(r: Partial<DiscountRule>): any {
+    return {
+      name: r.name, type: r.type === 'percent' ? 'percent' : 'flat', value: r.value, applies_to: r.appliesTo || 'all',
+      product_skus: r.appliesTo === 'selected' ? (r.productSkus || []) : [], start_date: r.startDate || null, end_date: r.endDate || null,
+      status: r.status || 'active'
+    };
+  }
+
+  /** All discounts from the database (also kept for offline billing). Falls back to the last copy when the server cannot be reached; null when there is none. */
+  async getDiscounts(): Promise<DiscountRule[] | null> {
+    try {
+      const list = (await firstValueFrom(this.http.get<any[]>(`${this.baseUrl}/discounts`, { headers: this.getHeaders() }))).map(d => this.discountFromApi(d));
+      try { localStorage.setItem('pos_p2_discounts_cache_v1', JSON.stringify(list)); } catch {}
+      return list;
+    } catch {
+      try {
+        const cached = localStorage.getItem('pos_p2_discounts_cache_v1');
+        return cached ? JSON.parse(cached) : null;
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  async createDiscount(rule: Partial<DiscountRule>): Promise<DiscountRule> {
+    return this.discountFromApi(await firstValueFrom(this.http.post<any>(`${this.baseUrl}/discounts`, this.discountToApi(rule), { headers: this.getHeaders() })));
+  }
+
+  async updateDiscount(id: string, rule: Partial<DiscountRule>): Promise<DiscountRule> {
+    return this.discountFromApi(await firstValueFrom(this.http.put<any>(`${this.baseUrl}/discounts/${encodeURIComponent(id)}`, this.discountToApi(rule), { headers: this.getHeaders() })));
+  }
+
+  async deleteDiscount(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`${this.baseUrl}/discounts/${encodeURIComponent(id)}`, { headers: this.getHeaders() }));
+  }
+
+  // --- Tax slabs (Tax Configuration) ---
+  async getTaxSlabs(): Promise<TaxSlab[]> {
+    try {
+      const list = await firstValueFrom(this.http.get<TaxSlab[]>(`${this.baseUrl}/settings/tax-slabs`, { headers: this.getHeaders() }));
+      return list.length ? list : DEFAULT_TAX_SLABS;
+    } catch {
+      return DEFAULT_TAX_SLABS;
+    }
+  }
+
+  async addTaxSlab(name: string, rate: number): Promise<TaxSlab> {
+    return await firstValueFrom(this.http.post<TaxSlab>(`${this.baseUrl}/settings/tax-slabs`, { name, rate }, { headers: this.getHeaders() }));
+  }
+
+  async deleteTaxSlab(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`${this.baseUrl}/settings/tax-slabs/${encodeURIComponent(id)}`, { headers: this.getHeaders() }));
+  }
+
+  async renameTaxSlab(id: string, name: string): Promise<TaxSlab> {
+    return await firstValueFrom(this.http.put<TaxSlab>(`${this.baseUrl}/settings/tax-slabs/${encodeURIComponent(id)}`, { name }, { headers: this.getHeaders() }));
   }
 
   // --- Stock Adjustments ---

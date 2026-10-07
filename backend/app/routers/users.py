@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List
 from app.schemas import UserSchema, UserCreate, UserUpdate, LeaveRequest, UserAccessUpdate, TransferAdminRequest
-from app.security import get_pin_hash, verify_pin, require_admin, require_module, get_phase_access, has_module, user_modules, MODULES
+from app.security import get_pin_hash, verify_pin, require_admin, require_module, get_phase_access, has_module, user_modules, user_permissions, MODULES, MODULE_GROUPS, ACTIONS
 from app import platform_service
 from app.database import db
 from app.idempotency import enforce_idempotency
@@ -396,7 +396,8 @@ async def _access_target(username: str):
 
 def _access_view(rec) -> dict:
     return {"username": _field(rec, "username"), "full_name": _field(rec, "full_name"), "role": _field(rec, "role", "cashier"),
-            "modules": user_modules(rec), "available": [{"key": k, "label": v} for k, v in MODULES.items()]}
+            "modules": user_modules(rec), "permissions": user_permissions(rec), "actions": list(ACTIONS),
+            "available": [{"key": k, "label": v, "group": g} for g, items in MODULE_GROUPS for k, v in items.items()]}
 
 
 @router.get("/{username}/access")
@@ -409,25 +410,33 @@ async def get_user_access(username: str, user = Depends(require_admin), _m = Dep
 
 @router.put("/{username}/access")
 async def set_user_access(username: str, req: UserAccessUpdate, request: Request, user = Depends(require_admin), _m = Depends(require_module("users"))):
-    """Allow / Deny each module for one user of the signed-in business. Stored on that user only; enforced by the APIs, not just the menu."""
+    """Sets, per module, what one user may do: View, Create, Edit, Delete. Stored on that user only; enforced by the APIs, not just the menu."""
     await enforce_idempotency(request, f"user_access_{username}")
     admin_user = getattr(user, "username", "admin")
     unknown = [k for k in req.modules if k not in MODULES]
     if unknown:
         raise HTTPException(status_code=422, detail=f"Unknown module(s): {', '.join(unknown)}")
+    for key, value in req.modules.items():
+        if isinstance(value, dict) and any(a not in ACTIONS for a in value):
+            raise HTTPException(status_code=422, detail=f"Unknown permission for {MODULES[key]}: use {', '.join(ACTIONS)}")
     if username == admin_user:
         raise HTTPException(status_code=400, detail="You cannot change your own access")
     rec = await _access_target(username)
     if rec is None:
         raise HTTPException(status_code=404, detail="User not found")
+    # a module saved as one on/off value means all four actions; Create / Edit / Delete need View
+    wanted = {}
+    for key, value in req.modules.items():
+        flags = {a: bool(value.get(a, False)) for a in ACTIONS} if isinstance(value, dict) else {a: bool(value) for a in ACTIONS}
+        wanted[key] = flags if flags["view"] else {a: False for a in ACTIONS}
     # nobody can hand out more than they hold themselves
-    beyond = [MODULES[k] for k, allowed in req.modules.items() if allowed and not has_module(user, k)]
+    beyond = sorted({f"{MODULES[k]} ({a})" for k, flags in wanted.items() for a, on in flags.items() if on and not has_module(user, k, action=a)})
     if beyond:
         raise HTTPException(status_code=403, detail=f"You cannot grant access you do not have: {', '.join(beyond)}")
-    before = user_modules(rec)
-    stored = json.dumps({k: bool(v) for k, v in req.modules.items()})
+    before = user_permissions(rec)
+    stored = json.dumps(wanted)
     now_iso = datetime.now(timezone.utc).isoformat()
-    after = user_modules({"role": _field(rec, "role"), "modules_json": stored})
+    after = user_permissions({"role": _field(rec, "role"), "modules_json": stored})
     changes = {k: after[k] for k in MODULES if before[k] != after[k]}
     details = json.dumps({"updated_by": admin_user, "changed": changes, "timestamp": now_iso})
 

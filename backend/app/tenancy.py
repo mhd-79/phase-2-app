@@ -168,7 +168,7 @@ def _run_db_push(schema: str) -> Tuple[int, str]:
 
 # Bump when prisma/schema.prisma changes the application tables: every ready tenant schema is then brought up to date
 # (prisma db push, additive only) by the background sweeper, so existing businesses get new columns without manual work.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 7          # 4: Item.batch_no, 5: procurement (vendor GSTIN, PO line GST / batch, purchase return status / PO link), 6: vendor payment reference, 7: tax slabs
 
 
 async def provision_schema(schema: str) -> None:

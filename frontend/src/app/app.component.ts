@@ -38,6 +38,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   /** Pages that are shown without the application shell (sign-in and the emailed invitation / reset links). */
   isPublicRoute(): boolean {
+    if (!this.auth.isAuthenticated()) return true;           // not signed in: never draw the sidebar / top bar, not even while the page redirects to Login
     const url = this.router.url;
     return url.includes('/login') || url.startsWith('/register') || url.includes('/accept-invitation') || url.includes('/reset-password');
   }

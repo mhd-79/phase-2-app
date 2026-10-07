@@ -25,6 +25,7 @@
     border: none !important;
     box-shadow: none !important;
   }
+  .printable-receipt .tr { border: none !important; max-width: 100% !important; padding: 0 !important; }
   .modal-overlay {
     position: static !important;
     background: transparent !important;

@@ -7,6 +7,8 @@ from app.security import get_current_user, verify_pin, get_phase_access, PHASE_2
 from app.security import require_module
 from app.routers.customers import _normalize_mobile, _clean, _view, _next_id
 from app.pricing_engine import compute_cart_totals, render_receipt_html
+from app import mailer
+from pydantic import BaseModel
 from app.database import db
 from app.tenant_scoped import TenantList, TenantDict
 from app.idempotency import enforce_idempotency, idempotency_manager
@@ -27,7 +29,7 @@ async def calculate_totals(payload: Dict[str, Any]):
     active_discounts = []
     if db.is_connected():
         try:
-            discounts_db = await db.discount.find_many(where={"status": "active"})
+            discounts_db = await db.discount.find_many(where={"status": "active"}, order={"created_at": "asc"})
             active_discounts = [d.dict() for d in discounts_db]
         except Exception:
             pass
@@ -88,7 +90,7 @@ async def create_sale(req: SaleCreate, request: Request, user = Depends(get_curr
         active_discounts = []
         if db.is_connected():
             try:
-                discounts_db = await db.discount.find_many(where={"status": "active"})
+                discounts_db = await db.discount.find_many(where={"status": "active"}, order={"created_at": "asc"})
                 active_discounts = [d.dict() for d in discounts_db]
             except Exception:
                 pass
@@ -272,6 +274,31 @@ async def create_sale(req: SaleCreate, request: Request, user = Depends(get_curr
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
+
+class InvoiceEmailRequest(BaseModel):
+    email: str
+
+
+@router.post("/sales/{invoice_no}/email", dependencies=[Depends(require_module("billing", "returns"))])
+async def email_invoice(invoice_no: str, req: InvoiceEmailRequest):
+    """Sends the customer a copy of an invoice through the application's email service."""
+    if not mailer.valid_address(req.email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+    sale = await get_sale_by_invoice(invoice_no)
+    store_name = "Okuto Mart"
+    if db.is_connected():
+        try:
+            store = await db.storesettings.find_unique(where={"id": "store_main"})
+            if store and store.store_name:
+                store_name = store.store_name
+        except Exception:
+            pass
+    subject, text, html_body = mailer.invoice_email(store_name, sale)
+    sent = await mailer.send_email(req.email.strip(), subject, text, html_body)
+    if not sent["delivered"]:
+        raise HTTPException(status_code=503, detail=("Email is not set up on this server." if sent["mode"] == "logged" and not sent["error"] else (sent["error"] or "The email could not be sent.")))
+    return {"message": f"Invoice {invoice_no} emailed to {req.email.strip()}"}
+
 
 @router.get("/sales/{invoice_no}", dependencies=[Depends(require_module("billing", "returns", "reports"))])
 async def get_sale_by_invoice(invoice_no: str):

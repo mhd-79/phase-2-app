@@ -36,11 +36,27 @@ def test_changing_one_users_access_never_touches_another():
 
 
 def test_require_module_checks_any_of_the_modules_on_the_server():
-    check = require_module("inventory", "stock_upload")
+    check = require_module("items_stock", "stock_upload")
     cashier = NS(role="cashier", modules_json=json.dumps({"stock_upload": True}))
     assert check(cashier) is cashier
     with pytest.raises(HTTPException) as e:
         check(NS(role="cashier", modules_json=None))
-    assert e.value.status_code == 403 and "Inventory" in e.value.detail
+    assert e.value.status_code == 403 and "Items & Stock" in e.value.detail
     with pytest.raises(HTTPException):
         check(NS(role="super_admin"))
+
+
+def test_modules_match_the_sidebar_groups():
+    from app.security import MODULE_GROUPS
+    assert [g for g, _ in MODULE_GROUPS] == ["Billing", "Inventory", "Procurement", "Stock Maintenance", "Insights", "Administration"]
+    assert list(MODULES.values()) == ["Billing", "Hold & Recall", "Returns", "Items & Stock", "Stock Upload", "Vendors", "Purchase Orders", "Purchase Returns",
+                                      "Stock Adjustment", "Batch & Expiry", "Reorder Alerts", "Physical Audit", "Reports", "AI Insights", "Discounts",
+                                      "Tax Configuration", "Users & Roles", "Store Settings"]
+
+
+def test_keys_saved_by_the_earlier_version_still_apply():
+    denied = user_modules(NS(role="admin", modules_json=json.dumps({"inventory": False})))
+    assert not any(denied[k] for k in ("items_stock", "stock_adjustment", "batch_expiry", "reorder_alerts", "physical_audit"))
+    assert denied["stock_upload"] and denied["vendors"]
+    granted = user_modules(NS(role="cashier", modules_json=json.dumps({"inventory": True})))
+    assert granted["items_stock"] and granted["physical_audit"] and not granted["vendors"]

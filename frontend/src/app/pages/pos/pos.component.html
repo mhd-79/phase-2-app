@@ -128,6 +128,9 @@
                 }
                 {{ line.pricingMethod === 'weight' ? '/kg' : '' }} &times; {{ line.unit === 'kg' ? line.qty.toFixed(3) + ' kg' : line.qty + ' pcs' }} &middot; GST {{ line.tax }}%
               </div>
+              @if (lineDiscount(line); as ld) {
+                <div class="line-sub" style="color:var(--success-700);font-weight:600">{{ ld.discountName || 'Discount' }} &minus;₹{{ ld.autoDiscountAmount.toFixed(2) }}</div>
+              }
             </div>
             @if (line.pricingMethod === 'weight') {
               <button type="button" class="btn btn-ghost btn-sm" (click)="openScaleModal(line.sku)">Edit</button>
@@ -147,8 +150,11 @@
       <div class="cart-summary">
         <div class="summary-row"><span>Taxable Amount</span><span class="mono">₹{{ calcTaxable().toFixed(2) }}</span></div>
         <div class="summary-row"><span>GST Amount</span><span class="mono">₹{{ calcGstTotal().toFixed(2) }}</span></div>
-        @if (calcDiscountAmount() > 0) {
-          <div class="summary-row" style="color:var(--success-700)"><span>Discount</span><span class="mono">−₹{{ calcDiscountAmount().toFixed(2) }}</span></div>
+        @if (totals().autoDiscountTotal > 0) {
+          <div class="summary-row" style="color:var(--success-700)"><span>Offer Discount</span><span class="mono">−₹{{ totals().autoDiscountTotal.toFixed(2) }}</span></div>
+        }
+        @if (totals().manualDiscountTotal > 0) {
+          <div class="summary-row" style="color:var(--success-700)"><span>Discount</span><span class="mono">−₹{{ totals().manualDiscountTotal.toFixed(2) }}</span></div>
         }
         <div class="summary-row total"><span>Grand Total</span><span class="mono">₹{{ calcGrandTotal().toFixed(2) }}</span></div>
       </div>
@@ -294,54 +300,21 @@
 <div class="modal-overlay" [class.open]="showReceiptModal">
   <div class="modal">
     <div class="modal-header"><h3>Sale Complete</h3><button class="icon-btn" (click)="showReceiptModal = false">✕</button></div>
-    <div class="modal-body mono printable-receipt" style="font-size:var(--text-sm)">
-      <div style="text-align:center;margin-bottom:var(--space-3)">
-        <strong>Okuto Mart</strong>
-        <div class="text-xs text-muted">12, MG Road, Bengaluru &middot; GSTIN 29ABCDE1234F1Z5</div>
-      </div>
-      <hr class="divider">
-      <div class="row-between text-sm"><span>Invoice</span><span class="mono">{{ lastSale?.invoiceNo || 'INV-FY26-01025' }}</span></div>
-      <div class="row-between text-sm"><span>Date</span><span class="mono">{{ lastSale?.timeLabel }}</span></div>
-      @if (lastSale?.customer) {
-        <div class="row-between text-sm"><span>Customer</span><span class="mono">{{ lastSale.customer.name }} &middot; {{ lastSale.customer.mobile }}</span></div>
-      }
-      <div class="row-between text-sm"><span>Pricing Mode</span><span class="mono">{{ lastSale?.pricingMode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span></div>
-      <hr class="divider">
-
-      @for (line of lastSale?.lines; track line.sku) {
-        <div class="row-between text-sm">
-          <span>{{ line.name }}{{ line.priceType === 'wholesale' ? ' (Wholesale)' : '' }} &times; {{ line.unit === 'kg' ? line.qty.toFixed(3) + ' kg' : line.qty + ' pcs' }}</span>
-          <span class="mono">₹{{ (line.price * line.qty).toFixed(2) }}</span>
-        </div>
-      }
-      <hr class="divider">
-
-      @if (lastSale?.pricingMode === 'inclusive') {
-        @if (lastSale?.discountTotal > 0) {
-          <div class="row-between text-sm"><span>Discount</span><span class="mono">−₹{{ lastSale?.discountTotal?.toFixed(2) }}</span></div>
-        }
-        <div class="row-between" style="font-weight:700;font-size:var(--text-md)"><span>Grand Total</span><span class="mono">₹{{ lastSale?.grandTotal?.toFixed(2) || '0.00' }}</span></div>
-        <div class="text-xs text-muted" style="text-align:center;margin-top:var(--space-1);font-style:italic">(Prices inclusive of GST)</div>
-      } @else {
-        <div class="row-between text-sm"><span>Taxable Amount</span><span class="mono">₹{{ lastSale?.taxable?.toFixed(2) || '0.00' }}</span></div>
-        <div class="row-between text-sm"><span>GST Amount</span><span class="mono">₹{{ lastSale?.gstTotal?.toFixed(2) || '0.00' }}</span></div>
-        @if (lastSale?.discountTotal > 0) {
-          <div class="row-between text-sm"><span>Discount</span><span class="mono">−₹{{ lastSale?.discountTotal?.toFixed(2) }}</span></div>
-        }
-        <div class="row-between" style="font-weight:700;font-size:var(--text-md)"><span>Grand Total</span><span class="mono">₹{{ lastSale?.grandTotal?.toFixed(2) || '0.00' }}</span></div>
-      }
-
-      <hr class="divider">
-      @for (t of lastSale?.tenders; track $index) {
-        @if (t.amount > 0) {
-          <div class="row-between text-sm"><span>{{ t.mode }} Paid</span><span class="mono">₹{{ t.amount.toFixed(2) }}</span></div>
-        }
-      }
-      @if (lastSale?.changeDue > 0) {
-        <div class="row-between text-sm" style="font-weight:600;color:var(--success-700)"><span>Change Returned</span><span class="mono">₹{{ lastSale?.changeDue?.toFixed(2) }}</span></div>
-      }
-
-      <p class="text-xs text-muted" style="text-align:center;margin-top:var(--space-4)">Thank you for shopping with us!</p>
+    <div class="modal-body printable-receipt">
+      <app-thermal-receipt
+        storeName="Okuto Mart"
+        storeLine="12, MG Road, Bengaluru · GSTIN 29ABCDE1234F1Z5"
+        [invoiceNo]="lastSale?.invoiceNo || ''"
+        [time]="lastSale?.time"
+        [customerLine]="lastSale?.customer ? lastSale.customer.name + ' · ' + lastSale.customer.mobile : ''"
+        [lines]="lastSale?.lines || []"
+        [taxable]="lastSale?.taxable"
+        [gstTotal]="lastSale?.gstTotal"
+        [discountTotal]="lastSale?.discountTotal || 0"
+        [grandTotal]="lastSale?.grandTotal || 0"
+        [pricingMode]="lastSale?.pricingMode"
+        [tenders]="lastSale?.tenders || []"
+        [changeDue]="lastSale?.changeDue || 0" />
     </div>
     <div class="modal-footer" style="justify-content:space-between">
       <label class="checkbox-row text-sm"><input type="checkbox"> Email/SMS digital copy</label>

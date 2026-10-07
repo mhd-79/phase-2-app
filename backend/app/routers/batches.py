@@ -68,7 +68,7 @@ async def list_batches(status: Optional[str] = None, sku: Optional[str] = None):
     result.sort(key=lambda x: x["daysToExpiry"])
     return result
 
-@router.post("", dependencies=[Depends(require_module("inventory", "stock_upload", "purchase_orders"))])
+@router.post("", dependencies=[Depends(require_module("batch_expiry", "stock_upload", "purchase_orders"))])
 async def add_batch(data: BatchCreate, current_user=Depends(get_current_user)):
     db = get_db()
     item = await db.item.find_unique(where={"sku": data.sku})

@@ -29,8 +29,9 @@ IST = timezone(timedelta(hours=5, minutes=30))
 REVIEW_DAYS = 7
 SERVICE_Z = 1.65            # ~95% service level
 DEFAULT_LEAD_DAYS = 7
-OPEN_PO_STATUSES = ("Approved", "Partially Received")
-RECEIVED_PO_STATUSES = ("Partially Received", "Received", "Closed")
+OPEN_PO_STATUSES = ("Approved", "Ordered", "Partially Received")
+RECEIVED_PO_STATUSES = ("Partially Received", "Received", "Closed")   # "Closed" = rows saved by earlier releases
+PENDING_PO_STATUSES = ("Pending", "Pending Approval")                  # "Pending Approval" = rows saved by earlier releases
 
 
 # --------------------------------------------------------------------------- helpers
@@ -260,7 +261,7 @@ def _open_po_qty(ds: Dataset) -> Tuple[Dict[str, float], Dict[str, float], Dict[
                     overdue[l["sku"]] += outstanding
                 else:
                     on_order[l["sku"]] += outstanding
-            elif p["status"] == "Pending Approval":
+            elif p["status"] in PENDING_PO_STATUSES:
                 pending[l["sku"]] += outstanding
     return on_order, pending, overdue
 
@@ -469,7 +470,7 @@ def _quotes(ds: Dataset) -> Dict[str, Dict[str, List[dict]]]:
         return ds._cache["quotes"]
     q: Dict[str, Dict[str, List[dict]]] = defaultdict(lambda: defaultdict(list))
     for p in ds.pos:
-        if p["status"] == "Draft" or not p["date"]:
+        if p["status"] in ("Draft", "Cancelled") or not p["date"]:
             continue
         for l in p["lines"]:
             if l["cost"] > 0:
@@ -520,7 +521,7 @@ def _vendor_metrics(ds: Dataset) -> Dict[str, dict]:
     out: Dict[str, dict] = {}
     for vid, v in ds.vendors.items():
         pos = [p for p in ds.pos if p["vendor_id"] == vid]
-        placed = [p for p in pos if p["status"] not in ("Draft", "Pending Approval")]
+        placed = [p for p in pos if p["status"] not in ("Draft", "Cancelled") + PENDING_PO_STATUSES]
         recvd = [p for p in placed if p["status"] in RECEIVED_PO_STATUSES]
         ordered = sum(l["ordered"] for p in recvd for l in p["lines"])
         received = sum(l["received"] for p in recvd for l in p["lines"])
@@ -534,7 +535,7 @@ def _vendor_metrics(ds: Dataset) -> Dict[str, dict]:
                     on_time += 1
                 else:
                     late += 1
-            elif not gs and p["expected"] and p["expected"] < ds.today and p["status"] == "Approved":
+            elif not gs and p["expected"] and p["expected"] < ds.today and p["status"] in ("Approved", "Ordered"):
                 late += 1
             if p["expected"] and p["expected"] < ds.today and p["status"] in OPEN_PO_STATUSES and outstanding:
                 overdue_open += 1

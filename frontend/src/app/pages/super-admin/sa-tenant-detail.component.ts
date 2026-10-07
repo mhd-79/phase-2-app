@@ -50,7 +50,8 @@ type Tab = 'overview' | 'subscription' | 'users' | 'invitations' | 'audit';
 
         <div class="tabs" role="tablist">
           @for (t of tabs; track t.key) {
-            <button class="tab" type="button" role="tab" [class.active]="tab() === t.key" (click)="tab.set(t.key)">{{ t.label }}</button>
+            <div class="tab" role="tab" tabindex="0" [attr.aria-selected]="tab() === t.key" [class.active]="tab() === t.key"
+                 (click)="tab.set(t.key)" (keydown.enter)="tab.set(t.key)" (keydown.space)="tab.set(t.key); $event.preventDefault()">{{ t.label }}</div>
           }
         </div>
 

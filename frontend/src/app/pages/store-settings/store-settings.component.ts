@@ -69,7 +69,7 @@ import { PlatformSubscriptionCardComponent } from '../../components/platform-sub
       </div>
       }
 
-      @if (auth.can('backup')) {
+      @if (auth.can('store_settings')) {
       <div class="card" style="max-width:720px">
         <h3>Database Backup &amp; Recovery</h3>
         <p class="text-sm text-muted" style="margin-bottom:var(--space-4)">Export full store database JSON file locally or sync to Azure Blob Storage.</p>

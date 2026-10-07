@@ -76,7 +76,10 @@ import { BUSINESS_TYPES, EDITABLE_TENANT_STATUSES, INDIAN_STATES, TENANT_STATUSE
                   <div class="field"><label>Country *</label><input class="input" name="country" [(ngModel)]="form.country"></div>
                   <div class="field"><label>Postal code *</label><input class="input" name="postal" [(ngModel)]="form.postal_code" maxlength="10"></div>
                   <div class="field"><label>Business type *</label>
-                    <select class="select" name="btype" [(ngModel)]="form.business_type">@for (b of businessTypes; track b) { <option [value]="b">{{ b }}</option> }</select></div>
+                    <select class="select" name="btype" [(ngModel)]="form.business_type">@for (b of businessTypes; track b) { <option [value]="b">{{ b }}</option> }</select>
+                    @if (form.business_type === 'Other') {
+                      <input class="input" name="btypeOther" [(ngModel)]="otherType" maxlength="80" placeholder="Type the business type" aria-label="Business type (other)" style="margin-top:var(--space-2)">
+                    }</div>
                   <div class="field"><label>Initial outlet name</label><input class="input" name="outlet" [(ngModel)]="form.initial_outlet_name" placeholder="Used as the store name"></div>
                 </div>
                 <datalist id="sa-states">@for (s of states; track s) { <option [value]="s"></option> }</datalist>
@@ -182,6 +185,7 @@ export class SaTenantsComponent implements OnInit {
 
   statuses = TENANT_STATUSES;
   businessTypes = BUSINESS_TYPES;
+  otherType = '';                          // what is typed when "Other" is picked
   states = INDIAN_STATES;
   badge = badgeClass;
   pretty = label;
@@ -240,17 +244,19 @@ export class SaTenantsComponent implements OnInit {
     } catch (e: any) { this.formError.set(e.message); } finally { this.saving.set(false); }
   }
 
-  openAdd() { this.form = emptyTenantForm(); this.formError.set(''); this.showAdd.set(true); }
+  openAdd() { this.form = emptyTenantForm(); this.otherType = ''; this.formError.set(''); this.showAdd.set(true); }
   closeAdd() { this.showAdd.set(false); }
 
   async save() {
     if (this.saving()) return;
     this.formError.set('');
+    const f = this.form;
+    const businessType = f.business_type === 'Other' ? this.otherType.trim() : f.business_type;
+    if (f.business_type === 'Other' && businessType.length < 2) { this.formError.set('Type the business type (at least 2 characters).'); return; }
     this.saving.set(true);
     try {
-      const f = this.form;
       const res = await this.api.createTenant({
-        ...f, initial_outlet_name: f.initial_outlet_name.trim() || null, subscription_plan: f.subscription_plan || null,
+        ...f, business_type: businessType, initial_outlet_name: f.initial_outlet_name.trim() || null, subscription_plan: f.subscription_plan || null,
         trial_duration_days: f.trial_duration_days || null
       });
       this.showAdd.set(false);

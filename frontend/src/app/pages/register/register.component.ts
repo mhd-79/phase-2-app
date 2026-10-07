@@ -42,7 +42,10 @@ import { BUSINESS_TYPES, INDIAN_STATES } from '../super-admin/sa-util';
               <div class="field"><label for="rgCountry">Country *</label><input class="input" id="rgCountry" name="country" [(ngModel)]="form.country"></div>
               <div class="field"><label for="rgPostal">Postal code *</label><input class="input" id="rgPostal" name="postal" [(ngModel)]="form.postal_code" maxlength="10"></div>
               <div class="field"><label for="rgType">Business type *</label>
-                <select class="select" id="rgType" name="btype" [(ngModel)]="form.business_type">@for (b of businessTypes; track b) { <option [value]="b">{{ b }}</option> }</select></div>
+                <select class="select" id="rgType" name="btype" [(ngModel)]="form.business_type">@for (b of businessTypes; track b) { <option [value]="b">{{ b }}</option> }</select>
+                @if (form.business_type === 'Other') {
+                  <input class="input" id="rgTypeOther" name="btypeOther" [(ngModel)]="otherType" maxlength="80" placeholder="Type your business type" aria-label="Business type (other)" style="margin-top:var(--space-2)">
+                }</div>
               <div class="field"><label for="rgOutlet">Initial outlet name</label><input class="input" id="rgOutlet" name="outlet" [(ngModel)]="form.initial_outlet_name" placeholder="Used as the store name"></div>
             </div>
             <datalist id="rg-states">@for (s of states; track s) { <option [value]="s"></option> }</datalist>
@@ -60,6 +63,7 @@ export class RegisterComponent {
   private router = inject(Router);
 
   businessTypes = BUSINESS_TYPES;
+  otherType = '';                          // what the user types when they pick "Other"
   states = INDIAN_STATES;
   busy = signal(false);
   error = signal('');
@@ -76,11 +80,13 @@ export class RegisterComponent {
     const missing = [['business name', f.tenant_name], ['legal business name', f.legal_business_name], ['owner name', f.owner_name], ['owner email', f.email], ['phone', f.phone],
       ['GSTIN', f.gstin], ['address', f.address], ['city', f.city], ['state', f.state], ['country', f.country], ['postal code', f.postal_code]]
       .filter(([, v]) => !String(v).trim()).map(([n]) => n);
+    const businessType = f.business_type === 'Other' ? this.otherType.trim() : f.business_type;
+    if (f.business_type === 'Other' && businessType.length < 2) missing.push('business type');
     if (missing.length) { this.error.set(`Please fill in: ${missing.join(', ')}.`); return; }
     this.busy.set(true);
     try {
       await this.api.submitTenantRequest({
-        ...f, tenant_name: f.tenant_name.trim(), legal_business_name: f.legal_business_name.trim(), owner_name: f.owner_name.trim(), email: f.email.trim(),
+        ...f, business_type: businessType, tenant_name: f.tenant_name.trim(), legal_business_name: f.legal_business_name.trim(), owner_name: f.owner_name.trim(), email: f.email.trim(),
         initial_outlet_name: f.initial_outlet_name.trim() || null, source: 'website'
       });
       this.done.set(true);

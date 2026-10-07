@@ -5,6 +5,8 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { ApiService, CatalogItem } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { OfflineDbService } from '../../services/offline-db.service';
+import { ThermalReceiptComponent } from '../../components/thermal-receipt/thermal-receipt.component';
+import { CartTotals, DiscountRule, PricedLine, computeCartTotals } from '../../services/pricing';
 
 export interface CartLine {
   sku: string;
@@ -27,7 +29,7 @@ export interface Tender {
 @Component({
   selector: 'app-pos',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, ThermalReceiptComponent],
   templateUrl: './pos.component.html'
 })
 export class PosComponent implements OnInit {
@@ -43,6 +45,9 @@ export class PosComponent implements OnInit {
   pricingMode: 'exclusive' | 'inclusive' = 'exclusive';
 
   cart = signal<CartLine[]>([]);
+  /** Discount Management rules (database). Active ones inside their Start / End date are applied automatically to the items they cover. */
+  discounts = signal<DiscountRule[]>([]);
+  private discountsFetchedAt = 0;
   manualDiscount = signal<{ type: 'percent' | 'flat'; value: number; approved: boolean }>({
     type: 'percent',
     value: 0,
@@ -213,6 +218,14 @@ export class PosComponent implements OnInit {
     this.catalog.set(items);
     const cats = await this.api.getCategories();
     this.categories.set(['All', ...cats]);
+    await this.refreshDiscounts();
+  }
+
+  /** Re-reads the discounts so one created or changed in Discount Management is picked up without reloading the screen. */
+  async refreshDiscounts() {
+    const list = await this.api.getDiscounts();
+    if (list) this.discounts.set(list);
+    this.discountsFetchedAt = Date.now();
   }
 
   filteredCatalog(): CatalogItem[] {
@@ -283,6 +296,7 @@ export class PosComponent implements OnInit {
   }
 
   addToCart(sku: string) {
+    if (Date.now() - this.discountsFetchedAt > 60000) void this.refreshDiscounts();
     const item = this.catalog().find((i) => i.sku === sku);
     if (!item || item.stock <= 0) {
       this.triggerToast('Item unavailable');
@@ -346,41 +360,33 @@ export class PosComponent implements OnInit {
     return this.cart().reduce((sum, l) => sum + l.price * l.qty, 0);
   }
 
+  /** Totals of the current bill: automatic discounts, the bill discount, GST and the grand total (same maths as the server's invoice). */
+  totals(): CartTotals {
+    const m = this.manualDiscount();
+    return computeCartTotals(this.cart(), this.pricingMode, m.approved && m.value ? { type: m.type, value: m.value } : null, this.discounts());
+  }
+
+  /** The line's automatic (Discount Management) discount, when it has one. */
+  lineDiscount(line: CartLine): PricedLine | null {
+    const priced = this.totals().lines.find((l) => l.sku === line.sku);
+    return priced && priced.autoDiscountAmount > 0 ? priced : null;
+  }
+
+  /** Everything taken off the bill: automatic discounts plus the bill discount. */
   calcDiscountAmount(): number {
-    const sub = this.calcSubtotal();
-    const disc = this.manualDiscount();
-    if (!disc.approved || !disc.value) return 0;
-    if (disc.type === 'percent') return (sub * disc.value) / 100;
-    return Math.min(disc.value, sub);
+    return this.totals().discountTotal;
   }
 
   calcTaxable(): number {
-    const net = this.calcSubtotal() - this.calcDiscountAmount();
-    if (this.pricingMode === 'inclusive') {
-      return this.cart().reduce((sum, l) => {
-        const rate = l.tax || 0;
-        const lineNet = l.price * l.qty;
-        return sum + (rate > 0 ? lineNet / (1 + rate / 100) : lineNet);
-      }, 0);
-    }
-    return net;
+    return this.totals().taxableTotal;
   }
 
   calcGstTotal(): number {
-    if (this.pricingMode === 'inclusive') {
-      return this.calcSubtotal() - this.calcTaxable();
-    }
-    return this.cart().reduce((sum, l) => {
-      const lineNet = l.price * l.qty;
-      return sum + lineNet * ((l.tax || 0) / 100);
-    }, 0);
+    return this.totals().gstTotal;
   }
 
   calcGrandTotal(): number {
-    if (this.pricingMode === 'inclusive') {
-      return this.calcSubtotal() - this.calcDiscountAmount();
-    }
-    return this.calcTaxable() + this.calcGstTotal();
+    return this.totals().grandTotal;
   }
 
   // --- Discount Modals ---
@@ -548,11 +554,9 @@ export class PosComponent implements OnInit {
     this.isCompletingSale = true;
     try {
       const subtotal = this.calcSubtotal();
-      const discount = this.calcDiscountAmount();
-      const taxable = this.calcTaxable();
-      const gstTotal = this.calcGstTotal();
-      const grandTotal = this.calcGrandTotal();
-      const change = this.changeDue();
+      const localTotals = this.totals();
+      const grandTotal = localTotals.grandTotal;
+      let change = this.changeDue();
       const cartCopy = [...this.cart()];
       const customerCopy = this.canPickCustomer() ? this.selectedCustomer() : null;
       const tendersCopy = JSON.parse(JSON.stringify(this.tenders));
@@ -568,17 +572,31 @@ export class PosComponent implements OnInit {
 
       const res = await this.api.createSale(payload);
 
+      // The invoice carries the server's figures (it applied the discounts itself); the on-screen maths is the fallback
+      const serverLines: any[] = Array.isArray(res?.lines) ? res.lines : [];
+      const receiptLines = cartCopy.map((l) => {
+        const local = localTotals.lines.find((x) => x.sku === l.sku);
+        const server = serverLines.find((x) => x.sku === l.sku);
+        return { ...l, discountAmount: server?.discount_amount ?? local?.discountAmount ?? 0, discountName: server?.discount_name ?? local?.discountName ?? null };
+      });
+      const discount = res?.discount_total ?? localTotals.discountTotal;
+      const taxable = res?.taxable_total ?? localTotals.taxableTotal;
+      const gstTotal = res?.gst_total ?? localTotals.gstTotal;
+      const billTotal = res?.grand_total ?? grandTotal;
+      if (Math.abs(billTotal - grandTotal) > 0.005) change = Math.max(0, this.tenderedSum() - billTotal);
+
       this.lastSale = {
         invoiceNo: res?.invoiceNo || res?.invoice_no || `INV-FY26-${Math.floor(10000 + Math.random() * 90000)}`,
         timeLabel: new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
+        time: new Date(),
         customer: customerCopy,
         pricingMode: this.pricingMode,
-        lines: cartCopy,
+        lines: receiptLines,
         subtotal,
         discountTotal: discount,
         taxable,
         gstTotal,
-        grandTotal,
+        grandTotal: billTotal,
         tenders: tendersCopy,
         changeDue: change
       };

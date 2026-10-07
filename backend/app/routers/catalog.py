@@ -18,9 +18,36 @@ def _to_dt(d: Optional[date]) -> Optional[datetime]:
 def _to_date(v: Optional[datetime]) -> Optional[date]:
     return v.date() if v else None
 
+def _batch_no_supported() -> bool:
+    """False while the generated Prisma client predates Item.batch_no (run `prisma generate` + `prisma db push`)."""
+    try:
+        from prisma.models import Item as _ItemModel
+        return "batch_no" in _ItemModel.model_fields
+    except Exception:
+        return False
+
+def _clean_batch_no(v: Optional[str]) -> Optional[str]:
+    return (v or "").strip() or None
+
+def _batch_data(batch_no: Optional[str]) -> dict:
+    """Item.batch_no for a create / update; blank clears it. Without the column, a blank value is simply not stored."""
+    value = _clean_batch_no(batch_no)
+    if _batch_no_supported():
+        return {"batch_no": value}
+    if value:
+        raise HTTPException(status_code=500, detail="Batch No. cannot be saved yet. Run `prisma generate` and `prisma db push`, then restart the API.")
+    return {}
+
 @router.get("/items", response_model=List[ItemSchema])
 async def get_items(category: Optional[str] = None, search: Optional[str] = None):
     items = await db.item.find_many(where={"is_active": True})
+    # an item without its own batch number shows its earliest-expiring open batch (from goods receipts / the Batch table)
+    batch_by_sku: dict = {}
+    try:
+        for b in sorted(await db.batch.find_many(where={"qty": {"gt": 0}}), key=lambda x: x.expiry_date or "9999"):
+            batch_by_sku.setdefault(b.sku, b.batch_no)
+    except Exception:
+        batch_by_sku = {}
     result = []
     for i in items:
         if category and category != "All" and i.category_name != category:
@@ -42,8 +69,10 @@ async def get_items(category: Optional[str] = None, search: Optional[str] = None
             min_stock=i.min_stock,
             pricing_method=i.pricing_method,
             unit=i.unit,
-            is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
+            is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None)),
+            batch_no=getattr(i, "batch_no", None) or batch_by_sku.get(i.sku)
         ))
+    result.sort(key=lambda r: r.sku)      # Item Master default order: SKU ascending
     return result
 
 @router.get("/items/{sku}", response_model=ItemSchema)
@@ -55,11 +84,12 @@ async def get_item_by_sku(sku: str):
         sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
         price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
         tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
-        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
+        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None)),
+        batch_no=getattr(i, "batch_no", None)
     )
 
 @router.post("/items", response_model=ItemSchema)
-async def create_item(item: ItemCreate, user = Depends(require_module("inventory", "stock_upload"))):
+async def create_item(item: ItemCreate, user = Depends(require_module("items_stock", "stock_upload"))):
     existing = await db.item.find_unique(where={"sku": item.sku})
     if existing:
         raise HTTPException(status_code=400, detail="Item SKU already exists")
@@ -78,21 +108,26 @@ async def create_item(item: ItemCreate, user = Depends(require_module("inventory
         "unit": item.unit,
         "mfg_date": _to_dt(item.mfg_date),
         "exp_date": _to_dt(item.exp_date),
+        **_batch_data(item.batch_no),
         "is_active": True
     })
     return ItemSchema(
         sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
         price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
         tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
-        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
+        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None)),
+        batch_no=getattr(i, "batch_no", None)
     )
 
 @router.put("/items/{sku}", response_model=ItemSchema)
-async def update_item(sku: str, item: ItemUpdate, user = Depends(require_module("inventory", "stock_upload"))):
+async def update_item(sku: str, item: ItemUpdate, user = Depends(require_module("items_stock", "stock_upload"))):
     existing = await db.item.find_unique(where={"sku": sku})
     if not existing:
         raise HTTPException(status_code=404, detail="Item not found")
     data = item.dict(exclude_unset=True)
+    if "batch_no" in data:
+        data.pop("batch_no")
+        data.update(_batch_data(item.batch_no))
     if "mfg_date" in data or "exp_date" in data:
         mfg = data["mfg_date"] if "mfg_date" in data else _to_date(getattr(existing, "mfg_date", None))
         exp = data["exp_date"] if "exp_date" in data else _to_date(getattr(existing, "exp_date", None))
@@ -106,11 +141,12 @@ async def update_item(sku: str, item: ItemUpdate, user = Depends(require_module(
         sku=i.sku, barcode=i.barcode, name=i.name, category_name=i.category_name,
         price=i.price, wholesale_price=i.wholesale_price, cost_price=i.cost_price,
         tax_rate=i.tax_rate, stock=i.stock, min_stock=i.min_stock,
-        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None))
+        pricing_method=i.pricing_method, unit=i.unit, is_active=i.is_active, mfg_date=_to_date(getattr(i, "mfg_date", None)), exp_date=_to_date(getattr(i, "exp_date", None)),
+        batch_no=getattr(i, "batch_no", None)
     )
 
 @router.delete("/items/{sku}")
-async def delete_item(sku: str, user = Depends(require_module("inventory"))):
+async def delete_item(sku: str, user = Depends(require_module("items_stock"))):
     existing = await db.item.find_unique(where={"sku": sku})
     if not existing:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -125,7 +161,7 @@ async def get_categories():
     return merged
 
 @router.post("/categories", response_model=CategorySchema)
-async def create_category(req: CategoryCreate, user = Depends(require_module("inventory", "stock_upload"))):
+async def create_category(req: CategoryCreate, user = Depends(require_module("items_stock", "stock_upload"))):
     existing = await db.category.find_unique(where={"name": req.name})
     if existing:
         return CategorySchema(id=existing.id, name=existing.name)

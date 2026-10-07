@@ -6,6 +6,9 @@ from app.schemas import VendorCreate, VendorUpdate, VendorSchema, VendorPaymentC
 from app.security import get_current_user
 from app.security import require_module
 from app.idempotency import enforce_idempotency, idempotency_manager
+from app.procurement import clean_gstin, today, db_error, tx, model_has_field
+from app.vendor_finance import build_vendor_summary
+from datetime import date
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
@@ -78,6 +81,9 @@ async def get_vendor(vendor_id: str):
 
 @router.post("", response_model=VendorSchema, dependencies=[Depends(require_module("vendors"))])
 async def create_vendor(data: VendorCreate, request: Request, current_user=Depends(get_current_user)):
+    if not data.name.strip():
+        raise HTTPException(status_code=400, detail="Enter the vendor name")
+    gstin = clean_gstin(data.gstin)
     lock_key = await enforce_idempotency(request, "create_vendor", data.id or data.name)
     try:
         db = get_db()
@@ -85,29 +91,34 @@ async def create_vendor(data: VendorCreate, request: Request, current_user=Depen
         if db.is_connected():
             try:
                 if not vendor_id:
-                    count = await db.vendor.count()
-                    vendor_id = f"V-{str(count + 1).zfill(3)}"
-                
+                    numbers = [int(v.id[2:]) for v in await db.vendor.find_many() if v.id[:2] == "V-" and v.id[2:].isdigit()]
+                    vendor_id = f"V-{str(max(numbers, default=0) + 1).zfill(3)}"
+                elif await db.vendor.find_unique(where={"id": vendor_id}):
+                    raise HTTPException(status_code=400, detail="A vendor with this ID already exists")
+
                 vendor = await db.vendor.create(
                     data={
                         "id": vendor_id,
-                        "name": data.name,
+                        "name": data.name.strip(),
                         "category": data.category,
                         "contact": data.contact,
                         "phone": data.phone,
                         "email": data.email,
                         "terms": data.terms,
                         "status": data.status,
-                        "payable": data.payable
+                        "payable": data.payable,
+                        "gstin": gstin
                     }
                 )
                 if lock_key:
                     await idempotency_manager.release_lock(lock_key, vendor.dict())
                 return vendor
-            except Exception:
-                pass
-                
-        # Fallback
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise db_error(exc)
+
+        # Fallback (no database connection)
         if not vendor_id:
             vendor_id = f"V-{str(len(SEED_VENDORS) + 1).zfill(3)}"
         new_v = VendorSchema(
@@ -119,7 +130,8 @@ async def create_vendor(data: VendorCreate, request: Request, current_user=Depen
             email=data.email,
             terms=data.terms,
             status=data.status,
-            payable=data.payable
+            payable=data.payable,
+            gstin=gstin
         )
         SEED_VENDORS.append(new_v.dict())
         if lock_key:
@@ -138,22 +150,25 @@ async def update_vendor(vendor_id: str, data: VendorUpdate, request: Request, cu
     try:
         db = get_db()
         update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+        if "gstin" in update_data:
+            update_data["gstin"] = clean_gstin(update_data["gstin"])
+        if "name" in update_data and not update_data["name"].strip():
+            raise HTTPException(status_code=400, detail="Enter the vendor name")
+        if update_data.get("status") not in (None, "Active", "Inactive"):
+            raise HTTPException(status_code=400, detail="Status must be Active or Inactive")
         if db.is_connected():
             try:
-                vendor = await db.vendor.update(
-                    where={"id": vendor_id},
-                    data=update_data
-                )
-                if not vendor:
+                if not await db.vendor.find_unique(where={"id": vendor_id}):
                     raise HTTPException(status_code=404, detail="Vendor not found")
+                vendor = await db.vendor.update(where={"id": vendor_id}, data=update_data)
                 if lock_key:
                     await idempotency_manager.release_lock(lock_key, vendor.dict())
                 return vendor
             except HTTPException:
                 raise
-            except Exception:
-                pass
-                
+            except Exception as exc:
+                raise db_error(exc)
+
         for v in SEED_VENDORS:
             if v["id"] == vendor_id:
                 v.update(update_data)
@@ -169,6 +184,73 @@ async def update_vendor(vendor_id: str, data: VendorUpdate, request: Request, cu
             raise e
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/{vendor_id}/products")
+async def get_vendor_products(vendor_id: str):
+    """Products this vendor supplies: items that name it as preferred vendor plus every SKU on its purchase orders / receipts."""
+    db = get_db()
+    if not db.is_connected():
+        return []
+    vendor = await db.vendor.find_unique(where={"id": vendor_id})
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    products: dict = {}
+
+    def entry(sku, name):
+        return products.setdefault(sku, {"sku": sku, "name": name, "preferred": False, "orderedQty": 0.0, "receivedQty": 0.0,
+                                         "lastCost": None, "lastDate": ""})
+
+    for it in await db.item.find_many(where={"preferred_vendor_id": vendor_id}):
+        entry(it.sku, it.name)["preferred"] = True
+    for po in await db.purchaseorder.find_many(where={"vendor_id": vendor_id}, include={"lines": True}):
+        for l in po.lines:
+            e = entry(l.sku, l.name)
+            e["orderedQty"] += l.ordered_qty
+            e["receivedQty"] += l.received_qty
+            if po.date >= e["lastDate"]:
+                e["lastDate"], e["lastCost"] = po.date, l.cost
+    for g in await db.goodsreceiptnote.find_many(where={"vendor_id": vendor_id}, include={"lines": True}):
+        for l in g.lines:
+            e = entry(l.sku, l.name)
+            if g.date >= e["lastDate"]:
+                e["lastDate"], e["lastCost"] = g.date, l.cost
+    stock = {i.sku: i.stock for i in await db.item.find_many(where={"sku": {"in": list(products)}})} if products else {}
+    for sku, e in products.items():
+        e["stock"] = stock.get(sku)
+    return sorted(products.values(), key=lambda e: e["sku"])
+
+async def _finance(db, vendor) -> dict:
+    """Loads a vendor's receipts, returns, payments and purchase orders and builds the finance summary from them."""
+    grns = await db.goodsreceiptnote.find_many(where={"vendor_id": vendor.id}, include={"lines": True})
+    returns = await db.purchasereturn.find_many(where={"vendor_id": vendor.id}, include={"lines": True})
+    payments = await db.vendorpayment.find_many(where={"vendor_id": vendor.id})
+    pos = await db.purchaseorder.find_many(where={"vendor_id": vendor.id}, include={"lines": True})
+    # a draft return has not gone back yet: it is neither stock nor money
+    returns = [r for r in returns if (getattr(r, "status", None) or "Processed") != "Draft"]
+    return build_vendor_summary(
+        payable=vendor.payable, terms=vendor.terms, today=date.today(),
+        grns=[{"id": g.id, "date": g.date, "total": g.total, "po_id": g.po_id,
+               "lines": [{"sku": l.sku, "name": l.name, "qty": l.qty, "cost": l.cost} for l in g.lines]} for g in grns],
+        returns=[{"id": r.id, "date": r.date, "total": r.total, "lines": [{"qty": l.qty} for l in r.lines]} for r in returns],
+        payments=[{"id": p.id, "date": p.date, "amount": p.amount, "mode": p.mode, "reference": getattr(p, "reference", None)} for p in payments],
+        pos=[{"id": p.id, "date": p.date, "expected": p.expected, "status": p.status,
+              "lines": [{"sku": l.sku, "name": l.name, "ordered_qty": l.ordered_qty, "received_qty": l.received_qty, "cost": l.cost} for l in p.lines]}
+             for p in pos],
+    )
+
+
+@router.get("/{vendor_id}/summary")
+async def get_vendor_summary(vendor_id: str):
+    """Finance summary of one vendor: outstanding / due / overdue, payable aging, purchases, PO counts, payment history,
+    performance, price history and alerts. Due dates are the receipt date plus the vendor's payment terms."""
+    db = get_db()
+    if not db.is_connected():
+        raise HTTPException(status_code=503, detail="The database is not connected")
+    vendor = await db.vendor.find_unique(where={"id": vendor_id})
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    return await _finance(db, vendor)
+
+
 @router.get("/{vendor_id}/ledger")
 async def get_vendor_ledger(vendor_id: str):
     await seed_vendors_if_needed()
@@ -178,54 +260,25 @@ async def get_vendor_ledger(vendor_id: str):
             vendor = await db.vendor.find_unique(where={"id": vendor_id})
             if not vendor:
                 raise HTTPException(status_code=404, detail="Vendor not found")
-            
-            grns = await db.goodsreceiptnote.find_many(where={"vendor_id": vendor_id})
-            returns = await db.purchasereturn.find_many(where={"vendor_id": vendor_id})
-            payments = await db.vendorpayment.find_many(where={"vendor_id": vendor_id})
-            
-            entries = []
-            for g in grns:
-                entries.append({
-                    "date": g.date,
-                    "type": "Purchase",
-                    "ref": f"{g.id} ({g.po_id})" if g.po_id else f"{g.id} (direct)",
-                    "amount": g.total
-                })
-            for r in returns:
-                entries.append({
-                    "date": r.date,
-                    "type": "Return",
-                    "ref": r.id,
-                    "amount": -r.total
-                })
-            for p in payments:
-                entries.append({
-                    "date": p.date,
-                    "type": "Payment",
-                    "ref": f"{p.id} ({p.mode})",
-                    "amount": -p.amount
-                })
-            
-            entries.sort(key=lambda x: x["date"], reverse=True)
-            
+            summary = await _finance(db, vendor)
             open_pos_count = await db.purchaseorder.count(
                 where={
                     "vendor_id": vendor_id,
-                    "status": {"not_in": ["Closed", "Received"]}
+                    "status": {"not_in": ["Closed", "Received", "Cancelled"]}
                 }
             )
-            
             return {
                 "vendor": vendor,
                 "payable": vendor.payable,
                 "open_pos": open_pos_count,
-                "ledger": entries
+                "opening_balance": summary["financial"]["openingBalance"],
+                "ledger": summary["ledger"]
             }
         except HTTPException:
             raise
         except Exception:
             pass
-            
+
     for v in SEED_VENDORS:
         if v["id"] == vendor_id:
             return {
@@ -240,7 +293,12 @@ async def get_vendor_ledger(vendor_id: str):
 
 @router.post("/{vendor_id}/payments", dependencies=[Depends(require_module("vendors"))])
 async def record_vendor_payment(vendor_id: str, data: VendorPaymentCreate, request: Request, current_user=Depends(get_current_user)):
-    lock_key = await enforce_idempotency(request, "vendor_payment", f"{vendor_id}_{data.amount}_{data.mode}")
+    if not (data.amount > 0):
+        raise HTTPException(status_code=400, detail="Payment amount must be greater than zero")
+    reference = (data.reference or "").strip() or None
+    if reference and not model_has_field("VendorPayment", "reference"):
+        raise HTTPException(status_code=500, detail="The payment reference cannot be saved yet. Run `prisma generate` and `prisma db push`, then restart the API.")
+    lock_key = await enforce_idempotency(request, "vendor_payment", f"{vendor_id}_{data.amount}_{data.mode}_{reference or ''}")
     try:
         db = get_db()
         if db.is_connected():
@@ -248,26 +306,17 @@ async def record_vendor_payment(vendor_id: str, data: VendorPaymentCreate, reque
                 vendor = await db.vendor.find_unique(where={"id": vendor_id})
                 if not vendor:
                     raise HTTPException(status_code=404, detail="Vendor not found")
-                
-                count = await db.vendorpayment.count()
-                pmt_id = f"PMT-{str(1001 + count)}"
-                
-                await db.vendorpayment.create(
-                    data={
-                        "id": pmt_id,
-                        "vendor_id": vendor_id,
-                        "date": "2026-09-07",
-                        "amount": data.amount,
-                        "mode": data.mode
-                    }
-                )
-                
+
+                numbers = [int(p.id[4:]) for p in await db.vendorpayment.find_many() if p.id[:4] == "PMT-" and p.id[4:].isdigit()]
+                pmt_id = f"PMT-{max(numbers, default=1000) + 1}"
                 new_payable = max(0.0, vendor.payable - data.amount)
-                await db.vendor.update(
-                    where={"id": vendor_id},
-                    data={"payable": new_payable}
-                )
-                
+                async with tx(db) as t:
+                    pay = {"id": pmt_id, "vendor_id": vendor_id, "date": today(), "amount": data.amount, "mode": data.mode}
+                    if reference:
+                        pay["reference"] = reference
+                    await t.vendorpayment.create(data=pay)
+                    await t.vendor.update(where={"id": vendor_id}, data={"payable": new_payable})
+
                 res = {
                     "id": pmt_id,
                     "message": f"{pmt_id} recorded — payable balance updated",
@@ -278,10 +327,10 @@ async def record_vendor_payment(vendor_id: str, data: VendorPaymentCreate, reque
                 return res
             except HTTPException:
                 raise
-            except Exception:
-                pass
-                
-        # Fallback
+            except Exception as exc:
+                raise db_error(exc)
+
+        # Fallback (no database connection)
         pmt_id = f"PMT-{str(1001 + len(SEED_VENDORS))}"
         for v in SEED_VENDORS:
             if v["id"] == vendor_id:
@@ -294,7 +343,7 @@ async def record_vendor_payment(vendor_id: str, data: VendorPaymentCreate, reque
                 if lock_key:
                     await idempotency_manager.release_lock(lock_key, res)
                 return res
-                
+
         raise HTTPException(status_code=404, detail="Vendor not found")
     except Exception as e:
         if lock_key:
@@ -302,4 +351,3 @@ async def record_vendor_payment(vendor_id: str, data: VendorPaymentCreate, reque
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
-

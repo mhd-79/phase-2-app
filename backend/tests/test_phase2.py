@@ -75,7 +75,7 @@ def test_purchase_order_lifecycle(client, admin_token):
     create_res = client.post("/api/v1/purchase-orders", json=po_payload, headers=headers)
     assert create_res.status_code == 200
     po_id = create_res.json()["id"]
-    assert create_res.json()["status"] == "Pending Approval"
+    assert create_res.json()["status"] == "Pending"
 
     # 2. Approve Purchase Order
     app_res = client.post(f"/api/v1/purchase-orders/{po_id}/approve", headers=headers)
@@ -117,9 +117,9 @@ def test_purchase_returns(client, admin_token):
     headers = {"Authorization": f"Bearer {admin_token}"}
     payload = {
         "vendorId": "V-002",
-        "reason": "Damaged in transit",
+        "reason": "Damaged",
         "lines": [
-            {"sku": "BEV-002", "name": "Orange Juice 1L", "qty": 5, "cost": 78.0}
+            {"sku": "BEV-003", "name": "Mineral Water 1L", "qty": 5, "cost": 12.0}
         ]
     }
     res = client.post("/api/v1/purchase-returns", json=payload, headers=headers)

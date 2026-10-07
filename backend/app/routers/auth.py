@@ -3,11 +3,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request, status
 from pydantic import BaseModel, Field
 from app.schemas import LoginRequest, TokenResponse, UserSchema, PinVerifyRequest, ForgotPinRequest, ResetPinRequest, SwitchCounterRequest
-from app.security import verify_pin, get_pin_hash, create_access_token, get_current_user, require_admin, require_module, user_modules, get_phase_access, security_bearer
+from app.security import verify_pin, get_pin_hash, create_access_token, get_current_user, require_admin, require_module, user_modules, user_permissions, get_phase_access, security_bearer
 from app.database import db, current_tenant_schema
 from app.tenant_scoped import TenantList, TenantDict
 from seed import DEMO_USERS
-from app import platform_audit, platform_service
+from app import mailer, platform_audit, platform_service
 from app.throttle import login_limiter, forgot_limiter
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -119,7 +119,8 @@ async def login(req: LoginRequest, request: Request):
         auto_lock=auto_lock or "2 min",
         phase_access=phase_access,
         active_counter=user.get("active_counter") if isinstance(user, dict) else getattr(user, "active_counter", None),
-        modules=user_modules(user)
+        modules=user_modules(user),
+        permissions=user_permissions(user)
     )
 
 @router.post("/verify-pin")
@@ -194,6 +195,16 @@ async def request_forgot_pin(req: ForgotPinRequest):
             "timestamp": now_iso
         })
         
+    # best effort, never delays or fails the request: admins with an email on record also get an email
+    try:
+        if db.is_connected():
+            subject, text, html_body = mailer.pin_reset_request_email(username, details["notes"])
+            for admin in await db.user.find_many(where={"role": "admin", "is_active": True}):
+                if getattr(admin, "email", None):
+                    mailer.send_in_background(admin.email, subject, text, html_body)
+    except Exception:
+        pass
+
     return {
         "success": True,
         "message": f"PIN reset request for '{username}' submitted successfully. Store Admin has been notified.",
@@ -346,6 +357,7 @@ async def get_me(user = Depends(get_current_user)):
         auto_lock=auto_lock or "2 min",
         schedule_json=schedule_json,
         modules=user_modules(user),
+        permissions=user_permissions(user),
         phase_access=get_phase_access(user),
         active_counter=getattr(user, 'active_counter', None) if not isinstance(user, dict) else user.get('active_counter')
     )

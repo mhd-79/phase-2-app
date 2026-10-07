@@ -78,6 +78,7 @@ model Item {
   preferred_vendor_id String?
   mfg_date            DateTime?
   exp_date            DateTime?
+  batch_no            String?
   is_active           Boolean  @default(true)
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
@@ -93,6 +94,7 @@ model Vendor {
   terms            String           // "Net 15", "Net 30", "Net 45", "Net 7", "Due on Delivery"
   status           String           @default("Active") // "Active" | "Inactive"
   payable          Float            @default(0.0)
+  gstin            String?
   created_at       DateTime         @default(now())
   updated_at       DateTime         @updatedAt
   purchase_orders  PurchaseOrder[]
@@ -107,7 +109,7 @@ model PurchaseOrder {
   vendor         Vendor              @relation(fields: [vendor_id], references: [id])
   date           String
   expected       String
-  status         String              @default("Pending Approval") // "Draft", "Pending Approval", "Approved", "Partially Received", "Received", "Closed"
+  status         String              @default("Pending") // "Draft", "Pending", "Approved", "Ordered", "Partially Received", "Received", "Cancelled" (older rows may still say "Pending Approval" / "Closed")
   approved_by    String?
   created_at     DateTime            @default(now())
   updated_at     DateTime            @updatedAt
@@ -124,6 +126,8 @@ model PurchaseOrderLine {
   ordered_qty  Float
   received_qty Float         @default(0.0)
   cost         Float
+  tax_rate     Float         @default(0.0)   // GST % on this line
+  batch_no     String?
 }
 
 model GoodsReceiptNote {
@@ -147,6 +151,7 @@ model GoodsReceiptNoteLine {
   name   String
   qty    Float
   cost   Float
+  tax_rate Float          @default(0.0)
 }
 
 model PurchaseReturn {
@@ -157,6 +162,8 @@ model PurchaseReturn {
   reason     String
   total      Float
   invoice_id String?              // purchase invoice the goods are returned against: a GRN id (or a PO id)
+  po_id      String?              // purchase order the returned goods came from
+  status     String               @default("Processed") // "Draft" | "Processed"
   created_at DateTime             @default(now())
   lines      PurchaseReturnLine[]
 }
@@ -169,6 +176,7 @@ model PurchaseReturnLine {
   name          String
   qty           Float
   cost          Float
+  tax_rate      Float          @default(0.0)
 }
 
 model VendorPayment {
@@ -178,6 +186,7 @@ model VendorPayment {
   date       String
   amount     Float
   mode       String   // "Bank Transfer", "Cheque", "UPI", "Cash"
+  reference  String?  // cheque / UTR / transaction number
   created_at DateTime @default(now())
 }
 
@@ -324,6 +333,14 @@ model StoreSettings {
   idle_timeout_seconds Int      @default(45)
   return_policy        String   @default("BOTH")   // allowed customer-return action: RETURN | EXCHANGE | BOTH
   updated_at           DateTime @updatedAt
+}
+
+/// GST tax slabs offered when pricing an item (Tax Configuration). An item stores the slab's rate, not the slab.
+model TaxSlab {
+  id         String   @id @default(uuid())
+  name       String
+  rate       Float    @unique
+  created_at DateTime @default(now())
 }
 
 /// OKUTO IQ chatbot add-on subscription (single row). Removing it only clears this row; no other data is touched.

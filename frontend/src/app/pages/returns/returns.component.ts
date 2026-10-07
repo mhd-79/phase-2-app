@@ -32,7 +32,11 @@ import { ApiService } from '../../services/api.service';
             <span class="badge" [class.badge-success]="sale.status === 'COMPLETED'" [class.badge-warning]="sale.status !== 'COMPLETED'">{{ sale.status }}</span>
           </div>
           <div class="table-scroll">
-            <table class="table">
+            <table class="table returns-table">
+              <colgroup>
+                <col style="width:5%"><col style="width:13%"><col style="width:9%"><col style="width:8%"><col style="width:8%">
+                <col style="width:11%"><col style="width:18%"><col style="width:12%"><col style="width:8%"><col style="width:8%">
+              </colgroup>
               <thead>
                 <tr>
                   <th>Return</th>
@@ -55,17 +59,18 @@ import { ApiService } from '../../services/api.service';
                     <td class="mono">{{ item.sku }}</td>
                     <td>{{ item.qty }} {{ item.unit }}</td>
                     <td>
-                      <input class="input" type="number" min="0.1" [max]="item.qty" [(ngModel)]="item.returnQty" style="width:90px" [disabled]="!item.selected">
+                      <input class="input rt-ctl" type="number" min="0.1" [max]="item.qty" [(ngModel)]="item.returnQty" [disabled]="!item.selected" aria-label="Return quantity">
                     </td>
                     <td>
-                      <select class="select" [(ngModel)]="item.condition" [disabled]="!item.selected" style="min-width:120px" aria-label="Item condition">
+                      <select class="select rt-ctl" [(ngModel)]="item.condition" [disabled]="!item.selected" aria-label="Item condition">
                         <option value="Good">Good</option>
                         <option value="Damaged">Damaged</option>
                         <option value="Warranty">Warranty</option>
                       </select>
                     </td>
                     <td>
-                      <select class="select" [(ngModel)]="item.reason" (ngModelChange)="onReasonChange(item)" [disabled]="!item.selected" style="min-width:150px" aria-label="Return reason">
+                      <div class="rt-reason">
+                      <select class="select rt-ctl" [(ngModel)]="item.reason" (ngModelChange)="onReasonChange(item)" [disabled]="!item.selected" aria-label="Return reason">
                         <option value="">No reason</option>
                         <option value="Customer Return">Customer Return</option>
                         <option value="Damaged">Damaged</option>
@@ -74,12 +79,13 @@ import { ApiService } from '../../services/api.service';
                         <option value="Other">Other</option>
                       </select>
                       @if (item.reason === 'Other') {
-                        <input class="input" [(ngModel)]="item.otherReason" [disabled]="!item.selected" placeholder="Enter reason" maxlength="120" style="min-width:150px;margin-top:var(--space-1)" aria-label="Other return reason">
+                        <input class="input rt-ctl" [(ngModel)]="item.otherReason" [disabled]="!item.selected" placeholder="Enter reason" maxlength="120" aria-label="Other return reason">
                       }
+                      </div>
                     </td>
                     <td>
                       @if (policy === 'BOTH') {
-                        <select class="select" [(ngModel)]="item.action" [disabled]="!item.selected" style="min-width:110px" aria-label="Return or exchange">
+                        <select class="select rt-ctl" [(ngModel)]="item.action" [disabled]="!item.selected" aria-label="Return or exchange">
                           <option value="Return">Return</option>
                           <option value="Exchange">Exchange</option>
                         </select>
@@ -107,7 +113,18 @@ import { ApiService } from '../../services/api.service';
         </div>
       }
     </main>
-  `
+  `,
+  styles: [`
+    /* Fixed-layout table: every column gets a share of the width so the whole table fits on desktop; narrower screens scroll inside .table-scroll */
+    table.returns-table { table-layout: fixed; min-width: 1040px; }
+    table.returns-table th, table.returns-table td { padding: var(--space-3) var(--space-2); }
+    table.returns-table th { white-space: normal; line-height: 1.25; }
+    table.returns-table th:first-child, table.returns-table td:first-child { padding-left: var(--space-4); }
+    table.returns-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: middle; }
+    table.returns-table td.num { white-space: nowrap; overflow-wrap: normal; }
+    .rt-reason { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+    .rt-ctl { width: 100%; min-width: 0; min-height: 36px; padding: 0 var(--space-2); font-size: var(--text-sm); }
+  `]
 })
 export class ReturnsComponent implements OnInit {
   api = inject(ApiService);
